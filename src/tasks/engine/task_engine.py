@@ -2,42 +2,18 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from src.tasks.models.contracts import Task, TaskCreateRequest, TaskUpdateRequest
+from src.tasks.models.contracts import (
+    Task,
+    TaskCreateRequest,
+    TaskUpdateRequest,
+)
 from src.tasks.models.enums import TaskPriority, TaskStatus
 from src.tasks.repository.memory import InMemoryTaskRepository
+from src.tasks.repository.protocol import TaskRepository
 
 
 class TaskEngine:
-    _allowed_transitions: dict[TaskStatus, set[TaskStatus]] = {
-        TaskStatus.PENDING: {
-            TaskStatus.READY,
-            TaskStatus.BLOCKED,
-            TaskStatus.CANCELLED,
-        },
-        TaskStatus.READY: {
-            TaskStatus.IN_PROGRESS,
-            TaskStatus.BLOCKED,
-            TaskStatus.CANCELLED,
-        },
-        TaskStatus.IN_PROGRESS: {
-            TaskStatus.COMPLETED,
-            TaskStatus.FAILED,
-            TaskStatus.BLOCKED,
-            TaskStatus.CANCELLED,
-        },
-        TaskStatus.BLOCKED: {
-            TaskStatus.READY,
-            TaskStatus.CANCELLED,
-        },
-        TaskStatus.FAILED: {
-            TaskStatus.READY,
-            TaskStatus.CANCELLED,
-        },
-        TaskStatus.COMPLETED: set(),
-        TaskStatus.CANCELLED: set(),
-    }
-
-    def __init__(self, repository: InMemoryTaskRepository | None = None) -> None:
+    def __init__(self, repository: TaskRepository | None = None) -> None:
         self.repository = repository or InMemoryTaskRepository()
 
     def create(self, request: TaskCreateRequest) -> Task:
@@ -59,11 +35,9 @@ class TaskEngine:
         self.repository.create(task)
 
         if self.dependencies_completed(task):
-            self.transition(task.id, TaskStatus.READY)
-        else:
-            self.transition(task.id, TaskStatus.BLOCKED)
+            return self.transition(task.id, TaskStatus.READY)
 
-        return task
+        return self.transition(task.id, TaskStatus.BLOCKED)
 
     def get(self, task_id: str) -> Task:
         return self.repository.get(task_id)
@@ -74,16 +48,13 @@ class TaskEngine:
         project_id: str | None = None,
         statuses: Iterable[TaskStatus] | None = None,
     ) -> list[Task]:
-        return self.repository.list(project_id=project_id, statuses=statuses)
+        return self.repository.list(
+            project_id=project_id,
+            statuses=statuses,
+        )
 
     def update(self, task_id: str, request: TaskUpdateRequest) -> Task:
         task = self.get(task_id)
-
-        if task.status in {
-            TaskStatus.COMPLETED,
-            TaskStatus.CANCELLED,
-        }:
-            raise ValueError(f"Cannot update terminal task: {task.id}")
 
         if request.title is not None:
             if not request.title.strip():
@@ -100,65 +71,85 @@ class TaskEngine:
             task.assigned_agent = request.assigned_agent
 
         task.touch()
-        return task
+        return self.repository.save(task)
 
     def assign(self, task_id: str, agent_name: str) -> Task:
-        if not agent_name.strip():
-            raise ValueError("Agent name cannot be empty")
-
         task = self.get(task_id)
-
-        if task.status not in {
-            TaskStatus.READY,
-            TaskStatus.PENDING,
-            TaskStatus.BLOCKED,
-        }:
-            raise ValueError(f"Task cannot be assigned from {task.status}")
-
-        task.assigned_agent = agent_name.strip()
+        task.assigned_agent = agent_name
         task.touch()
-        return task
+        return self.repository.save(task)
 
-    def transition(self, task_id: str, new_status: TaskStatus) -> Task:
+    def transition(self, task_id: str, status: TaskStatus) -> Task:
         task = self.get(task_id)
 
-        if new_status == task.status:
-            return task
+        allowed_transitions = {
+            TaskStatus.PENDING: {
+                TaskStatus.READY,
+                TaskStatus.BLOCKED,
+                TaskStatus.CANCELLED,
+            },
+            TaskStatus.READY: {
+                TaskStatus.IN_PROGRESS,
+                TaskStatus.CANCELLED,
+            },
+            TaskStatus.BLOCKED: {
+                TaskStatus.READY,
+                TaskStatus.CANCELLED,
+            },
+            TaskStatus.IN_PROGRESS: {
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+                TaskStatus.CANCELLED,
+            },
+            TaskStatus.FAILED: {
+                TaskStatus.READY,
+                TaskStatus.CANCELLED,
+            },
+            TaskStatus.COMPLETED: set(),
+            TaskStatus.CANCELLED: set(),
+        }
 
-        allowed = self._allowed_transitions[task.status]
-
-        if new_status not in allowed:
+        if status not in allowed_transitions[task.status]:
             raise ValueError(
-                f"Invalid task transition: {task.status} -> {new_status}"
+                f"Invalid task transition: "
+                f"{task.status.value} -> {status.value}"
             )
 
-        task.status = new_status
-        task.touch()
+        task.status = status
 
-        if new_status == TaskStatus.IN_PROGRESS:
+        if status == TaskStatus.IN_PROGRESS:
             task.started_at = task.started_at or task.updated_at
 
-        if new_status == TaskStatus.COMPLETED:
+        if status == TaskStatus.COMPLETED:
             task.completed_at = task.updated_at
-            task.error = None
 
-        return task
+        task.touch()
+        return self.repository.save(task)
 
     def dependencies_completed(self, task: Task) -> bool:
-        return all(
-            self.get(dependency_id).status == TaskStatus.COMPLETED
+        if not task.dependencies:
+            return True
+
+        dependencies = [
+            self.repository.get(dependency_id)
             for dependency_id in task.dependencies
+        ]
+
+        return all(
+            dependency.status == TaskStatus.COMPLETED
+            for dependency in dependencies
         )
 
     def refresh_blocked_tasks(self) -> list[Task]:
-        changed: list[Task] = []
+        refreshed: list[Task] = []
 
         for task in self.repository.list(statuses=[TaskStatus.BLOCKED]):
             if self.dependencies_completed(task):
-                self.transition(task.id, TaskStatus.READY)
-                changed.append(task)
+                refreshed.append(
+                    self.transition(task.id, TaskStatus.READY)
+                )
 
-        return changed
+        return refreshed
 
     def ready_tasks(self, project_id: str | None = None) -> list[Task]:
         self.refresh_blocked_tasks()
@@ -177,34 +168,28 @@ class TaskEngine:
 
         return sorted(
             tasks,
-            key=lambda task: (priority_order[task.priority], task.created_at),
+            key=lambda task: (
+                priority_order[task.priority],
+                task.created_at,
+            ),
         )
 
     def start(self, task_id: str) -> Task:
         return self.transition(task_id, TaskStatus.IN_PROGRESS)
 
     def complete(self, task_id: str) -> Task:
-        task = self.transition(task_id, TaskStatus.COMPLETED)
-        self.refresh_blocked_tasks()
-        return task
+        return self.transition(task_id, TaskStatus.COMPLETED)
 
     def fail(self, task_id: str, error: str) -> Task:
-        task = self.transition(task_id, TaskStatus.FAILED)
+        task = self.get(task_id)
         task.error = error
-        task.touch()
-        return task
+        return self.transition(task_id, TaskStatus.FAILED)
 
     def retry(self, task_id: str) -> Task:
         task = self.get(task_id)
-
-        if task.status != TaskStatus.FAILED:
-            raise ValueError("Only failed tasks can be retried")
-
         task.retry_count += 1
         task.error = None
-        task.touch()
-        self.transition(task.id, TaskStatus.READY)
-        return task
+        return self.transition(task_id, TaskStatus.READY)
 
     def cancel(self, task_id: str) -> Task:
         return self.transition(task_id, TaskStatus.CANCELLED)

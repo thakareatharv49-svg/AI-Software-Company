@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "AI Software Company"
     environment: str = "development"
+    debug: bool = True
     log_level: str = "INFO"
 
     database_url: str = (

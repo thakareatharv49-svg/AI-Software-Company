@@ -1,3 +1,7 @@
-from src.tasks.repository.memory import InMemoryTaskRepository
+from .memory import InMemoryTaskRepository
+from .protocol import TaskRepository
 
-__all__ = ["InMemoryTaskRepository"]
+__all__ = [
+    "InMemoryTaskRepository",
+    "TaskRepository",
+]
