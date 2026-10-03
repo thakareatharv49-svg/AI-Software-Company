@@ -1,6 +1,9 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 
+from src.agents.execution.context import AgentExecutionContext
+from src.agents.execution.executor import AgentExecutor
+from src.agents.models.contracts import AgentRequest
 from src.github.automation.automation import GitHubAutomation
 from src.github.models.contracts import GitHubRepository
 from src.manager.manager import MasterManager
@@ -51,23 +54,22 @@ class CompanyExecutionPipeline:
         *,
         project_request: ProjectCreateRequest,
         mission: Mission,
-        tasks: Sequence[TaskPlanItem],
+        tasks: list[TaskPlanItem],
         qa_request: QATestRequest,
         files: dict[str, str],
-        agent_executor: Callable | None = None,
+        agent_executor: Callable | AgentExecutor | None = None,
         github_repository: GitHubRepository | None = None,
         pull_request_head: str | None = None,
     ) -> PipelineResult:
         project = self.project_engine.create(project_request)
-
         project = self._transition_to_development(project)
-
         mission = replace(mission, project_id=project.id)
 
         self.manager.start_mission(mission)
         task_ids = self.manager.create_plan(tasks)
 
-        await self._execute_tasks(agent_executor)
+        executor = self._build_executor(agent_executor)
+        await self._execute_tasks(executor)
 
         project = self.project_engine.transition(
             project.id,
@@ -108,10 +110,7 @@ class CompanyExecutionPipeline:
                 f"{review_result.summary}"
             )
 
-        self.project_engine.transition(
-            project.id,
-            ProjectStatus.REVIEW,
-        )
+        self.project_engine.transition(project.id, ProjectStatus.REVIEW)
 
         github_message = None
 
@@ -124,23 +123,19 @@ class CompanyExecutionPipeline:
                 github_repository,
                 title=f"feat: complete {project.name}",
                 head=pull_request_head,
-                body=project.objective,
+                body=project.description,
             )
 
             if not github_result.success:
-                self.project_engine.block(project.id)
-                raise RuntimeError(
-                    f"GitHub release step failed: "
-                    f"{github_result.message}"
+                self.project_engine.transition(
+                    project.id,
+                    ProjectStatus.BLOCKED,
                 )
+                raise RuntimeError(github_result.message)
 
             github_message = github_result.message
 
-        self.project_engine.transition(
-            project.id,
-            ProjectStatus.RELEASE,
-        )
-
+        self.project_engine.transition(project.id, ProjectStatus.RELEASE)
         project = self.project_engine.complete(project.id)
 
         memory_entry = self.memory.remember(
@@ -148,12 +143,10 @@ class CompanyExecutionPipeline:
                 memory_type=MemoryType.PROJECT,
                 title=f"Completed project: {project.name}",
                 content=(
-                    f"Project '{project.name}' completed successfully. "
-                    f"Objective: {project.objective}. "
+                    f"Project {project.name} completed successfully. "
                     f"Tasks completed: {len(task_ids)}."
                 ),
                 project_id=project.id,
-                tags=["project-completed", "pipeline"],
             )
         )
 
@@ -166,6 +159,68 @@ class CompanyExecutionPipeline:
             memory_id=memory_entry.id,
         )
 
+    def _build_executor(
+        self,
+        executor: Callable | AgentExecutor | None,
+    ) -> Callable:
+        if executor is None:
+            return self.manager.agent_executor
+
+        if isinstance(executor, AgentExecutor):
+            return self._agent_executor_adapter(executor)
+
+        return executor
+
+    def _agent_executor_adapter(
+        self,
+        executor: AgentExecutor,
+    ) -> Callable:
+        async def run(request: AgentRequest):
+            task = self.manager.task_engine.get(request.task_id)
+            agent_name = task.assigned_agent
+
+            if agent_name is None:
+                raise RuntimeError(
+                    f"Task {request.task_id} has no assigned agent"
+                )
+
+            agent = self.manager.agent_registry.get(agent_name)
+
+            if agent is None:
+                raise RuntimeError(
+                    f"Agent '{agent_name}' is not registered"
+                )
+
+            context = AgentExecutionContext(
+                agent=agent,
+                allowed_permissions=agent.permissions,
+            )
+
+            return await executor.execute(context, request)
+
+        return run
+
+    async def _execute_tasks(self, executor: Callable | None) -> None:
+        while True:
+            decision = await self.manager.tick(executor=executor)
+
+            if decision.decision.value == "complete_mission":
+                return
+
+            if decision.decision.value == "wait":
+                if decision.task_id is None:
+                    raise RuntimeError(decision.reason)
+
+                task = self.manager.task_engine.get(decision.task_id)
+
+                if task.status.value == "failed":
+                    raise RuntimeError(decision.reason)
+
+                raise RuntimeError(decision.reason)
+
+            if decision.task_id is None:
+                raise RuntimeError("Manager started a task without a task ID")
+
     def _transition_to_development(self, project: Project) -> Project:
         for status in (
             ProjectStatus.RESEARCH,
@@ -174,47 +229,7 @@ class CompanyExecutionPipeline:
             ProjectStatus.ARCHITECTURE,
             ProjectStatus.DEVELOPMENT,
         ):
-            project = self.project_engine.transition(
-                project.id,
-                status,
-            )
+            project = self.project_engine.transition(project.id, status)
 
         return project
-
-    async def _execute_tasks(
-        self,
-        executor: Callable | None,
-    ) -> None:
-        while True:
-            decision = await self.manager.tick(
-                executor=executor,
-            )
-
-            if decision.decision.value == "complete_mission":
-                return
-
-            if decision.decision.value == "wait":
-                if decision.task_id is None:
-                    raise RuntimeError(
-                        f"Task execution blocked: {decision.reason}"
-                    )
-
-                task = self.manager.task_engine.get(
-                    decision.task_id
-                )
-
-                if task.status.value == "failed":
-                    raise RuntimeError(
-                        f"Task failed: {task.error or decision.reason}"
-                    )
-
-                raise RuntimeError(
-                    f"Task execution stopped: {decision.reason}"
-                )
-
-            if decision.task_id is None:
-                raise RuntimeError(
-                    f"Manager returned no task: {decision.reason}"
-                )
-
 
