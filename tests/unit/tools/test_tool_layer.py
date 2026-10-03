@@ -1,5 +1,5 @@
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -8,9 +8,9 @@ from src.agents.models.contracts import AgentDefinition
 from src.agents.models.enums import AgentPermission, AgentStatus
 from src.tools.builtin.commands import CommandTools
 from src.tools.builtin.files import FileTools
-from src.tools.builtin.registration import register_builtin_tools
 from src.tools.builtin.git import GitTools
 from src.tools.builtin.git_write import GitWriteTools
+from src.tools.builtin.registration import register_builtin_tools
 from src.tools.execution.executor import ToolExecutor
 from src.tools.factory import create_tool_executor
 from src.tools.models.contracts import ToolDefinition, ToolRequest
@@ -134,7 +134,7 @@ def test_tool_executor_blocks_permission() -> None:
     )
 
     assert not result.success
-    assert "GIT_PUSH" in result.error
+    assert "git_push" in result.error
 
 
 def test_file_tools_write_and_read(tmp_path: Path) -> None:
@@ -246,3 +246,4 @@ def test_tool_factory_creates_executor(tmp_path: Path) -> None:
     executor = create_tool_executor(str(tmp_path))
 
     assert len(executor.registry.list_tools()) == 7
+
