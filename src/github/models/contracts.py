@@ -20,6 +20,23 @@ class GitHubPullRequest(BaseModel):
     body: str = ""
 
 
+class GitHubBranch(BaseModel):
+    name: str
+    sha: str
+
+
+class GitHubFile(BaseModel):
+    path: str
+    content: str
+    sha: str | None = None
+
+
+class GitHubCheckRun(BaseModel):
+    name: str
+    status: str
+    conclusion: str | None = None
+
+
 class GitHubActionResult(BaseModel):
     success: bool
     message: str
