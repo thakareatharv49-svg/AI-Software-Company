@@ -3,21 +3,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "AI Software Company"
-    app_env: str = "development"
-    debug: bool = True
-
-    database_url: str = (
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/"
-        "ai_software_company"
-    )
-
+    environment: str = "development"
     log_level: str = "INFO"
 
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_default_model: str = "llama3.2"
+    database_url: str = (
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_software_company"
+    )
 
-    github_token: str = ""
-    github_owner: str = ""
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.2"
+    ollama_timeout: float = 120.0
 
     model_config = SettingsConfigDict(
         env_file=".env",
