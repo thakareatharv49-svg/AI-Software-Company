@@ -3,17 +3,12 @@ from src.company.models.contracts import (
     CompanyMission,
     CompanyState,
 )
-from src.company.models.enums import (
-    CompanyDecision,
-    CompanyStatus,
-)
-from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.company.models.enums import CompanyDecision, CompanyStatus
 
 __all__ = [
     "CompanyCycleResult",
     "CompanyDecision",
     "CompanyMission",
-    "CompanyOrchestrator",
     "CompanyState",
     "CompanyStatus",
 ]
