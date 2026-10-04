@@ -16,6 +16,11 @@ from .metrics import (
     RuntimeMetricsCollector,
 )
 from .production import ProductionRuntime
+from .recovery import (
+    RecoveringProductionRuntime,
+    RuntimeRecoveryController,
+    RuntimeRecoveryState,
+)
 from .resources import RuntimeResourceMonitor, RuntimeResourceState
 from .shutdown import RuntimeShutdownController, RuntimeShutdownState
 from .supervisor import RuntimeSupervisor, RuntimeSupervisorStatus
@@ -27,6 +32,7 @@ __all__ = [
     "InstrumentedRuntimeExecutor",
     "ObservableProductionRuntime",
     "ProductionRuntime",
+    "RecoveringProductionRuntime",
     "RuntimeAlert",
     "RuntimeAlertManager",
     "RuntimeAlertingExecutor",
@@ -43,6 +49,8 @@ __all__ = [
     "RuntimeLifecycle",
     "RuntimeMetrics",
     "RuntimeMetricsCollector",
+    "RuntimeRecoveryController",
+    "RuntimeRecoveryState",
     "RuntimeResourceMonitor",
     "RuntimeResourceState",
     "RuntimeShutdownController",
