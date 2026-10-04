@@ -17,10 +17,20 @@ class QATestResult(BaseModel):
     duration_ms: int | None = None
 
 
+class DebugDiagnosis(BaseModel):
+    attempt: int
+    test_status: QATestStatus
+    error: str
+    stdout: str = ""
+    stderr: str = ""
+
+
 class DebugAttempt(BaseModel):
     attempt: int
     test_status: QATestStatus
     error: str = ""
+    diagnosis: DebugDiagnosis | None = None
+    repair_success: bool | None = None
 
 
 class DebugResult(BaseModel):

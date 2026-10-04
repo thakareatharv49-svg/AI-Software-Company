@@ -1,8 +1,19 @@
+import inspect
 from collections.abc import Awaitable, Callable
 
 from src.qa.execution.runner import QARunner
-from src.qa.models.contracts import DebugAttempt, DebugResult, QATestRequest
+from src.qa.models.contracts import (
+    DebugAttempt,
+    DebugDiagnosis,
+    DebugResult,
+    QATestRequest,
+)
 from src.qa.models.enums import DebugStatus, QATestStatus
+
+RepairCallback = Callable[
+    [QATestRequest, DebugDiagnosis],
+    Awaitable[bool | None] | bool | None,
+]
 
 
 class AutonomousDebugger:
@@ -20,10 +31,7 @@ class AutonomousDebugger:
     async def run(
         self,
         request: QATestRequest,
-        repair: Callable[
-            [QATestRequest, str],
-            Awaitable[None] | None,
-        ] | None = None,
+        repair: RepairCallback | None = None,
     ) -> DebugResult:
         attempts: list[DebugAttempt] = []
 
@@ -42,13 +50,22 @@ class AutonomousDebugger:
 
             error = result.stderr or result.stdout or "QA test failed"
 
-            attempts.append(
-                DebugAttempt(
-                    attempt=attempt_number,
-                    test_status=result.status,
-                    error=error,
-                )
+            diagnosis = DebugDiagnosis(
+                attempt=attempt_number,
+                test_status=result.status,
+                error=error,
+                stdout=result.stdout,
+                stderr=result.stderr,
             )
+
+            attempt = DebugAttempt(
+                attempt=attempt_number,
+                test_status=result.status,
+                error=error,
+                diagnosis=diagnosis,
+            )
+
+            attempts.append(attempt)
 
             if attempt_number == self.max_attempts:
                 return DebugResult(
@@ -57,11 +74,24 @@ class AutonomousDebugger:
                     final_error=error,
                 )
 
-            if repair is not None:
-                repair_result = repair(request, error)
+            if repair is None:
+                continue
 
-                if repair_result is not None:
-                    await repair_result
+            repair_result = repair(request, diagnosis)
+
+            if inspect.isawaitable(repair_result):
+                repair_result = await repair_result
+
+            attempt.repair_success = (
+                True if repair_result is None else bool(repair_result)
+            )
+
+            if not attempt.repair_success:
+                return DebugResult(
+                    status=DebugStatus.BLOCKED,
+                    attempts=attempts,
+                    final_error="Repair attempt failed",
+                )
 
         return DebugResult(
             status=DebugStatus.BLOCKED,

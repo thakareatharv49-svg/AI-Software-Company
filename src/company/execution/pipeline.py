@@ -14,9 +14,10 @@ from src.memory.service.service import MemoryService
 from src.projects.engine.project_engine import ProjectEngine
 from src.projects.models.contracts import Project, ProjectCreateRequest
 from src.projects.models.enums import ProjectStatus
+from src.qa.debugging.debugger import AutonomousDebugger
 from src.qa.execution.runner import QARunner
 from src.qa.models.contracts import QATestRequest, QATestResult
-from src.qa.models.enums import QATestStatus
+from src.qa.models.enums import DebugStatus, QATestStatus
 from src.security.models.contracts import CodeReviewRequest, CodeReviewResult
 from src.security.review.reviewer import CodeReviewer
 
@@ -38,6 +39,7 @@ class CompanyExecutionPipeline:
         project_engine: ProjectEngine | None = None,
         manager: MasterManager | None = None,
         qa_runner: QARunner | None = None,
+        debugger: AutonomousDebugger | None = None,
         reviewer: CodeReviewer | None = None,
         github: GitHubAutomation | None = None,
         memory: MemoryService | None = None,
@@ -45,6 +47,9 @@ class CompanyExecutionPipeline:
         self.project_engine = project_engine or ProjectEngine()
         self.manager = manager or MasterManager()
         self.qa_runner = qa_runner or QARunner()
+        self.debugger = debugger or AutonomousDebugger(
+            qa_runner=self.qa_runner,
+        )
         self.reviewer = reviewer or CodeReviewer()
         self.github = github
         self.memory = memory or MemoryService()
@@ -76,6 +81,18 @@ class CompanyExecutionPipeline:
             ProjectStatus.TESTING,
         )
 
+        debug_result = await self.debugger.run(qa_request)
+
+        if debug_result.status == DebugStatus.BLOCKED:
+            self.project_engine.transition(
+                project.id,
+                ProjectStatus.DEBUGGING,
+            )
+            raise RuntimeError(
+                f"QA debugging failed for project {project.id}: "
+                f"{debug_result.final_error}"
+            )
+
         qa_result = await self.qa_runner.run(qa_request)
 
         if qa_result.status != QATestStatus.PASSED:
@@ -84,7 +101,7 @@ class CompanyExecutionPipeline:
                 ProjectStatus.DEBUGGING,
             )
             raise RuntimeError(
-                f"QA failed for project {project.id}: "
+                f"QA verification failed for project {project.id}: "
                 f"{qa_result.stderr or qa_result.stdout}"
             )
 
