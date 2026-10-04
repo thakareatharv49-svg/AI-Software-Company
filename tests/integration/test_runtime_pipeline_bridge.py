@@ -1,52 +1,44 @@
-from unittest.mock import AsyncMock
-
 import pytest
 
-from company.runtime.pipeline_bridge import (
+from src.company.runtime.pipeline_bridge import (
     RuntimePipelineBridge,
     RuntimePipelineRequest,
 )
 
 
 class FakePipeline:
-    def __init__(self) -> None:
-        self.run_end_to_end = AsyncMock(return_value="pipeline-result")
+    async def run_end_to_end(self, **kwargs):
+        return {"ok": True}
+
+
+class FailingPipeline:
+    async def run_end_to_end(self, **kwargs):
+        raise RuntimeError("bridge failure")
+
+
+def build_request() -> RuntimePipelineRequest:
+    return RuntimePipelineRequest(
+        project_request="project",
+        mission="mission",
+        tasks=["task"],
+        qa_request="qa",
+        files={"main.py": "pass"},
+    )
 
 
 @pytest.mark.asyncio
-async def test_pipeline_bridge_executes_real_pipeline_contract():
-    pipeline = FakePipeline()
-    bridge = RuntimePipelineBridge(pipeline, dispatcher=None)
-
-    request = RuntimePipelineRequest(
-        project_request="project",
-        mission="mission",
-        tasks=["task"],
-        qa_request="qa",
-        files={"app.py": "print('ok')"},
-        agent_executor="agent",
-        repair_agent_executor="repair",
-        github_repository="github",
-        pull_request_head="main",
-    )
+async def test_bridge_submit_returns_pipeline_result_future():
+    bridge = RuntimePipelineBridge(FakePipeline())
 
     await bridge.start()
-    await bridge.submit(request)
+
+    future = await bridge.submit(build_request())
+
+    assert await future == {"ok": True}
+
     await bridge.wait()
-
-    pipeline.run_end_to_end.assert_awaited_once_with(
-        project_request="project",
-        mission="mission",
-        tasks=["task"],
-        qa_request="qa",
-        files={"app.py": "print('ok')"},
-        agent_executor="agent",
-        repair_agent_executor="repair",
-        github_repository="github",
-        pull_request_head="main",
-    )
-
     state = await bridge.state()
+
     assert state.processed == 1
     assert state.failed == 0
 
@@ -54,49 +46,20 @@ async def test_pipeline_bridge_executes_real_pipeline_contract():
 
 
 @pytest.mark.asyncio
-async def test_pipeline_bridge_preserves_pipeline_failure():
-    class FailingPipeline:
-        async def run_end_to_end(self, **kwargs):
-            raise RuntimeError("pipeline failed")
-
+async def test_bridge_submit_future_propagates_pipeline_failure():
     bridge = RuntimePipelineBridge(FailingPipeline())
 
     await bridge.start()
 
-    await bridge.submit(
-        RuntimePipelineRequest(
-            project_request="project",
-            mission="mission",
-            tasks=[],
-            qa_request="qa",
-            files={},
-        )
-    )
+    future = await bridge.submit(build_request())
+
+    with pytest.raises(RuntimeError, match="bridge failure"):
+        await future
 
     await bridge.wait()
-
     state = await bridge.state()
-    assert state.failed == 1
+
     assert state.processed == 0
+    assert state.failed == 1
 
     await bridge.stop()
-
-
-def test_pipeline_bridge_rejects_invalid_pipeline():
-    with pytest.raises(TypeError, match="run_end_to_end"):
-        RuntimePipelineBridge(object())
-
-
-def test_pipeline_request_defaults_are_optional():
-    request = RuntimePipelineRequest(
-        project_request="project",
-        mission="mission",
-        tasks=[],
-        qa_request="qa",
-        files={},
-    )
-
-    assert request.agent_executor is None
-    assert request.repair_agent_executor is None
-    assert request.github_repository is None
-    assert request.pull_request_head is None

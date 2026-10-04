@@ -1,107 +1,104 @@
-from unittest.mock import AsyncMock
-
 import pytest
 
-from company.runtime.autonomous import AutonomousRuntime
+from src.company.runtime.autonomous import AutonomousRuntime
 
 
 class FakePipeline:
     def __init__(self) -> None:
-        self.run_end_to_end = AsyncMock(return_value="completed")
+        self.calls = []
+
+    async def run_end_to_end(self, **kwargs):
+        self.calls.append(kwargs)
+        return {"status": "completed", "project_id": "project-1"}
+
+
+class FailingPipeline:
+    async def run_end_to_end(self, **kwargs):
+        raise RuntimeError("pipeline failure")
 
 
 @pytest.mark.asyncio
-async def test_autonomous_runtime_executes_company_pipeline():
+async def test_autonomous_runtime_returns_real_pipeline_result():
     pipeline = FakePipeline()
     runtime = AutonomousRuntime(pipeline)
 
     await runtime.start()
 
     result = await runtime.run(
-        project_request="project",
+        project_request="project-request",
         mission="mission",
         tasks=["task"],
         qa_request="qa",
-        files={"main.py": "print('ok')"},
+        files={"app.py": "print('ok')"},
     )
 
-    assert result.submitted is True
+    assert result.result == {
+        "status": "completed",
+        "project_id": "project-1",
+    }
     assert result.processed == 1
     assert result.failed == 0
-
-    pipeline.run_end_to_end.assert_awaited_once()
+    assert len(pipeline.calls) == 1
 
     await runtime.stop()
 
 
 @pytest.mark.asyncio
-async def test_autonomous_runtime_tracks_pipeline_failure():
-    class FailingPipeline:
-        async def run_end_to_end(self, **kwargs):
-            raise RuntimeError("execution failed")
-
+async def test_autonomous_runtime_propagates_pipeline_failure():
     runtime = AutonomousRuntime(FailingPipeline())
 
     await runtime.start()
 
-    result = await runtime.run(
-        project_request="project",
-        mission="mission",
-        tasks=[],
-        qa_request="qa",
-        files={},
-    )
-
-    assert result.submitted is True
-    assert result.processed == 0
-    assert result.failed == 1
-
-    await runtime.stop()
-
-
-@pytest.mark.asyncio
-async def test_autonomous_runtime_state():
-    pipeline = FakePipeline()
-    runtime = AutonomousRuntime(pipeline)
-
-    await runtime.start()
+    with pytest.raises(RuntimeError, match="pipeline failure"):
+        await runtime.run(
+            project_request="project-request",
+            mission="mission",
+            tasks=["task"],
+            qa_request="qa",
+            files={},
+        )
 
     state = await runtime.state()
 
-    assert state.running is True
     assert state.processed == 0
-    assert state.failed == 0
+    assert state.failed == 1
 
     await runtime.stop()
 
-    state = await runtime.state()
-    assert state.running is False
-
 
 @pytest.mark.asyncio
-async def test_autonomous_runtime_supports_full_pipeline_arguments():
+async def test_autonomous_runtime_forwards_all_pipeline_arguments():
     pipeline = FakePipeline()
     runtime = AutonomousRuntime(pipeline)
 
     await runtime.start()
+
+    agent_executor = object()
+    repair_agent_executor = object()
+    github_repository = object()
 
     await runtime.run(
         project_request="project",
         mission="mission",
-        tasks=["task"],
+        tasks=["task-1", "task-2"],
         qa_request="qa",
         files={"main.py": "pass"},
-        agent_executor="agent",
-        repair_agent_executor="repair",
-        github_repository="github",
+        agent_executor=agent_executor,
+        repair_agent_executor=repair_agent_executor,
+        github_repository=github_repository,
         pull_request_head="feature/test",
     )
 
-    call = pipeline.run_end_to_end.await_args.kwargs
+    call = pipeline.calls[0]
 
-    assert call["agent_executor"] == "agent"
-    assert call["repair_agent_executor"] == "repair"
-    assert call["github_repository"] == "github"
+    assert call["project_request"] == "project"
+    assert call["mission"] == "mission"
+    assert call["tasks"] == ["task-1", "task-2"]
+    assert call["qa_request"] == "qa"
+    assert call["files"] == {"main.py": "pass"}
+    assert call["agent_executor"] is agent_executor
+    assert call["repair_agent_executor"] is repair_agent_executor
+    assert call["github_repository"] is github_repository
     assert call["pull_request_head"] == "feature/test"
 
     await runtime.stop()

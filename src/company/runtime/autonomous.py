@@ -1,23 +1,23 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 
-from company.runtime.pipeline_bridge import RuntimePipelineBridge, RuntimePipelineRequest
+from src.company.runtime.pipeline_bridge import (
+    RuntimePipelineBridge,
+    RuntimePipelineRequest,
+)
 
 
 @dataclass(slots=True, frozen=True)
 class RuntimeRunResult:
-    submitted: bool
+    result: Any
     processed: int
     failed: int
 
 
 class AutonomousRuntime:
-    def __init__(
-        self,
-        pipeline: Any,
-        *,
-        dispatcher=None,
-    ) -> None:
+    def __init__(self, pipeline: Any, *, dispatcher=None) -> None:
         self.bridge = RuntimePipelineBridge(
             pipeline,
             dispatcher=dispatcher,
@@ -51,13 +51,13 @@ class AutonomousRuntime:
             pull_request_head=pull_request_head,
         )
 
-        await self.bridge.submit(request)
+        result_future = await self.bridge.submit(request)
+        result = await result_future
         await self.bridge.wait()
-
         state = await self.bridge.state()
 
         return RuntimeRunResult(
-            submitted=True,
+            result=result,
             processed=state.processed,
             failed=state.failed,
         )

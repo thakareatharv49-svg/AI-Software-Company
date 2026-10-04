@@ -1,7 +1,10 @@
+from __future__ import annotations
+
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from company.runtime.dispatcher import RuntimeDispatcher
+from src.company.runtime.dispatcher import RuntimeDispatcher
 
 
 @dataclass(slots=True, frozen=True)
@@ -36,21 +39,37 @@ class RuntimePipelineBridge:
     async def start(self) -> None:
         await self.dispatcher.start()
 
-    async def submit(self, request: RuntimePipelineRequest) -> None:
+    async def submit(
+        self,
+        request: RuntimePipelineRequest,
+    ) -> asyncio.Future[Any]:
+        loop = asyncio.get_running_loop()
+        result_future: asyncio.Future[Any] = loop.create_future()
+
         async def operation() -> Any:
-            return await self.pipeline.run_end_to_end(
-                project_request=request.project_request,
-                mission=request.mission,
-                tasks=request.tasks,
-                qa_request=request.qa_request,
-                files=request.files,
-                agent_executor=request.agent_executor,
-                repair_agent_executor=request.repair_agent_executor,
-                github_repository=request.github_repository,
-                pull_request_head=request.pull_request_head,
-            )
+            try:
+                result = await self.pipeline.run_end_to_end(
+                    project_request=request.project_request,
+                    mission=request.mission,
+                    tasks=request.tasks,
+                    qa_request=request.qa_request,
+                    files=request.files,
+                    agent_executor=request.agent_executor,
+                    repair_agent_executor=request.repair_agent_executor,
+                    github_repository=request.github_repository,
+                    pull_request_head=request.pull_request_head,
+                )
+            except BaseException as exc:
+                if not result_future.done():
+                    result_future.set_exception(exc)
+                raise
+            else:
+                if not result_future.done():
+                    result_future.set_result(result)
+                return result
 
         await self.dispatcher.submit(operation)
+        return result_future
 
     async def wait(self) -> None:
         await self.dispatcher.wait()
