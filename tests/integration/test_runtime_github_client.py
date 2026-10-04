@@ -123,11 +123,10 @@ async def test_async_pull_request():
     assert pr.number == 7
 
 
-def test_command_failure_is_wrapped():
+def test_auth_status_returns_false_on_command_failure():
     def failing_runner(command):
         raise GitHubError("failure")
 
     client = GitHubClient(failing_runner)
 
-    with pytest.raises(GitHubError):
-        client.auth_status()
+    assert client.auth_status() is False
