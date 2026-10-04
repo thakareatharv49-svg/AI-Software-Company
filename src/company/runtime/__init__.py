@@ -6,6 +6,7 @@ from .backpressure import (
 )
 from .config import RuntimeConfig
 from .coordinator import RuntimeCoordinator, RuntimeStatus
+from .events import ObservableProductionRuntime, RuntimeEvent, RuntimeEventRecorder
 from .health import RuntimeHealth, RuntimeHealthMonitor
 from .heartbeat import RuntimeHeartbeat, RuntimeHeartbeatMonitor
 from .lifecycle import RuntimeLifecycle, RuntimeShutdownResult
@@ -24,6 +25,7 @@ from .timeouts import RuntimeTimeoutController, RuntimeTimeoutResult
 __all__ = [
     "BackpressuredRuntimeExecutor",
     "InstrumentedRuntimeExecutor",
+    "ObservableProductionRuntime",
     "ProductionRuntime",
     "RuntimeAlert",
     "RuntimeAlertManager",
@@ -32,6 +34,8 @@ __all__ = [
     "RuntimeBackpressureController",
     "RuntimeConfig",
     "RuntimeCoordinator",
+    "RuntimeEvent",
+    "RuntimeEventRecorder",
     "RuntimeHealth",
     "RuntimeHealthMonitor",
     "RuntimeHeartbeat",
