@@ -31,6 +31,22 @@ def create_runtime_app(service: CompanyRuntimeService) -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/runtime/runs/{run_id}")
+    async def runtime_run_status(run_id: str) -> dict[str, object]:
+        try:
+            run = await service.get_run(run_id)
+        except KeyError:
+            raise HTTPException(
+                status_code=404,
+                detail="Run not found",
+            ) from None
+
+        return {
+            "run_id": run.run_id,
+            "status": run.status.value,
+            "error": str(run.error) if run.error is not None else None,
+        }
+
     @app.get("/runtime/state")
     async def runtime_state() -> dict[str, Any]:
         state = await service.state()

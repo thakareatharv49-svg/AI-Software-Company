@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
+from src.company.runtime.persistent_run_store import PersistentRunStore
 from src.company.runtime.pipeline_bridge import (
     RuntimePipelineBridge,
     RuntimePipelineRequest,
@@ -24,6 +25,7 @@ class AutonomousRuntime:
     def __init__(self, pipeline: Any, *, dispatcher=None) -> None:
         self.bridge = RuntimePipelineBridge(pipeline, dispatcher=dispatcher)
         self.registry = RuntimeRunRegistry()
+        self.persistent_store = PersistentRunStore()
         self._futures: dict[str, asyncio.Future[Any]] = {}
 
     async def start(self) -> None:
@@ -79,6 +81,12 @@ class AutonomousRuntime:
         future.add_done_callback(finalize)
 
         return run.run_id
+
+    async def get_run(self, run_id: str) -> Any:
+        run = self.registry.get(run_id)
+        if run is None:
+            raise KeyError(run_id)
+        return run
 
     async def wait_run(self, run_id: str) -> Any:
         future = self._futures.get(run_id)
