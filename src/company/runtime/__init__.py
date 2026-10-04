@@ -14,6 +14,7 @@ from .metrics import (
     RuntimeMetrics,
     RuntimeMetricsCollector,
 )
+from .resources import RuntimeResourceMonitor, RuntimeResourceState
 from .shutdown import RuntimeShutdownController, RuntimeShutdownState
 from .supervisor import RuntimeSupervisor, RuntimeSupervisorStatus
 from .tasks import RuntimeTask, RuntimeTaskExecutor, RuntimeTaskRegistry
@@ -35,6 +36,8 @@ __all__ = [
     "RuntimeLifecycle",
     "RuntimeMetrics",
     "RuntimeMetricsCollector",
+    "RuntimeResourceMonitor",
+    "RuntimeResourceState",
     "RuntimeShutdownController",
     "RuntimeShutdownResult",
     "RuntimeShutdownState",
