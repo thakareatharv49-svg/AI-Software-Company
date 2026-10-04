@@ -114,3 +114,164 @@ async def test_pipeline_blocks_when_security_review_fails(tmp_path: Path):
             agent_executor=FakeAgentExecutor(),
         )
 
+
+
+
+@pytest.mark.asyncio
+async def test_run_end_to_end_recovers_from_transient_failure(tmp_path: Path):
+    pipeline = build_pipeline()
+    pipeline.event_service.clear()
+
+    class FlakyReviewer:
+        def __init__(self):
+            self.calls = 0
+
+        def review(self, request):
+            self.calls += 1
+
+            if self.calls < 3:
+                raise RuntimeError("transient review failure")
+
+            return type(
+                "ReviewResult",
+                (),
+                {
+                    "status": type("Status", (), {"value": "approved"})(),
+                    "summary": "Review approved",
+                },
+            )()
+
+    pipeline.reviewer = FlakyReviewer()
+
+    result = await pipeline.run_end_to_end(
+        project_request=ProjectCreateRequest(
+            name="Recovery Transient Failure Test",
+            description="Test autonomous recovery from transient failure",
+            objective="Verify the pipeline retries and eventually completes",
+        ),
+        mission=Mission(
+            name="Recovery Transient Failure Mission",
+            objective="Test transient recovery",
+            project_id="temporary",
+        ),
+        tasks=[
+            TaskPlanItem(
+                title="Implement feature",
+                description="Implement feature",
+                priority="high",
+            )
+        ],
+        qa_request=QATestRequest(
+            command=["python", "-c", "print('tests passed')"],
+            working_directory=str(tmp_path),
+        ),
+        files={"example.py": "def example():\n    return True\n"},
+        agent_executor=FakeAgentExecutor(),
+    )
+
+    events = pipeline.event_service.list_events()
+
+    failed_events = [
+        event
+        for event in events
+        if event.event_type == "autonomous.run.failed"
+    ]
+
+    recovery_events = [
+        event
+        for event in events
+        if event.event_type == "autonomous.run.recovery_available"
+    ]
+
+    completed_events = [
+        event
+        for event in events
+        if event.event_type == "autonomous.run.completed"
+    ]
+
+    assert result.project.status.value == "completed"
+
+    assert len(failed_events) == 2
+    assert [event.payload["attempt"] for event in failed_events] == [1, 2]
+    assert [
+        event.payload["recovery_action"] for event in failed_events
+    ] == ["retry", "retry"]
+    assert all(
+        event.payload["retryable"] is True
+        for event in failed_events
+    )
+
+    assert len(recovery_events) == 2
+    assert [event.payload["attempt"] for event in recovery_events] == [1, 2]
+
+    assert len(completed_events) == 1
+
+
+@pytest.mark.asyncio
+async def test_run_end_to_end_blocks_after_recovery_limit(tmp_path: Path):
+    pipeline = build_pipeline()
+    pipeline.event_service.clear()
+
+    class FailingReviewer:
+        def review(self, request):
+            raise RuntimeError("permanent review failure")
+
+    pipeline.reviewer = FailingReviewer()
+
+    with pytest.raises(RuntimeError, match="permanent review failure"):
+        await pipeline.run_end_to_end(
+            project_request=ProjectCreateRequest(
+                name="Recovery Limit Test",
+                description="Test bounded autonomous recovery",
+                objective="Verify recovery attempt limit",
+            ),
+            mission=Mission(
+                name="Recovery Limit Mission",
+                objective="Test recovery limit",
+                project_id="temporary",
+            ),
+            tasks=[
+                TaskPlanItem(
+                    title="Implement feature",
+                    description="Implement feature",
+                    priority="high",
+                )
+            ],
+            qa_request=QATestRequest(
+                command=["python", "-c", "print('tests passed')"],
+                working_directory=str(tmp_path),
+            ),
+            files={"example.py": "def example():\n    return True\n"},
+            agent_executor=FakeAgentExecutor(),
+        )
+
+    events = pipeline.event_service.list_events()
+
+    failed_events = [
+        event
+        for event in events
+        if event.event_type == "autonomous.run.failed"
+    ]
+
+    recovery_events = [
+        event
+        for event in events
+        if event.event_type == "autonomous.run.recovery_available"
+    ]
+
+    assert len(failed_events) == 3
+
+    assert failed_events[0].payload["attempt"] == 1
+    assert failed_events[0].payload["recovery_action"] == "retry"
+    assert failed_events[0].payload["retryable"] is True
+
+    assert failed_events[1].payload["attempt"] == 2
+    assert failed_events[1].payload["recovery_action"] == "retry"
+    assert failed_events[1].payload["retryable"] is True
+
+    assert failed_events[2].payload["attempt"] == 3
+    assert failed_events[2].payload["recovery_action"] == "block"
+    assert failed_events[2].payload["retryable"] is False
+
+    assert len(recovery_events) == 2
+    assert [event.payload["attempt"] for event in recovery_events] == [1, 2]

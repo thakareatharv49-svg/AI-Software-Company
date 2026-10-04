@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
+from src.company.recovery.service import RecoveryService
 from src.events.models.contracts import CompanyEvent
 from src.events.service.factory import get_event_service
 from src.github.automation.automation import GitHubAutomation
@@ -56,6 +57,7 @@ class CompanyExecutionPipeline:
         self.reviewer = reviewer or CodeReviewer()
         self.github = github
         self.memory = memory or MemoryService()
+        self.recovery = RecoveryService()
 
     def _publish_event(
         self,
@@ -268,40 +270,61 @@ class CompanyExecutionPipeline:
         method remains the authoritative project execution workflow.
         """
 
-        try:
-            result = await self.execute(
-                project_request=project_request,
-                mission=mission,
-                tasks=tasks,
-                qa_request=qa_request,
-                files=files,
-                agent_executor=agent_executor,
-                repair_agent_executor=repair_agent_executor,
-                github_repository=github_repository,
-                pull_request_head=pull_request_head,
-            )
+        while True:
+            try:
+                result = await self.execute(
+                    project_request=project_request,
+                    mission=mission,
+                    tasks=tasks,
+                    qa_request=qa_request,
+                    files=files,
+                    agent_executor=agent_executor,
+                    repair_agent_executor=repair_agent_executor,
+                    github_repository=github_repository,
+                    pull_request_head=pull_request_head,
+                )
 
-            self._publish_event(
-                "autonomous.run.completed",
-                project_id=result.project.id,
-                payload={
-                    "status": "completed",
-                    "task_count": len(result.task_ids),
-                },
-            )
+                self.recovery.reset()
 
-            return result
+                self._publish_event(
+                    "autonomous.run.completed",
+                    project_id=result.project.id,
+                    payload={
+                        "status": "completed",
+                        "task_count": len(result.task_ids),
+                    },
+                )
 
-        except Exception as exc:
-            self._publish_event(
-                "autonomous.run.failed",
-                payload={
-                    "status": "failed",
-                    "error": str(exc),
-                    "project_name": project_request.name,
-                },
-            )
-            raise
+                return result
+
+            except Exception as exc:
+                recovery = self.recovery.record_failure(error=exc)
+
+                self._publish_event(
+                    "autonomous.run.failed",
+                    project_id=recovery.project_id,
+                    payload={
+                        "status": "failed",
+                        "error": str(exc),
+                        "project_name": project_request.name,
+                        "recovery_action": recovery.action,
+                        "retryable": recovery.retryable,
+                        "attempt": recovery.attempt,
+                    },
+                )
+
+                if not recovery.retryable:
+                    self.recovery.reset()
+                    raise
+
+                self._publish_event(
+                    "autonomous.run.recovery_available",
+                    project_id=recovery.project_id,
+                    payload={
+                        "action": recovery.action,
+                        "attempt": recovery.attempt,
+                    },
+                )
 
     def _select_repair_agent(self) -> str:
         agents = self.manager.agent_registry.list_agents()
