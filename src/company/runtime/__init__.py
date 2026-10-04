@@ -110,3 +110,16 @@ __all__ = [
     "RuntimeDeadlineController",
     "RuntimeDeadlineResult",
 ]
+from .circuit import (
+    CircuitOpenError,
+    CircuitProtectedRuntime,
+    RuntimeCircuitBreaker,
+    RuntimeCircuitState,
+)
+
+__all__ = [
+    "CircuitOpenError",
+    "CircuitProtectedRuntime",
+    "RuntimeCircuitBreaker",
+    "RuntimeCircuitState",
+]
