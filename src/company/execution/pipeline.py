@@ -89,7 +89,7 @@ class CompanyExecutionPipeline:
                 ProjectStatus.DEBUGGING,
             )
             raise RuntimeError(
-                f"QA debugging failed for project {project.id}: "
+                f"QA failed for project {project.id}: "
                 f"{debug_result.final_error}"
             )
 
@@ -101,7 +101,7 @@ class CompanyExecutionPipeline:
                 ProjectStatus.DEBUGGING,
             )
             raise RuntimeError(
-                f"QA verification failed for project {project.id}: "
+                f"QA failed for project {project.id}: "
                 f"{qa_result.stderr or qa_result.stdout}"
             )
 
