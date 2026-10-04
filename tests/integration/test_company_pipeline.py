@@ -90,7 +90,7 @@ async def test_company_pipeline_completes_project(tmp_path: Path):
         working_directory=str(tmp_path),
     )
 
-    result = await pipeline.execute(
+    result = await pipeline.run_end_to_end(
         project_request=project_request,
         mission=mission,
         tasks=tasks,
@@ -112,3 +112,7 @@ async def test_company_pipeline_completes_project(tmp_path: Path):
     assert result.review_result.status.value == "approved"
     assert result.memory_id is not None
     assert result.github_message is not None
+
+def test_pipeline_exposes_real_end_to_end_entrypoint() -> None:
+    assert hasattr(CompanyExecutionPipeline, "run_end_to_end")
+    assert callable(CompanyExecutionPipeline.run_end_to_end)

@@ -77,7 +77,7 @@ class CompanyExecutionPipeline:
         self.event_service.publish(event)
 
         try:
-            self.memory_service.remember_event(event)
+            self.memory.remember_event(event)
         except AttributeError:
             pass
 
@@ -94,14 +94,6 @@ class CompanyExecutionPipeline:
         github_repository: GitHubRepository | None = None,
         pull_request_head: str | None = None,
     ) -> PipelineResult:
-        self._publish_event(
-            "project.execution.started",
-            payload={
-                "project_name": project_request.name,
-                "objective": project_request.objective,
-            },
-        )
-
         project = self.project_engine.create(project_request)
 
         self._publish_event(
@@ -255,6 +247,61 @@ class CompanyExecutionPipeline:
             github_message=github_message,
             memory_id=memory_entry.id,
         )
+
+    async def run_end_to_end(
+        self,
+        *,
+        project_request: ProjectCreateRequest,
+        mission: Mission,
+        tasks: list[TaskPlanItem],
+        qa_request: QATestRequest,
+        files: dict[str, str],
+        agent_executor: Callable | AgentExecutor | None = None,
+        repair_agent_executor: Callable | AgentExecutor | None = None,
+        github_repository: GitHubRepository | None = None,
+        pull_request_head: str | None = None,
+    ) -> PipelineResult:
+        """
+        Execute one complete autonomous company run.
+
+        This is the public M15 entry point. The existing execute()
+        method remains the authoritative project execution workflow.
+        """
+
+        try:
+            result = await self.execute(
+                project_request=project_request,
+                mission=mission,
+                tasks=tasks,
+                qa_request=qa_request,
+                files=files,
+                agent_executor=agent_executor,
+                repair_agent_executor=repair_agent_executor,
+                github_repository=github_repository,
+                pull_request_head=pull_request_head,
+            )
+
+            self._publish_event(
+                "autonomous.run.completed",
+                project_id=result.project.id,
+                payload={
+                    "status": "completed",
+                    "task_count": len(result.task_ids),
+                },
+            )
+
+            return result
+
+        except Exception as exc:
+            self._publish_event(
+                "autonomous.run.failed",
+                payload={
+                    "status": "failed",
+                    "error": str(exc),
+                    "project_name": project_request.name,
+                },
+            )
+            raise
 
     def _select_repair_agent(self) -> str:
         agents = self.manager.agent_registry.list_agents()
