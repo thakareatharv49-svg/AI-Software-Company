@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.dashboard.routes.routes import router
+from src.events.service.factory import get_event_service
 
 
 def create_app() -> FastAPI:
@@ -20,6 +21,7 @@ def test_dashboard_health() -> None:
 
 
 def test_dashboard_summary() -> None:
+    get_event_service().clear()
     client = TestClient(create_app())
 
     response = client.get("/dashboard/summary")
