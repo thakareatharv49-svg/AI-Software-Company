@@ -2,6 +2,7 @@ from enum import StrEnum
 
 
 class MemoryType(StrEnum):
+    EVENT = "event"
     COMPANY = "company"
     PROJECT = "project"
     TECHNICAL = "technical"

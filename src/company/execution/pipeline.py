@@ -4,6 +4,8 @@ from dataclasses import dataclass, replace
 from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
+from src.events.models.contracts import CompanyEvent
+from src.events.service.factory import get_event_service
 from src.github.automation.automation import GitHubAutomation
 from src.github.models.contracts import GitHubRepository
 from src.manager.manager import MasterManager
@@ -44,6 +46,7 @@ class CompanyExecutionPipeline:
         github: GitHubAutomation | None = None,
         memory: MemoryService | None = None,
     ) -> None:
+        self.event_service = get_event_service()
         self.project_engine = project_engine or ProjectEngine()
         self.manager = manager or MasterManager()
         self.qa_runner = qa_runner or QARunner()
@@ -53,6 +56,30 @@ class CompanyExecutionPipeline:
         self.reviewer = reviewer or CodeReviewer()
         self.github = github
         self.memory = memory or MemoryService()
+
+    def _publish_event(
+        self,
+        event_type: str,
+        *,
+        project_id: str | None = None,
+        task_id: str | None = None,
+        agent_name: str | None = None,
+        payload: dict[str, object] | None = None,
+    ) -> None:
+        event = CompanyEvent(
+            event_type=event_type,
+            project_id=project_id,
+            task_id=task_id,
+            agent_name=agent_name,
+            payload=payload or {},
+        )
+
+        self.event_service.publish(event)
+
+        try:
+            self.memory_service.remember_event(event)
+        except AttributeError:
+            pass
 
     async def execute(
         self,
@@ -67,7 +94,24 @@ class CompanyExecutionPipeline:
         github_repository: GitHubRepository | None = None,
         pull_request_head: str | None = None,
     ) -> PipelineResult:
+        self._publish_event(
+            "project.execution.started",
+            payload={
+                "project_name": project_request.name,
+                "objective": project_request.objective,
+            },
+        )
+
         project = self.project_engine.create(project_request)
+
+        self._publish_event(
+            "project.execution.started",
+            project_id=project.id,
+            payload={
+                "project_name": project.name,
+                "objective": project.objective,
+            },
+        )
         project = self._transition_to_development(project)
         mission = replace(mission, project_id=project.id)
 
@@ -90,6 +134,20 @@ class CompanyExecutionPipeline:
             qa_request,
             repair=repair_callback,
         )
+
+        if debug_result.attempts:
+            latest_attempt = debug_result.attempts[-1]
+
+            if latest_attempt.test_status != QATestStatus.PASSED:
+                self._publish_event(
+                    "qa.failed",
+                    project_id=project.id,
+                    payload={
+                        "attempt": latest_attempt.attempt,
+                        "error": latest_attempt.error,
+                        "status": latest_attempt.test_status.value,
+                    },
+                )
 
         if debug_result.status == DebugStatus.BLOCKED:
             self.project_engine.transition(
@@ -173,6 +231,14 @@ class CompanyExecutionPipeline:
                 ),
                 project_id=project.id,
             )
+        )
+
+        self._publish_event(
+            "project.execution.completed",
+            project_id=project.id,
+            payload={
+                "status": project.status.value,
+            },
         )
 
         return PipelineResult(

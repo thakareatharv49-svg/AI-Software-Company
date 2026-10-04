@@ -1,3 +1,4 @@
+from src.events.models.contracts import CompanyEvent
 from src.memory.models.contracts import (
     MemoryCreateRequest,
     MemoryEntry,
@@ -44,3 +45,32 @@ class MemoryService:
         memory_type: MemoryType,
     ) -> list[MemoryEntry]:
         return self.store.filter(memory_type=memory_type)
+
+    def remember_event(
+        self,
+        event: CompanyEvent,
+    ) -> None:
+        try:
+            from src.memory.models.contracts import MemoryCreateRequest
+            from src.memory.models.enums import MemoryType
+
+            request = MemoryCreateRequest(
+                memory_type=MemoryType.EVENT,
+                content=(
+                    f"Event: {event.event_type}. "
+                    f"Project: {event.project_id or 'unknown'}. "
+                    f"Task: {event.task_id or 'unknown'}. "
+                    f"Agent: {event.agent_name or 'unknown'}. "
+                    f"Payload: {event.payload}"
+                ),
+                metadata={
+                    "event_type": event.event_type,
+                    "project_id": event.project_id,
+                    "task_id": event.task_id,
+                    "agent_name": event.agent_name,
+                },
+            )
+
+            self.create(request)
+        except Exception:
+            return None
