@@ -275,3 +275,60 @@ async def test_run_end_to_end_blocks_after_recovery_limit(tmp_path: Path):
 
     assert len(recovery_events) == 2
     assert [event.payload["attempt"] for event in recovery_events] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_run_end_to_end_creates_observability_audit_trail(tmp_path: Path):
+    pipeline = build_pipeline()
+
+    result = await pipeline.run_end_to_end(
+        project_request=ProjectCreateRequest(
+            name="Observability Test",
+            description="Test audit trail",
+            objective="Verify execution observability",
+        ),
+        mission=Mission(
+            name="Observability Mission",
+            objective="Verify audit trail",
+            project_id="temporary",
+        ),
+        tasks=[
+            TaskPlanItem(
+                title="Implement feature",
+                description="Implement feature",
+                priority="high",
+            )
+        ],
+        qa_request=QATestRequest(
+            command=["python", "-c", "print('tests passed')"],
+            working_directory=str(tmp_path),
+        ),
+        files={"example.py": "def example():\n    return True\n"},
+        agent_executor=FakeAgentExecutor(),
+    )
+
+    completed = [
+        event
+        for event in pipeline.event_service.list_events()
+        if event.event_type == "autonomous.run.completed"
+    ]
+
+    assert len(completed) == 1
+
+    run_id = completed[0].payload["run_id"]
+    records = pipeline.observability.records(run_id)
+    metrics = pipeline.observability.metrics(run_id)
+
+    assert records
+    assert all(record.run_id == run_id for record in records)
+    assert any(
+        record.event_type == "project.execution.started"
+        for record in records
+    )
+    assert any(
+        record.event_type == "autonomous.run.completed"
+        for record in records
+    )
+    assert metrics["events"] == len(records)
+    assert metrics["completed"] == 1
+    assert result.project.status.value == "completed"

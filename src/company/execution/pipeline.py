@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
+from src.company.observability.service import ObservabilityService
 from src.company.recovery.service import RecoveryService
 from src.events.models.contracts import CompanyEvent
 from src.events.service.factory import get_event_service
@@ -58,30 +59,33 @@ class CompanyExecutionPipeline:
         self.github = github
         self.memory = memory or MemoryService()
         self.recovery = RecoveryService()
+        self.observability = ObservabilityService()
+        self._active_run_id: str | None = None
 
     def _publish_event(
         self,
         event_type: str,
         *,
         project_id: str | None = None,
-        task_id: str | None = None,
-        agent_name: str | None = None,
-        payload: dict[str, object] | None = None,
+        payload: dict | None = None,
     ) -> None:
+        event_payload = dict(payload or {})
+
+        if self._active_run_id is not None:
+            event_payload.setdefault("run_id", self._active_run_id)
+            self.observability.record(
+                run_id=self._active_run_id,
+                event_type=event_type,
+                project_id=project_id,
+                payload=event_payload,
+            )
+
         event = CompanyEvent(
             event_type=event_type,
             project_id=project_id,
-            task_id=task_id,
-            agent_name=agent_name,
-            payload=payload or {},
+            payload=event_payload,
         )
-
         self.event_service.publish(event)
-
-        try:
-            self.memory.remember_event(event)
-        except AttributeError:
-            pass
 
     async def execute(
         self,
@@ -269,6 +273,8 @@ class CompanyExecutionPipeline:
         This is the public M15 entry point. The existing execute()
         method remains the authoritative project execution workflow.
         """
+
+        self._active_run_id = self.observability.create_run_id()
 
         while True:
             try:
