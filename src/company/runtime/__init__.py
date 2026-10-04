@@ -9,6 +9,11 @@ from .coordinator import RuntimeCoordinator, RuntimeStatus
 from .events import ObservableProductionRuntime, RuntimeEvent, RuntimeEventRecorder
 from .health import RuntimeHealth, RuntimeHealthMonitor
 from .heartbeat import RuntimeHeartbeat, RuntimeHeartbeatMonitor
+from .history import (
+    RuntimeExecutionHistory,
+    RuntimeExecutionRecord,
+    TrackedProductionRuntime,
+)
 from .lifecycle import RuntimeLifecycle, RuntimeShutdownResult
 from .metrics import (
     InstrumentedRuntimeExecutor,
@@ -42,6 +47,8 @@ __all__ = [
     "RuntimeCoordinator",
     "RuntimeEvent",
     "RuntimeEventRecorder",
+    "RuntimeExecutionHistory",
+    "RuntimeExecutionRecord",
     "RuntimeHealth",
     "RuntimeHealthMonitor",
     "RuntimeHeartbeat",
@@ -64,4 +71,5 @@ __all__ = [
     "RuntimeTaskRegistry",
     "RuntimeTimeoutController",
     "RuntimeTimeoutResult",
+    "TrackedProductionRuntime",
 ]
