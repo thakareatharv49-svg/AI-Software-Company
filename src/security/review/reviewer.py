@@ -13,7 +13,13 @@ class CodeReviewer:
 
     def review(self, request: CodeReviewRequest) -> CodeReviewResult:
         scan = self.scanner.scan(
-            SecurityScanRequest(files=request.files)
+            SecurityScanRequest(
+                project_id=request.project_id,
+                task_id=request.task_id,
+                working_directory=request.working_directory,
+                files=request.files,
+                diff=request.diff,
+            )
         )
 
         blocking = [
@@ -28,12 +34,14 @@ class CodeReviewer:
 
         if blocking:
             return CodeReviewResult(
+                approved=False,
                 status=ReviewStatus.CHANGES_REQUESTED,
                 findings=scan.findings,
                 summary="Security findings require changes before approval",
             )
 
         return CodeReviewResult(
+            approved=True,
             status=ReviewStatus.APPROVED,
             findings=scan.findings,
             summary=request.summary or "Review passed",

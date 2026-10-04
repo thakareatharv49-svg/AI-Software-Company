@@ -178,8 +178,14 @@ class CompanyExecutionPipeline:
 
         review_result = self.reviewer.review(
             CodeReviewRequest(
+                project_id=project.id,
+                task_id=task_ids[-1] if task_ids else None,
+                working_directory=qa_request.working_directory,
                 files=files,
-                summary=f"Automated review for project {project.name}",
+                diff="\n".join(
+                    f"--- {path}\n+++ {path}\n{content}"
+                    for path, content in files.items()
+                ),
             )
         )
 
