@@ -8,30 +8,27 @@ from datetime import UTC, datetime
 @dataclass(slots=True, frozen=True)
 class RuntimeExecutionRecord:
     execution_id: str
-    started_at: str
-    completed_at: str | None
+    started_at: datetime
+    completed_at: datetime | None
     status: str
-    error: str | None
+    error: str | None = None
 
 
 class RuntimeExecutionHistory:
     def __init__(self) -> None:
-        self._records: list[RuntimeExecutionRecord] = []
+        self._records: dict[str, RuntimeExecutionRecord] = {}
         self._lock = asyncio.Lock()
 
     async def start(self, execution_id: str) -> RuntimeExecutionRecord:
-        record = RuntimeExecutionRecord(
-            execution_id=execution_id,
-            started_at=datetime.now(UTC).isoformat(),
-            completed_at=None,
-            status="running",
-            error=None,
-        )
-
         async with self._lock:
-            self._records.append(record)
-
-        return record
+            record = RuntimeExecutionRecord(
+                execution_id=execution_id,
+                started_at=datetime.now(UTC),
+                completed_at=None,
+                status="running",
+            )
+            self._records[execution_id] = record
+            return record
 
     async def complete(self, execution_id: str) -> RuntimeExecutionRecord:
         return await self._update(
@@ -53,14 +50,11 @@ class RuntimeExecutionHistory:
 
     async def records(self) -> list[RuntimeExecutionRecord]:
         async with self._lock:
-            return list(self._records)
+            return list(self._records.values())
 
     async def get(self, execution_id: str) -> RuntimeExecutionRecord | None:
         async with self._lock:
-            for record in reversed(self._records):
-                if record.execution_id == execution_id:
-                    return record
-        return None
+            return self._records.get(execution_id)
 
     async def _update(
         self,
@@ -70,24 +64,21 @@ class RuntimeExecutionHistory:
         error: str | None,
     ) -> RuntimeExecutionRecord:
         async with self._lock:
-            for index in range(len(self._records) - 1, -1, -1):
-                record = self._records[index]
+            record = self._records.get(execution_id)
 
-                if record.execution_id != execution_id:
-                    continue
+            if record is None:
+                raise KeyError(f"Unknown execution: {execution_id}")
 
-                updated = RuntimeExecutionRecord(
-                    execution_id=record.execution_id,
-                    started_at=record.started_at,
-                    completed_at=datetime.now(UTC).isoformat(),
-                    status=status,
-                    error=error,
-                )
+            updated = RuntimeExecutionRecord(
+                execution_id=record.execution_id,
+                started_at=record.started_at,
+                completed_at=datetime.now(UTC),
+                status=status,
+                error=error,
+            )
 
-                self._records[index] = updated
-                return updated
-
-        raise KeyError(f"unknown execution_id: {execution_id}")
+            self._records[execution_id] = updated
+            return updated
 
 
 class TrackedProductionRuntime:
@@ -100,12 +91,10 @@ class TrackedProductionRuntime:
         self.history = history
         self._counter = 0
 
-    def _next_execution_id(self) -> str:
+    async def execute(self, operation):
         self._counter += 1
-        return f"runtime-execution-{self._counter}"
+        execution_id = f"runtime-execution-{self._counter}"
 
-    async def execute(self, operation) -> object:
-        execution_id = self._next_execution_id()
         await self.history.start(execution_id)
 
         try:
