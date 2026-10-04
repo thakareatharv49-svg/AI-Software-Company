@@ -1,4 +1,9 @@
 ﻿from .alerts import RuntimeAlert, RuntimeAlertingExecutor, RuntimeAlertManager
+from .backpressure import (
+    BackpressuredRuntimeExecutor,
+    RuntimeBackpressure,
+    RuntimeBackpressureController,
+)
 from .config import RuntimeConfig
 from .coordinator import RuntimeCoordinator, RuntimeStatus
 from .health import RuntimeHealth, RuntimeHealthMonitor
@@ -14,10 +19,13 @@ from .supervisor import RuntimeSupervisor, RuntimeSupervisorStatus
 from .tasks import RuntimeTask, RuntimeTaskExecutor, RuntimeTaskRegistry
 
 __all__ = [
+    "BackpressuredRuntimeExecutor",
     "InstrumentedRuntimeExecutor",
     "RuntimeAlert",
     "RuntimeAlertManager",
     "RuntimeAlertingExecutor",
+    "RuntimeBackpressure",
+    "RuntimeBackpressureController",
     "RuntimeConfig",
     "RuntimeCoordinator",
     "RuntimeHealth",
