@@ -3,7 +3,7 @@ from dataclasses import dataclass, replace
 
 from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
-from src.agents.models.contracts import AgentRequest
+from src.agents.models.contracts import AgentRequest, AgentResult
 from src.github.automation.automation import GitHubAutomation
 from src.github.models.contracts import GitHubRepository
 from src.manager.manager import MasterManager
@@ -63,6 +63,7 @@ class CompanyExecutionPipeline:
         qa_request: QATestRequest,
         files: dict[str, str],
         agent_executor: Callable | AgentExecutor | None = None,
+        repair_agent_executor: Callable | AgentExecutor | None = None,
         github_repository: GitHubRepository | None = None,
         pull_request_head: str | None = None,
     ) -> PipelineResult:
@@ -81,7 +82,14 @@ class CompanyExecutionPipeline:
             ProjectStatus.TESTING,
         )
 
-        debug_result = await self.debugger.run(qa_request)
+        repair_callback = self._build_repair_callback(
+            repair_agent_executor or agent_executor
+        )
+
+        debug_result = await self.debugger.run(
+            qa_request,
+            repair=repair_callback,
+        )
 
         if debug_result.status == DebugStatus.BLOCKED:
             self.project_engine.transition(
@@ -175,6 +183,49 @@ class CompanyExecutionPipeline:
             github_message=github_message,
             memory_id=memory_entry.id,
         )
+
+    def _build_repair_callback(
+        self,
+        executor: Callable | AgentExecutor | None,
+    ) -> Callable | None:
+        if executor is None:
+            return None
+
+        if isinstance(executor, AgentExecutor):
+            executor = self._agent_executor_adapter(executor)
+
+        async def repair(
+            request: QATestRequest,
+            diagnosis,
+        ) -> bool:
+            result = await executor(
+                AgentRequest(
+                    task_id=f"qa-repair-{diagnosis.attempt}",
+                    instruction=(
+                        "Repair the current QA failure autonomously. "
+                        "Inspect the failure, locate the faulty code, "
+                        "modify the workspace using permitted tools, and "
+                        "run the relevant test or command to verify the fix."
+                    ),
+                    context={
+                        "qa_command": request.command,
+                        "working_directory": request.working_directory,
+                        "failure": diagnosis.error,
+                        "stdout": diagnosis.stdout,
+                        "stderr": diagnosis.stderr,
+                    },
+                )
+            )
+
+            if isinstance(result, AgentResult):
+                return result.success
+
+            if isinstance(result, bool):
+                return result
+
+            return bool(getattr(result, "success", False))
+
+        return repair
 
     def _build_executor(
         self,
