@@ -14,6 +14,7 @@ from .metrics import (
     RuntimeMetrics,
     RuntimeMetricsCollector,
 )
+from .production import ProductionRuntime
 from .resources import RuntimeResourceMonitor, RuntimeResourceState
 from .shutdown import RuntimeShutdownController, RuntimeShutdownState
 from .supervisor import RuntimeSupervisor, RuntimeSupervisorStatus
@@ -23,6 +24,7 @@ from .timeouts import RuntimeTimeoutController, RuntimeTimeoutResult
 __all__ = [
     "BackpressuredRuntimeExecutor",
     "InstrumentedRuntimeExecutor",
+    "ProductionRuntime",
     "RuntimeAlert",
     "RuntimeAlertManager",
     "RuntimeAlertingExecutor",
