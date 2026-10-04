@@ -149,3 +149,9 @@ __all__ = [
     "RuntimeQueueWorker",
     "RuntimeWorkQueue",
 ]
+from .worker import RuntimeWorker, RuntimeWorkerState
+
+__all__ = [
+    "RuntimeWorker",
+    "RuntimeWorkerState",
+]
