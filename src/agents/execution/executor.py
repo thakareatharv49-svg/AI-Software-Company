@@ -1,3 +1,4 @@
+import json
 from time import perf_counter
 
 from src.agents.execution.context import AgentExecutionContext
@@ -84,6 +85,21 @@ class AgentExecutor:
                     ),
                 )
             )
+
+            tool_output = await self._execute_tool_calls(
+                context,
+                request,
+                response.content,
+            )
+
+            if tool_output is not None:
+                return AgentResult(
+                    task_id=request.task_id,
+                    agent_name=context.agent.name,
+                    success=True,
+                    output=tool_output,
+                    duration_ms=int((perf_counter() - started) * 1000),
+                )
         except Exception as exc:
             return AgentResult(
                 task_id=request.task_id,
@@ -104,6 +120,53 @@ class AgentExecutor:
                 (perf_counter() - started) * 1000
             ),
         )
+
+    async def _execute_tool_calls(
+        self,
+        context: AgentExecutionContext,
+        request: AgentRequest,
+        response: str,
+    ) -> str | None:
+        if self.tool_executor is None:
+            return None
+
+        try:
+            payload = json.loads(response)
+        except json.JSONDecodeError:
+            return None
+
+        calls = payload.get("tool_calls")
+        if not isinstance(calls, list):
+            return None
+
+        outputs: list[str] = []
+
+        for call in calls:
+            if not isinstance(call, dict):
+                return None
+
+            tool_name = call.get("tool_name")
+            arguments = call.get("arguments", {})
+
+            if not isinstance(tool_name, str) or not isinstance(arguments, dict):
+                return None
+
+            result = self.tool_executor.execute(
+                context,
+                ToolRequest(
+                    tool_name=tool_name,
+                    arguments=arguments,
+                ),
+            )
+
+            if not result.success:
+                raise RuntimeError(
+                    result.error or f"Tool '{tool_name}' failed"
+                )
+
+            outputs.append(str(result.output))
+
+        return "\n".join(outputs)
 
     def _execute_requested_tool(
         self,

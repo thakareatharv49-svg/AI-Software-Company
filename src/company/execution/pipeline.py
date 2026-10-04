@@ -184,6 +184,28 @@ class CompanyExecutionPipeline:
             memory_id=memory_entry.id,
         )
 
+    def _select_repair_agent(self) -> str:
+        agents = self.manager.agent_registry.list_agents()
+
+        preferred = (
+            "backend-engineer",
+            "ai-engineer",
+            "infrastructure-engineer",
+            "database-engineer",
+            "frontend-engineer",
+        )
+
+        available = {agent.name for agent in agents}
+
+        for name in preferred:
+            if name in available:
+                return name
+
+        if agents:
+            return agents[0].name
+
+        raise RuntimeError("No repair agent is registered")
+
     def _build_repair_callback(
         self,
         executor: Callable | AgentExecutor | None,
