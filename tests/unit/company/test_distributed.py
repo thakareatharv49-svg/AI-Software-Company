@@ -1,3 +1,5 @@
+import pytest
+
 from company.distributed import DistributedExecutor, Worker
 
 
