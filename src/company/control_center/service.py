@@ -5,10 +5,15 @@ from threading import Lock
 
 from pydantic import BaseModel, Field
 
+from src.agents.execution.executor import AgentExecutor
+from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
+from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
-from src.company.models.contracts import CompanyMission, CompanyState
+from src.company.models.contracts import AgentResult, CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.runtime.providers.ollama import OllamaProvider
+from src.runtime.service import AIRuntime
 
 
 class MissionSubmission(BaseModel):
@@ -32,6 +37,11 @@ class CompanyControlCenter:
     def __init__(self, orchestrator: CompanyOrchestrator | None = None) -> None:
         self._orchestrator = orchestrator or CompanyOrchestrator()
         self._mission_controller = MissionController(self._orchestrator)
+        self._execution_pipeline = MissionExecutionPipeline(
+            self._orchestrator,
+            AgentExecutor(AIRuntime(OllamaProvider())),
+            AgentRegistry(),
+        )
         self._missions: dict[str, MissionRecord] = {}
         self._lock = Lock()
 
@@ -47,7 +57,11 @@ class CompanyControlCenter:
 
     def missions(self) -> list[MissionRecord]:
         with self._lock:
-            return sorted(self._missions.values(), key=lambda item: item.created_at, reverse=True)
+            return sorted(
+                self._missions.values(),
+                key=lambda item: item.created_at,
+                reverse=True,
+            )
 
     def submit_mission(self, submission: MissionSubmission) -> MissionRecord:
         with self._lock:
@@ -71,6 +85,27 @@ class CompanyControlCenter:
             self._missions[mission.id] = record
             return record
 
+    async def execute_next_stage(self, mission_id: str) -> AgentResult:
+        with self._lock:
+            record = self._missions.get(mission_id)
+        if record is None:
+            raise KeyError(f"Mission '{mission_id}' not found")
+
+        result = await self._execution_pipeline.execute_next(
+            record.mission,
+            record.plan,
+        )
+        with self._lock:
+            self._missions[mission_id] = record.model_copy(
+                update={
+                    "status": self._orchestrator.state.status.value,
+                    "message": result.output if result.success else result.error or "Stage failed",
+                    "updated_at": datetime.now(UTC),
+                    "plan": record.plan,
+                }
+            )
+        return result
+
     def stop(self) -> CompanyState:
         self._orchestrator.stop()
         self._sync_latest()
@@ -89,9 +124,11 @@ class CompanyControlCenter:
             self._missions[latest.mission.id] = latest.model_copy(
                 update={
                     "status": self._orchestrator.state.status.value,
-                    "message": self._orchestrator.state.last_decision.value
-                    if self._orchestrator.state.last_decision
-                    else "Company state updated",
+                    "message": (
+                        self._orchestrator.state.last_decision.value
+                        if self._orchestrator.state.last_decision
+                        else "Company state updated"
+                    ),
                     "updated_at": datetime.now(UTC),
                 }
             )
