@@ -12,7 +12,6 @@ from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 
 
-@dataclass
 class FactoryStore(Protocol):
     def save(self, project: FactoryProject) -> None: ...
     def load_pending(self) -> list[dict]: ...
@@ -32,13 +31,12 @@ class FactoryProject:
 class ProjectFactory:
     """Persistent, sequential project factory with bounded retry scheduling."""
 
-    _running: bool = False
-
     orchestrator: CompanyOrchestrator
     controller: MissionController
     pipeline: MissionExecutionPipeline
     store: FactoryStore | None = None
     queue: list[FactoryProject] = field(default_factory=list)
+    _running: bool = field(default=False, init=False, repr=False)
 
     def restore(self) -> int:
         if self.store is None:
@@ -147,22 +145,23 @@ class ProjectFactory:
             raise ValueError("max_retries must be non-negative")
         self._running = True
         completed: list[FactoryProject] = []
-        while self.queue and (max_projects is None or len(completed) < max_projects):
-            project = await self.run_next(max_stages=max_stages, max_retries=max_retries)
-            if project is None:
-                break
-            completed.append(project)
-            if project.status == "blocked":
-                break
-
-        self.orchestrator.events.publish(
-            CompanyEvent(
-                event_type="FACTORY_RUN_COMPLETED",
-                message=f"Factory run completed: {len(completed)} project(s)",
+        try:
+            while self.queue and (max_projects is None or len(completed) < max_projects):
+                project = await self.run_next(max_stages=max_stages, max_retries=max_retries)
+                if project is None:
+                    break
+                completed.append(project)
+                if project.status == "blocked":
+                    break
+            self.orchestrator.events.publish(
+                CompanyEvent(
+                    event_type="FACTORY_RUN_COMPLETED",
+                    message=f"Factory run completed: {len(completed)} project(s)",
+                )
             )
-        )
-        self._running = False
-        return completed
+            return completed
+        finally:
+            self._running = False
 
     def _save(self, project: FactoryProject) -> None:
         if self.store is not None:
