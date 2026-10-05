@@ -20,5 +20,6 @@ def test_cost_controller_tracks_budget_and_tokens() -> None:
 
 
 def test_cost_controller_rejects_negative_values() -> None:
+    controller = CostController()
     with pytest.raises(ValueError):
-        UsageRecord("agent", "p1", input_tokens=-1)
+        controller.record(UsageRecord("agent", "p1", input_tokens=-1))
