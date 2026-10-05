@@ -186,9 +186,18 @@ class CompanyControlCenter:
             pass
         return job
 
-    def audit(self, mission_id: str) -> list[MissionAuditEntry]:
+    def audit(
+        self,
+        mission_id: str,
+        event_type: str | None = None,
+        status: str | None = None,
+    ) -> list[MissionAuditEntry]:
         try:
-            return self._audit_store.list_for_mission(mission_id)
+            return self._audit_store.list_for_mission(
+                mission_id,
+                event_type=event_type,
+                status=status,
+            )
         except SQLAlchemyError:
             return []
 
