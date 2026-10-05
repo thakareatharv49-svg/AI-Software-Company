@@ -323,3 +323,80 @@ async def test_factory_records_project_output_manifest() -> None:
     assert output_store.manifests[0].mission_id == mission.id
     assert output_store.manifests[0].project_id == f"project:{mission.id}"
     assert output_store.manifests[0].status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_factory_can_use_real_m36_runner_adapter() -> None:
+    from src.company.autonomous_factory_runner import FactoryAutonomousRunner
+    from src.company.autonomous_project import AutonomousProjectRequest
+    from src.company.project_outputs import ProjectOutputManifest
+
+    class Stage:
+        def __init__(self, status: str):
+            self.status = status
+
+    class Project:
+        id = "real-project-1"
+        repository = "owner/real-project"
+
+    class Pipeline:
+        project = Project()
+        github_message = "pull request created"
+        memory_id = "memory-1"
+
+    class Result:
+        stages = tuple(Stage("completed") for _ in range(12))
+        pipeline = Pipeline()
+
+    class Runner:
+        async def run(self, request: AutonomousProjectRequest):
+            assert request.mission.mission_id == mission.id
+            return Result()
+
+    def build_request(mission, plan):
+        from company.ceo.models import Mission as CEOMission
+
+        return AutonomousProjectRequest.model_construct(
+            mission=CEOMission(mission_id=mission.id, objective=mission.objective),
+            research_query=mission.objective,
+            project_request=None,
+            manager_mission=None,
+            tasks=(),
+            qa_request=None,
+            files={},
+        )
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    adapter = FactoryAutonomousRunner(Runner(), build_request)
+    class OutputStore:
+        def __init__(self):
+            self.manifests: list[ProjectOutputManifest] = []
+        def save(self, manifest):
+            self.manifests.append(manifest)
+
+    output_store = OutputStore()
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        output_store=output_store,
+        autonomous_runner=adapter,
+    )
+    mission = CompanyMission(name="Real M36", objective="Run real lifecycle")
+    project = factory.enqueue(mission)
+
+    result = await factory.run(max_projects=1, max_stages=12, max_retries=0)
+
+    assert result == [project]
+    assert project.status == "completed"
+    assert project.stages_executed == 12
+    assert output_store.manifests[0].project_id == "real-project-1"
+    assert output_store.manifests[0].repository == "owner/real-project"
+    assert output_store.manifests[0].github_message == "pull request created"
+    assert output_store.manifests[0].memory_id == "memory-1"

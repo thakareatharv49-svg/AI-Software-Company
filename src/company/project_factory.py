@@ -5,6 +5,7 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from src.company.audit import MissionAuditEntry
+from src.company.autonomous_factory_runner import FactoryAutonomousRunner
 from src.company.events.events import CompanyEvent
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
@@ -55,8 +56,10 @@ class ProjectFactory:
     job_store: MissionJobStoreProtocol | None = None
     audit_store: MissionAuditStoreProtocol | None = None
     output_store: ProjectOutputStoreProtocol | None = None
+    autonomous_runner: FactoryAutonomousRunner | None = None
     queue: list[FactoryProject] = field(default_factory=list)
     _running: bool = field(default=False, init=False, repr=False)
+    _last_autonomous_result: object | None = field(default=None, init=False, repr=False)
 
     def restore(self) -> int:
         if self.store is None:
@@ -198,11 +201,28 @@ class ProjectFactory:
         )
 
         try:
-            results = await self.pipeline.execute_mission(
-                project.mission,
-                project.plan,
-                max_stages=max_stages,
-            )
+            if self.autonomous_runner is not None:
+                autonomous_result = await self.autonomous_runner.run(
+                    project.mission,
+                    project.plan,
+                )
+                for step in project.plan.steps:
+                    step.status = "completed"
+                results = [
+                    type(
+                        "FactoryStageResult",
+                        (),
+                        {"success": stage.status.value == "completed"},
+                    )()
+                    for stage in autonomous_result.stages
+                ]
+                self._last_autonomous_result = autonomous_result
+            else:
+                results = await self.pipeline.execute_mission(
+                    project.mission,
+                    project.plan,
+                    max_stages=max_stages,
+                )
         except Exception as exc:
             project.last_error = str(exc)
             results = []
@@ -315,13 +335,19 @@ class ProjectFactory:
     def _save_output_manifest(self, project: FactoryProject, status: str) -> None:
         if self.output_store is None:
             return
+        result = self._last_autonomous_result
+        pipeline_result = getattr(result, "pipeline", None)
+        pipeline_project = getattr(pipeline_result, "project", None)
         self.output_store.save(
             ProjectOutputManifest(
                 id=str(uuid4()),
                 mission_id=project.mission.id,
-                project_id=f"project:{project.mission.id}",
+                project_id=getattr(pipeline_project, "id", f"project:{project.mission.id}"),
                 name=project.mission.name,
                 status=status,
+                repository=getattr(pipeline_project, "repository", None),
+                github_message=getattr(pipeline_result, "github_message", None),
+                memory_id=getattr(pipeline_result, "memory_id", None),
             )
         )
 
