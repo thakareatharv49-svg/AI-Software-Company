@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from src.company.events.events import CompanyEvent
 from src.company.mission_controller.controller import MissionController
@@ -9,6 +10,12 @@ from src.company.mission_controller.models import MissionPlan
 from src.company.mission_controller.planner import build_mission_plan
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+
+
+@dataclass
+class FactoryStore(Protocol):
+    def save(self, project: FactoryProject) -> None: ...
+    def load_pending(self) -> list[dict]: ...
 
 
 @dataclass
@@ -26,7 +33,7 @@ class ProjectFactory:
     orchestrator: CompanyOrchestrator
     controller: MissionController
     pipeline: MissionExecutionPipeline
-    store: object | None = None
+    store: FactoryStore | None = None
     queue: list[FactoryProject] = field(default_factory=list)
 
     def restore(self) -> int:
