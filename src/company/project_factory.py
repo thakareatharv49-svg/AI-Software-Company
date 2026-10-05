@@ -95,6 +95,48 @@ class ProjectFactory:
         )
         return project
 
+    def cancel(self, mission_id: str) -> MissionJob:
+        job = self._load_job(mission_id)
+        if job is None:
+            raise KeyError(mission_id)
+        if job.status != MissionJobStatus.QUEUED:
+            raise ValueError(
+                f"Mission '{mission_id}' cannot be cancelled from '{job.status.value}'"
+            )
+        self.queue = [item for item in self.queue if item.mission.id != mission_id]
+        cancelled = transition_job(
+            job,
+            MissionJobStatus.CANCELLED,
+            f"Mission cancelled: {job.mission.name}",
+        )
+        self._save_job(cancelled)
+        return cancelled
+
+    def retry(self, mission_id: str) -> MissionJob:
+        job = self._load_job(mission_id)
+        if job is None:
+            raise KeyError(mission_id)
+        if job.status not in {MissionJobStatus.FAILED, MissionJobStatus.BLOCKED}:
+            raise ValueError(
+                f"Mission '{mission_id}' cannot be retried from '{job.status.value}'"
+            )
+        if any(item.mission.id == mission_id for item in self.queue):
+            raise ValueError(f"Mission '{mission_id}' is already queued")
+        queued = transition_job(
+            job,
+            MissionJobStatus.QUEUED,
+            f"Mission manually re-queued: {job.mission.name}",
+        )
+        self._save_job(queued)
+        project = FactoryProject(
+            mission=queued.mission,
+            plan=queued.plan,
+            attempts=queued.attempts,
+        )
+        self.queue.append(project)
+        self._save(project)
+        return queued
+
     async def run_next(self, max_stages: int | None = None, max_retries: int = 2) -> FactoryProject | None:
         if not self.queue:
             return None
