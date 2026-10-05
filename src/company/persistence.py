@@ -7,7 +7,7 @@ from sqlalchemy import JSON, DateTime, Integer, String, create_engine, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from src.company.mission_controller.models import MissionPlan
-from src.company.mission_jobs import MissionJob, MissionJobStatus
+from src.company.mission_jobs import MissionJob, MissionJobStatus, recover_running_job
 from src.company.models.contracts import CompanyMission
 from src.config.settings import settings
 from src.db.base import Base
@@ -85,6 +85,31 @@ class MissionJobStore:
                 created_at=row.created_at,
                 updated_at=row.updated_at,
             )
+
+    def recover_running(self) -> list[MissionJob]:
+        recovered: list[MissionJob] = []
+        with Session(self._engine) as session:
+            rows = session.scalars(
+                select(MissionJobRow).where(MissionJobRow.status == MissionJobStatus.RUNNING.value)
+            ).all()
+            for row in rows:
+                job = MissionJob(
+                    id=row.id,
+                    mission=CompanyMission.model_validate(row.mission),
+                    plan=MissionPlan.model_validate(row.plan),
+                    status=MissionJobStatus(row.status),
+                    message=row.message,
+                    attempts=row.attempts,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                )
+                job = recover_running_job(job)
+                row.status = job.status.value
+                row.message = job.message
+                row.updated_at = job.updated_at
+                recovered.append(job)
+            session.commit()
+        return recovered
 
     def list_all(self) -> list[MissionJob]:
         with Session(self._engine) as session:
