@@ -17,7 +17,12 @@ from src.company.audit import MissionAuditEntry
 from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
-from src.company.persistence import MissionAuditStore, MissionJobStore, ProjectOutputStore, ProjectStore
+from src.company.persistence import (
+    MissionAuditStore,
+    MissionJobStore,
+    ProjectOutputStore,
+    ProjectStore,
+)
 from src.company.project_outputs import ProjectOutputManifest
 from src.company.project_factory import ProjectFactory
 from src.runtime.providers.ollama import OllamaProvider
