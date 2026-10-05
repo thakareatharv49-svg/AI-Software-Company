@@ -15,6 +15,12 @@ def test_submit_mission_starts_company() -> None:
     assert record.status == "running"
     assert record.mission.objective == "Create X for users"
     assert center.state.status.value == "running"
+    assert [step.stage.value for step in record.plan.steps] == [
+        "research", "product", "architecture", "tasks", "agents", "execution",
+        "qa", "security", "github", "deployment", "monitoring", "learning",
+    ]
+    assert center.state.current_project_id == f"project:{record.mission.id}"
+    assert center.state.current_task_id == f"task:{record.mission.id}:research"
 
 
 def test_running_company_rejects_second_mission() -> None:
@@ -49,3 +55,21 @@ def test_stop_control_changes_company_state() -> None:
     state = center.stop()
     assert isinstance(state, CompanyState)
     assert state.status.value == "stopped"
+
+
+def test_mission_plan_api_exposes_internal_pipeline() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    app.dependency_overrides[get_control_center] = lambda: center
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/missions",
+            json={"name": "Build X", "objective": "Create X"},
+        )
+        mission_id = response.json()["mission"]["id"]
+        plan = client.get(f"/api/missions/{mission_id}/plan")
+        assert plan.status_code == 200
+        assert len(plan.json()["steps"]) == 12
+        assert plan.json()["steps"][0]["stage"] == "research"
+    finally:
+        app.dependency_overrides.clear()
