@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 from src.config.settings import settings
 from src.db.base import Base
+from src.company.persistence import FactoryProjectRow
 
 config = context.config
 
