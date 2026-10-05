@@ -7,8 +7,8 @@ from src.company.events.events import CompanyEvent
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
-from src.company.mission_jobs import MissionJob, MissionJobStatus, transition_job
 from src.company.mission_controller.planner import build_mission_plan
+from src.company.mission_jobs import MissionJob, MissionJobStatus, transition_job
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 
@@ -16,6 +16,11 @@ from src.company.orchestration.orchestrator import CompanyOrchestrator
 class FactoryStore(Protocol):
     def save(self, project: FactoryProject) -> None: ...
     def load_pending(self) -> list[dict]: ...
+
+
+class MissionJobStoreProtocol(Protocol):
+    def get(self, job_id: str) -> MissionJob | None: ...
+    def save(self, job: MissionJob) -> None: ...
 
 
 @dataclass
@@ -36,7 +41,7 @@ class ProjectFactory:
     controller: MissionController
     pipeline: MissionExecutionPipeline
     store: FactoryStore | None = None
-    job_store: object | None = None
+    job_store: MissionJobStoreProtocol | None = None
     queue: list[FactoryProject] = field(default_factory=list)
     _running: bool = field(default=False, init=False, repr=False)
 
@@ -234,8 +239,7 @@ class ProjectFactory:
     def _load_job(self, mission_id: str) -> MissionJob | None:
         if self.job_store is None:
             return None
-        getter = getattr(self.job_store, "get", None)
-        return getter(mission_id) if getter is not None else None
+        return self.job_store.get(mission_id)
 
     def _save_job(self, job: MissionJob) -> None:
         if self.job_store is not None:
