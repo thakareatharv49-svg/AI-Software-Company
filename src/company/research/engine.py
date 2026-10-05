@@ -68,10 +68,18 @@ class StaticResearchProvider:
         self._sources = tuple(sources)
 
     def search(self, query: str) -> tuple[ResearchSource, ...]:
-        terms = {term.lower() for term in query.split() if term.strip()}
-        if not terms:
+        normalized = " ".join(query.split()).lower()
+        if not normalized:
             return ()
 
+        exact = tuple(
+            source for source in self._sources
+            if " ".join(source.title.split()).lower() == normalized
+        )
+        if exact:
+            return exact
+
+        terms = {term for term in normalized.split() if term}
         matches = []
         for source in self._sources:
             haystack = " ".join(
