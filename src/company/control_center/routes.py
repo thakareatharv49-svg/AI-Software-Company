@@ -90,3 +90,24 @@ def block_company(
     center: CompanyControlCenter = ControlCenter,
 ):
     return center.block(reason)
+
+
+@router.post("/missions/{mission_id}/factory-run")
+async def run_factory(
+    mission_id: str,
+    max_stages: int | None = Query(default=None, ge=1, le=12),
+    center: CompanyControlCenter = ControlCenter,
+) -> dict[str, object]:
+    try:
+        center.enqueue_factory_mission(mission_id)
+        await center.run_factory(max_projects=1, max_stages=max_stages)
+        return {"status": "started", "mission_id": mission_id}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/factory/status")
+def factory_status(center: CompanyControlCenter = ControlCenter) -> dict[str, bool]:
+    return {"running": center.factory_running()}

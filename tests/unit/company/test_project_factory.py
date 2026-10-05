@@ -67,3 +67,58 @@ async def test_factory_stops_after_blocked_project() -> None:
     assert queued.status == "queued"
     assert len(results) == 1
     assert orchestrator.state.status.value == "blocked"
+
+
+@pytest.mark.asyncio
+async def test_factory_can_pause_and_resume_a_project() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    project = factory.enqueue(CompanyMission(name="Resume", objective="Build resume-safe project"))
+
+    paused = await factory.run_next(max_stages=2)
+
+    assert paused is project
+    assert project.status == "queued"
+    assert project.stages_executed == 2
+    assert len(factory.queue) == 1
+    assert project.plan.steps[0].status == "completed"
+    assert project.plan.steps[2].status == "planned"
+
+    resumed = await factory.run_next(max_stages=10)
+
+    assert resumed is project
+    assert project.status == "completed"
+    assert project.stages_executed == 12
+    assert len(factory.queue) == 0
+
+
+@pytest.mark.asyncio
+async def test_factory_restores_pending_projects() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    mission = CompanyMission(name="Persisted", objective="Restore me")
+    plan = controller.start(mission)[0]
+
+    class Store:
+        def load_pending(self):
+            return [{"mission": mission, "plan": plan, "status": "queued", "stages_executed": 4}]
+
+        def save(self, project):
+            pass
+
+    factory = ProjectFactory(orchestrator, controller, pipeline, store=Store())
+
+    assert factory.restore() == 1
+    assert factory.queue[0].mission.id == mission.id
+    assert factory.queue[0].stages_executed == 4

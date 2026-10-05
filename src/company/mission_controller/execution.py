@@ -186,38 +186,3 @@ class MissionExecutionPipeline:
             )
         )
         return results
-
-        step.status = "completed"
-        self.orchestrator.complete_task()
-        self.orchestrator.events.publish(
-            CompanyEvent(
-                event_type="STAGE_COMPLETED",
-                message=f"Stage completed: {step.stage.value}",
-                project_id=self.orchestrator.state.current_project_id,
-                task_id=task_id,
-            )
-        )
-
-        next_step = next((item for item in plan.steps if item.status == "planned"), None)
-        if next_step is None:
-            self.orchestrator.complete_project()
-            self.orchestrator.events.publish(
-                CompanyEvent(
-                    event_type="MISSION_PIPELINE_COMPLETED",
-                    message=f"Mission pipeline completed: {mission.name}",
-                    project_id=f"project:{mission.id}",
-                )
-            )
-            return result
-
-        next_task_id = f"task:{mission.id}:{next_step.stage.value}"
-        self.orchestrator.assign_task(next_task_id)
-        self.orchestrator.events.publish(
-            CompanyEvent(
-                event_type="STAGE_READY",
-                message=f"Next stage ready: {next_step.stage.value}",
-                project_id=self.orchestrator.state.current_project_id,
-                task_id=next_task_id,
-            )
-        )
-        return result

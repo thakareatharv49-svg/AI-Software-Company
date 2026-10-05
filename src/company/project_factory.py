@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Protocol
 
 from src.company.events.events import CompanyEvent
 from src.company.mission_controller.controller import MissionController
@@ -9,6 +10,12 @@ from src.company.mission_controller.models import MissionPlan
 from src.company.mission_controller.planner import build_mission_plan
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+
+
+@dataclass
+class FactoryStore(Protocol):
+    def save(self, project: FactoryProject) -> None: ...
+    def load_pending(self) -> list[dict]: ...
 
 
 @dataclass
@@ -21,17 +28,27 @@ class FactoryProject:
 
 @dataclass
 class ProjectFactory:
-    """Queues missions and runs projects sequentially through the company pipeline."""
+    """Persistent, sequential project factory."""
 
     orchestrator: CompanyOrchestrator
     controller: MissionController
     pipeline: MissionExecutionPipeline
+    store: FactoryStore | None = None
     queue: list[FactoryProject] = field(default_factory=list)
 
+    def restore(self) -> int:
+        if self.store is None:
+            return 0
+        restored = 0
+        for item in self.store.load_pending():
+            self.queue.append(FactoryProject(**item))
+            restored += 1
+        return restored
+
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
-        plan = build_mission_plan(mission)
-        project = FactoryProject(mission=mission, plan=plan)
+        project = FactoryProject(mission=mission, plan=build_mission_plan(mission))
         self.queue.append(project)
+        self._save(project)
         self.orchestrator.events.publish(
             CompanyEvent(
                 event_type="FACTORY_PROJECT_QUEUED",
@@ -47,6 +64,8 @@ class ProjectFactory:
 
         project = self.queue.pop(0)
         project.status = "running"
+        self._save(project)
+
         if self.orchestrator.state.status.value != "running":
             self.controller.start(project.mission)
 
@@ -63,35 +82,37 @@ class ProjectFactory:
             project.plan,
             max_stages=max_stages,
         )
-        project.stages_executed = len(results)
+        project.stages_executed += len(results)
 
         if all(result.success for result in results) and all(
             step.status == "completed" for step in project.plan.steps
         ):
             project.status = "completed"
             self.orchestrator.stop()
-            self.orchestrator.events.publish(
-                CompanyEvent(
-                    event_type="FACTORY_PROJECT_COMPLETED",
-                    message=f"Factory completed project: {project.mission.name}",
-                    project_id=f"project:{project.mission.id}",
-                )
-            )
+            event_type = "FACTORY_PROJECT_COMPLETED"
         elif self.orchestrator.state.status.value == "blocked":
             project.status = "blocked"
-            self.orchestrator.events.publish(
-                CompanyEvent(
-                    event_type="FACTORY_PROJECT_BLOCKED",
-                    message=f"Factory blocked project: {project.mission.name}",
-                    project_id=f"project:{project.mission.id}",
-                )
-            )
+            event_type = "FACTORY_PROJECT_BLOCKED"
         else:
-            project.status = "stopped"
+            project.status = "queued"
+            event_type = "FACTORY_PROJECT_PAUSED"
+            self.queue.insert(0, project)
 
+        self._save(project)
+        self.orchestrator.events.publish(
+            CompanyEvent(
+                event_type=event_type,
+                message=f"Factory project {project.status}: {project.mission.name}",
+                project_id=f"project:{project.mission.id}",
+            )
+        )
         return project
 
-    async def run(self, max_projects: int | None = None, max_stages: int | None = None) -> list[FactoryProject]:
+    async def run(
+        self,
+        max_projects: int | None = None,
+        max_stages: int | None = None,
+    ) -> list[FactoryProject]:
         completed: list[FactoryProject] = []
         while self.queue and (max_projects is None or len(completed) < max_projects):
             project = await self.run_next(max_stages=max_stages)
@@ -108,3 +129,7 @@ class ProjectFactory:
             )
         )
         return completed
+
+    def _save(self, project: FactoryProject) -> None:
+        if self.store is not None:
+            self.store.save(project)
