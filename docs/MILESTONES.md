@@ -374,6 +374,10 @@ Measure whether the company is actually improving.
 
 # Final Company Buildout
 
+## Post-Merge Validation
+
+M36-M45 validation fixes are tracked through CI before final completion.
+
 ## M41 — Scalability & Distributed Execution
 Status: NEXT
 
