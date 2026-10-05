@@ -103,7 +103,14 @@ class ProjectFactory:
             raise ValueError(
                 f"Mission '{mission_id}' cannot be cancelled from '{job.status.value}'"
             )
-        self.queue = [item for item in self.queue if item.mission.id != mission_id]
+        remaining: list[FactoryProject] = []
+        for item in self.queue:
+            if item.mission.id == mission_id:
+                item.status = "cancelled"
+                self._save(item)
+            else:
+                remaining.append(item)
+        self.queue = remaining
         cancelled = transition_job(
             job,
             MissionJobStatus.CANCELLED,
