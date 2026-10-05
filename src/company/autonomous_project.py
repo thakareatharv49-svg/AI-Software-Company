@@ -14,7 +14,8 @@ from company.execution.pipeline import CompanyExecutionPipeline, PipelineResult
 from company.learning.engine import LearningEngine, LearningReport
 from company.research.engine import ResearchEngine, ResearchProvider, ResearchReport
 from src.github.models.contracts import GitHubRepository
-from src.manager.models.contracts import Mission as ManagerMission, TaskPlanItem
+from src.manager.models.contracts import Mission as ManagerMission
+from src.manager.models.contracts import TaskPlanItem
 from src.projects.models.contracts import ProjectCreateRequest
 from src.qa.models.contracts import QATestRequest
 
@@ -123,7 +124,7 @@ class AutonomousProjectRunner:
             lambda: self._define_architecture(ceo, request),
         )
 
-        pipeline_result = self._run_stage(
+        pipeline_result = await self._run_async_stage(
             stages,
             "engineering_qa_security_github",
             lambda: self._pipeline.run_end_to_end(
@@ -260,6 +261,20 @@ class AutonomousProjectRunner:
         stages.append(StageResult(name, StageStatus.COMPLETED, "Stage completed."))
         return result
 
+    @staticmethod
+    async def _run_async_stage(
+        stages: list[StageResult],
+        name: str,
+        action: Callable[[], Awaitable[Any]],
+    ) -> Any:
+        try:
+            result = await action()
+        except Exception as exc:
+            stages.append(StageResult(name, StageStatus.FAILED, str(exc)))
+            raise
+        stages.append(StageResult(name, StageStatus.COMPLETED, "Stage completed."))
+        return result
+
     async def _delivery_stage(
         self,
         stages: list[StageResult],
@@ -338,12 +353,10 @@ class AutonomousProjectRunner:
                 "security": lambda: {
                     "status": pipeline.review_result.status.value,
                 },
-                "deployments": lambda: (
-                    {"status": deployment.status.value, "detail": deployment.detail},
-                ),
-                "monitoring": lambda: (
-                    {"status": monitoring.status.value, "detail": monitoring.detail},
-                ),
+                "deployments": lambda: {
+                    "status": deployment.status.value,
+                    "detail": deployment.detail,
+                },
                 "research": lambda: (
                     {
                         "query": research.query,
