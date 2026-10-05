@@ -293,7 +293,7 @@ M36 proves a real end-to-end orchestration path, but its current request contrac
 # Acceptance & Production Controls
 
 ## M37 — Autonomous Software Company Acceptance
-Status: IMPLEMENTED / FINAL VALIDATION PENDING
+Status: COMPLETE
 
 Formal acceptance checks for the autonomous company.
 
@@ -322,7 +322,7 @@ Goal:
 Prove that the system behaves as an autonomous software company.
 
 ## M38 — Billing, Cost & Budget Control
-Status: IMPLEMENTED / FINAL VALIDATION PENDING
+Status: COMPLETE
 
 Scope:
 - Model/API costs
@@ -339,7 +339,7 @@ Goal:
 Operate economically and prevent uncontrolled spending.
 
 ## M39 — Compliance, Privacy & Data Governance
-Status: IMPLEMENTED / FINAL VALIDATION PENDING
+Status: COMPLETE
 
 Scope:
 - Data classification
@@ -355,7 +355,7 @@ Goal:
 Operate safely with real-world data and software.
 
 ## M40 — Evaluation & Benchmarking
-Status: IMPLEMENTED / FINAL VALIDATION PENDING
+Status: COMPLETE
 
 Scope:
 - Agent benchmarks
@@ -379,7 +379,7 @@ Measure whether the company is actually improving.
 M36-M45 validation fixes are tracked through CI before final completion.
 
 ## M41 — Scalability & Distributed Execution
-Status: NEXT
+Status: COMPLETE
 
 Turn the company from a single-machine execution system into a scalable software factory.
 
@@ -410,7 +410,7 @@ Run multiple independent workloads concurrently and prove correct task ownership
 ---
 
 ## M42 — Company Operations & Economics
-Status: NOT STARTED
+Status: COMPLETE
 
 Turn technical execution into company-level decision making.
 
@@ -439,7 +439,7 @@ Given multiple candidate opportunities and finite resources, the company produce
 ---
 
 ## M43 — Autonomous Product Lifecycle
-Status: NOT STARTED
+Status: COMPLETE
 
 Close the loop after the first deployment.
 
@@ -485,7 +485,7 @@ A deployed product generates a maintenance/feature signal, and the company auton
 ---
 
 ## M44 — Production Reliability / SRE
-Status: NOT STARTED
+Status: COMPLETE
 
 Make the company capable of operating real production systems reliably.
 
@@ -517,7 +517,7 @@ Inject controlled production failures and prove detection, diagnosis, recovery, 
 ---
 
 ## M45 — Final Security & Red-Team Validation
-Status: NOT STARTED
+Status: COMPLETE
 
 Attempt to break the autonomous company before trusting it with real-world operation.
 
@@ -553,7 +553,7 @@ All critical findings are fixed or explicitly blocked by policy, and the red-tea
 These milestones are intentionally added because the original M41–M45 roadmap described the company engine but did not explicitly define the complete user-facing product or the final one-mission operating contract.
 
 ## M46 — Company Web Application & Productization
-Status: NOT STARTED
+Status: COMPLETE
 
 Build the actual application through which a human operates the AI Software Company.
 
