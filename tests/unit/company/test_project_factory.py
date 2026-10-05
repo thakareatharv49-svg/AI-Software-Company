@@ -354,8 +354,10 @@ async def test_factory_can_use_real_m36_runner_adapter() -> None:
             return Result()
 
     def build_request(mission, plan):
+        from company.ceo.models import Mission as CEOMission
+
         return AutonomousProjectRequest.model_construct(
-            mission=None,
+            mission=CEOMission(mission_id=mission.id, objective=mission.objective),
             research_query=mission.objective,
             project_request=None,
             manager_mission=None,
