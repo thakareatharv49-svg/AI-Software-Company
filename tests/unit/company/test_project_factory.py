@@ -288,3 +288,38 @@ def test_factory_can_retry_blocked_mission() -> None:
 
     assert retried.status == MissionJobStatus.QUEUED
     assert factory.queue[0].mission.id == mission.id
+
+
+@pytest.mark.asyncio
+async def test_factory_records_project_output_manifest() -> None:
+    class OutputStore:
+        def __init__(self):
+            self.manifests = []
+
+        def save(self, manifest):
+            self.manifests.append(manifest)
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    output_store = OutputStore()
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        output_store=output_store,
+    )
+    mission = CompanyMission(name="Output", objective="Record output")
+
+    project = factory.enqueue(mission)
+    result = await factory.run(max_projects=1, max_stages=12, max_retries=0)
+
+    assert result == [project]
+    assert len(output_store.manifests) == 1
+    assert output_store.manifests[0].mission_id == mission.id
+    assert output_store.manifests[0].project_id == f"project:{mission.id}"
+    assert output_store.manifests[0].status == "completed"
