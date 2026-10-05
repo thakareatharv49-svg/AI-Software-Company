@@ -23,3 +23,14 @@ def test_readiness_report_passes_for_authenticated_production(monkeypatch) -> No
     report = build_readiness_report()
     assert report.ready is True
     assert all(check.passed for check in report.checks)
+
+
+def test_readiness_api_is_exposed() -> None:
+    from fastapi.testclient import TestClient
+    from src.main import app
+
+    response = TestClient(app).get("/api/company/readiness")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "ready" in payload
+    assert "checks" in payload
