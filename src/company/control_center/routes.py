@@ -122,7 +122,7 @@ async def run_factory(
         return {"status": "started", "mission_id": mission_id}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except RuntimeError as exc:
+    except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
