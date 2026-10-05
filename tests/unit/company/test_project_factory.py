@@ -96,3 +96,29 @@ async def test_factory_can_pause_and_resume_a_project() -> None:
     assert project.status == "completed"
     assert project.stages_executed == 12
     assert len(factory.queue) == 0
+
+
+@pytest.mark.asyncio
+async def test_factory_restores_pending_projects() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    mission = CompanyMission(name="Persisted", objective="Restore me")
+    plan = controller.start(mission)[0]
+
+    class Store:
+        def load_pending(self):
+            return [{"mission": mission, "plan": plan, "status": "queued", "stages_executed": 4}]
+
+        def save(self, project):
+            pass
+
+    factory = ProjectFactory(orchestrator, controller, pipeline, store=Store())
+
+    assert factory.restore() == 1
+    assert factory.queue[0].mission.id == mission.id
+    assert factory.queue[0].stages_executed == 4
