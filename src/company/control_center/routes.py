@@ -9,6 +9,7 @@ from src.company.control_center.service import (
     control_center,
 )
 from src.company.events.events import CompanyEvent
+from src.company.mission_controller.models import MissionPlan
 from src.company.models.contracts import CompanyState
 
 router = APIRouter(prefix="/api", tags=["company-control"])
@@ -27,7 +28,7 @@ def company_state(center: ControlCenter) -> CompanyState:
 
 
 @router.get("/missions/{mission_id}/plan")
-def mission_plan(mission_id: str, center: ControlCenter):
+def mission_plan(mission_id: str, center: ControlCenter) -> MissionPlan:
     plan = center.mission_plan(mission_id)
     if plan is None:
         raise HTTPException(status_code=404, detail="Mission plan not found")
