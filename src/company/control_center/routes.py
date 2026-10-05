@@ -76,11 +76,13 @@ def retry_mission(
 @router.get("/missions/{mission_id}/audit", response_model=list[MissionAuditEntry])
 def mission_audit(
     mission_id: str,
+    event_type: str | None = Query(default=None, max_length=100),
+    status: str | None = Query(default=None, max_length=32),
     center: CompanyControlCenter = ControlCenter,
 ) -> list[MissionAuditEntry]:
     if center.mission_job(mission_id) is None:
         raise HTTPException(status_code=404, detail="Mission job not found")
-    return center.audit(mission_id)
+    return center.audit(mission_id, event_type=event_type, status=status)
 
 
 @router.get("/missions/{mission_id}/job", response_model=MissionJob)
