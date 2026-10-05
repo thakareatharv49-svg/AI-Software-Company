@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Any, Protocol
+
+from uuid import uuid4
+
+from src.company.audit import MissionAuditEntry
 
 from src.company.events.events import CompanyEvent
 from src.company.mission_controller.controller import MissionController
@@ -16,6 +20,10 @@ from src.company.orchestration.orchestrator import CompanyOrchestrator
 class FactoryStore(Protocol):
     def save(self, project: FactoryProject) -> None: ...
     def load_pending(self) -> list[dict]: ...
+
+
+class MissionAuditStoreProtocol(Protocol):
+    def append(self, entry: MissionAuditEntry) -> None: ...
 
 
 class MissionJobStoreProtocol(Protocol):
@@ -42,6 +50,7 @@ class ProjectFactory:
     pipeline: MissionExecutionPipeline
     store: FactoryStore | None = None
     job_store: MissionJobStoreProtocol | None = None
+    audit_store: MissionAuditStoreProtocol | None = None
     queue: list[FactoryProject] = field(default_factory=list)
     _running: bool = field(default=False, init=False, repr=False)
 
@@ -142,6 +151,7 @@ class ProjectFactory:
         )
         self.queue.append(project)
         self._save(project)
+        self._audit(mission_id, "MISSION_REQUEUED", queued.message, queued.status.value)
         return queued
 
     async def run_next(self, max_stages: int | None = None, max_retries: int = 2) -> FactoryProject | None:
@@ -161,6 +171,13 @@ class ProjectFactory:
                     MissionJobStatus.RUNNING,
                     f"Factory attempt {project.attempts} started: {project.mission.name}",
                 )
+            )
+            self._audit(
+                project.mission.id,
+                "MISSION_RUNNING",
+                f"Factory attempt {project.attempts} started: {project.mission.name}",
+                MissionJobStatus.RUNNING.value,
+                {"attempt": project.attempts},
             )
 
         if self.orchestrator.state.status.value != "running":
@@ -242,6 +259,13 @@ class ProjectFactory:
             self.queue.insert(0, project)
 
         self._save(project)
+        self._audit(
+            project.mission.id,
+            event_type,
+            f"Factory project {project.status}: {project.mission.name}",
+            self._load_job(project.mission.id).status.value if self._load_job(project.mission.id) else None,
+            {"attempt": project.attempts, "stages_executed": project.stages_executed},
+        )
         self.orchestrator.events.publish(
             CompanyEvent(
                 event_type=event_type,
@@ -280,6 +304,26 @@ class ProjectFactory:
             return completed
         finally:
             self._running = False
+
+    def _audit(
+        self,
+        mission_id: str,
+        event_type: str,
+        message: str,
+        status: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        if self.audit_store is not None:
+            self.audit_store.append(
+                MissionAuditEntry(
+                    id=str(uuid4()),
+                    mission_id=mission_id,
+                    event_type=event_type,
+                    message=message,
+                    status=status,
+                    metadata=metadata or {},
+                )
+            )
 
     def _save(self, project: FactoryProject) -> None:
         if self.store is not None:
