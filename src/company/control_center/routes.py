@@ -1,54 +1,43 @@
-from typing import Annotated
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from fastapi import APIRouter, Depends, HTTPException
-
+from src.agents.models.contracts import AgentResult
 from src.company.control_center.service import (
     CompanyControlCenter,
     MissionRecord,
     MissionSubmission,
     control_center,
 )
-from src.company.events.events import CompanyEvent
 from src.company.mission_controller.models import MissionPlan
-from src.company.models.contracts import CompanyState
 
-router = APIRouter(prefix="/api", tags=["company-control"])
+router = APIRouter(prefix="/api")
 
 
 def get_control_center() -> CompanyControlCenter:
     return control_center
 
 
-ControlCenter = Annotated[CompanyControlCenter, Depends(get_control_center)]
+ControlCenter = Depends(get_control_center)
 
 
-@router.get("/company/state", response_model=CompanyState)
-def company_state(center: ControlCenter) -> CompanyState:
+@router.get("/company/state")
+def company_state(center: CompanyControlCenter = ControlCenter):
     return center.state
 
 
-@router.get("/missions/{mission_id}/plan")
-def mission_plan(mission_id: str, center: ControlCenter) -> MissionPlan:
-    plan = center.mission_plan(mission_id)
-    if plan is None:
-        raise HTTPException(status_code=404, detail="Mission plan not found")
-    return plan
-
-
-@router.get("/missions", response_model=list[MissionRecord])
-def list_missions(center: ControlCenter) -> list[MissionRecord]:
+@router.get("/missions")
+def missions(center: CompanyControlCenter = ControlCenter) -> list[MissionRecord]:
     return center.missions()
 
 
-@router.get("/company/events", response_model=list[CompanyEvent])
-def company_events(center: ControlCenter) -> list[CompanyEvent]:
+@router.get("/company/events")
+def company_events(center: CompanyControlCenter = ControlCenter):
     return center.events()
 
 
-@router.post("/missions", response_model=MissionRecord, status_code=201)
+@router.post("/missions", status_code=status.HTTP_201_CREATED)
 def submit_mission(
     submission: MissionSubmission,
-    center: ControlCenter,
+    center: CompanyControlCenter = ControlCenter,
 ) -> MissionRecord:
     try:
         return center.submit_mission(submission)
@@ -56,14 +45,36 @@ def submit_mission(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@router.post("/company/stop", response_model=CompanyState)
-def stop_company(center: ControlCenter) -> CompanyState:
+@router.get("/missions/{mission_id}/plan")
+def mission_plan(
+    mission_id: str,
+    center: CompanyControlCenter = ControlCenter,
+) -> MissionPlan:
+    plan = center.mission_plan(mission_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Mission plan not found")
+    return plan
+
+
+@router.post("/missions/{mission_id}/execute", response_model=AgentResult)
+async def execute_mission_stage(
+    mission_id: str,
+    center: CompanyControlCenter = ControlCenter,
+) -> AgentResult:
+    try:
+        return await center.execute_next_stage(mission_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/company/stop")
+def stop_company(center: CompanyControlCenter = ControlCenter):
     return center.stop()
 
 
-@router.post("/company/block", response_model=CompanyState)
+@router.post("/company/block")
 def block_company(
-    center: ControlCenter,
-    reason: str = "Paused by operator",
-) -> CompanyState:
+    reason: str,
+    center: CompanyControlCenter = ControlCenter,
+):
     return center.block(reason)
