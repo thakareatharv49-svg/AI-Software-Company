@@ -8,6 +8,7 @@ from src.company.control_center.service import (
     control_center,
 )
 from src.company.mission_controller.models import MissionPlan
+from src.company.mission_jobs import MissionJob
 
 router = APIRouter(prefix="/api")
 
@@ -41,8 +42,24 @@ def submit_mission(
 ) -> MissionRecord:
     try:
         return center.submit_mission(submission)
-    except RuntimeError as exc:
+    except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/missions/{mission_id}/job", response_model=MissionJob)
+def mission_job(
+    mission_id: str,
+    center: CompanyControlCenter = ControlCenter,
+) -> MissionJob:
+    job = center.mission_job(mission_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Mission job not found")
+    return job
+
+
+@router.get("/mission-jobs", response_model=list[MissionJob])
+def mission_jobs(center: CompanyControlCenter = ControlCenter) -> list[MissionJob]:
+    return center.mission_jobs()
 
 
 @router.get("/missions/{mission_id}/plan")
@@ -105,7 +122,7 @@ async def run_factory(
         return {"status": "started", "mission_id": mission_id}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except RuntimeError as exc:
+    except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 

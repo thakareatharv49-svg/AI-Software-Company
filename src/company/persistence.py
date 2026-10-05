@@ -7,6 +7,7 @@ from sqlalchemy import JSON, DateTime, Integer, String, create_engine, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from src.company.mission_controller.models import MissionPlan
+from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission
 from src.config.settings import settings
 from src.db.base import Base
@@ -25,6 +26,87 @@ class FactoryProjectRow(Base):
     stages_executed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class MissionJobRow(Base):
+    __tablename__ = "mission_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    mission: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    plan: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    message: Mapped[str] = mapped_column(String(5000), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class MissionJobStore:
+    """Durable store for mission lifecycle jobs."""
+
+    def __init__(self) -> None:
+        url = settings.database_url.replace(
+            "postgresql+asyncpg://",
+            "postgresql+psycopg://",
+        )
+        self._engine = create_engine(url, pool_pre_ping=True)
+
+    def save(self, job: MissionJob) -> None:
+        with Session(self._engine) as session:
+            row = session.get(MissionJobRow, job.id)
+            values = {
+                "mission": job.mission.model_dump(mode="json"),
+                "plan": job.plan.model_dump(mode="json"),
+                "status": job.status.value,
+                "message": job.message,
+                "attempts": job.attempts,
+                "created_at": job.created_at,
+                "updated_at": job.updated_at,
+            }
+            if row is None:
+                session.add(MissionJobRow(id=job.id, **values))
+            else:
+                for key, value in values.items():
+                    setattr(row, key, value)
+            session.commit()
+
+    def get(self, job_id: str) -> MissionJob | None:
+        with Session(self._engine) as session:
+            row = session.get(MissionJobRow, job_id)
+            if row is None:
+                return None
+            return MissionJob(
+                id=row.id,
+                mission=CompanyMission.model_validate(row.mission),
+                plan=MissionPlan.model_validate(row.plan),
+                status=MissionJobStatus(row.status),
+                message=row.message,
+                attempts=row.attempts,
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+
+    def list_all(self) -> list[MissionJob]:
+        with Session(self._engine) as session:
+            rows = session.scalars(
+                select(MissionJobRow).order_by(MissionJobRow.created_at.desc())
+            ).all()
+            return [
+                MissionJob(
+                    id=row.id,
+                    mission=CompanyMission.model_validate(row.mission),
+                    plan=MissionPlan.model_validate(row.plan),
+                    status=MissionJobStatus(row.status),
+                    message=row.message,
+                    attempts=row.attempts,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                )
+                for row in rows
+            ]
+
+    def close(self) -> None:
+        self._engine.dispose()
 
 
 class ProjectStore:
