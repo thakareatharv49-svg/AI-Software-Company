@@ -136,6 +136,11 @@ class ProjectFactory:
         ):
             project.status = "completed"
             self.orchestrator.stop()
+            self._transition_job(
+                project,
+                MissionJobStatus.COMPLETED,
+                f"Project completed: {project.mission.name}",
+            )
             event_type = "FACTORY_PROJECT_COMPLETED"
         elif self.orchestrator.state.status.value == "blocked":
             project.last_error = project.last_error or "Project execution blocked"
