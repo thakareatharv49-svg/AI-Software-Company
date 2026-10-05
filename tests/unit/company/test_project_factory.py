@@ -122,3 +122,39 @@ async def test_factory_restores_pending_projects() -> None:
     assert factory.restore() == 1
     assert factory.queue[0].mission.id == mission.id
     assert factory.queue[0].stages_executed == 4
+
+
+@pytest.mark.asyncio
+async def test_factory_retries_a_failed_project() -> None:
+    class RecoveringRuntime:
+        calls = 0
+        async def generate(self, request):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("temporary model failure")
+            return ModelResponse(content="stage completed", model="fake", provider="fake")
+
+    runtime = RecoveringRuntime()
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(orchestrator, AgentExecutor(runtime), AgentRegistry())
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    project = factory.enqueue(CompanyMission(name="Retry", objective="Recover"))
+
+    result = await factory.run(max_projects=1, max_stages=12, max_retries=1)
+
+    assert result == [project]
+    assert project.status == "completed"
+    assert project.attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_factory_rejects_duplicate_run() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(orchestrator, AgentExecutor(FakeRuntime()), AgentRegistry())
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    factory._running = True
+
+    with pytest.raises(RuntimeError, match="already running"):
+        await factory.run()
