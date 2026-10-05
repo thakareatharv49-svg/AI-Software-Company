@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, DateTime, Integer, String, create_engine, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -10,12 +11,15 @@ from src.company.models.contracts import CompanyMission
 from src.config.settings import settings
 from src.db.base import Base
 
+if TYPE_CHECKING:
+    from src.company.project_factory import FactoryProject
+
 
 class FactoryProjectRow(Base):
     __tablename__ = "factory_projects"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    mission: Mapped[dict] = mapped_column(JSON, nullable=False)
+    mission: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     plan: Mapped[dict] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     stages_executed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -32,7 +36,7 @@ class ProjectStore:
         )
         self._engine = create_engine(url, pool_pre_ping=True)
 
-    def save(self, project) -> None:
+    def save(self, project: FactoryProject) -> None:
         now = datetime.now(UTC)
         with Session(self._engine) as session:
             row = session.get(FactoryProjectRow, project.mission.id)
