@@ -282,7 +282,7 @@ def test_factory_can_retry_blocked_mission() -> None:
     mission = CompanyMission(name="Retry", objective="Retry safely")
     factory.enqueue(mission)
     job = store.jobs[mission.id]
-    store.jobs[mission.id] = job.model_copy(status=MissionJobStatus.BLOCKED)
+    store.jobs[mission.id] = job.model_copy(update={"status": MissionJobStatus.BLOCKED})
 
     retried = factory.retry(mission.id)
 
