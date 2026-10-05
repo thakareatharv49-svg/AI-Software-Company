@@ -1,4 +1,4 @@
-﻿# AI Software Company â€” Master Milestone Roadmap
+# AI Software Company â€” Master Milestone Roadmap
 
 ## Purpose
 
@@ -844,4 +844,5 @@ M27 Bounded AI Tool-Calling Loop — COMPLETE
 M28 AI Execution Runtime — COMPLETE
 M29 AI Execution Observability — COMPLETE
 M30 AI Execution History & Persistence — COMPLETE
-M31 NEXT
+M31 AI Execution Coordinator — COMPLETE
+M32 NEXT
