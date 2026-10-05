@@ -71,6 +71,7 @@ async def execute_mission_stage(
 async def execute_mission(
     mission_id: str,
     max_stages: int | None = Query(default=None, ge=1, le=12),
+    max_retries: int = Query(default=2, ge=0, le=5),
     center: CompanyControlCenter = ControlCenter,
 ) -> list[AgentResult]:
     try:
@@ -100,7 +101,7 @@ async def run_factory(
 ) -> dict[str, object]:
     try:
         center.enqueue_factory_mission(mission_id)
-        await center.run_factory(max_projects=1, max_stages=max_stages)
+        await center.run_factory(max_projects=1, max_stages=max_stages, max_retries=max_retries)
         return {"status": "started", "mission_id": mission_id}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
