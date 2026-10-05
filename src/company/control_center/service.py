@@ -35,6 +35,9 @@ class CompanyControlCenter:
     def state(self) -> CompanyState:
         return self._orchestrator.state.model_copy(deep=True)
 
+    def events(self):
+        return self._orchestrator.events.list_events()
+
     def missions(self) -> list[MissionRecord]:
         with self._lock:
             return sorted(self._missions.values(), key=lambda item: item.created_at, reverse=True)
