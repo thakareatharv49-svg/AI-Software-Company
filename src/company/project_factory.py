@@ -5,7 +5,6 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from src.company.audit import MissionAuditEntry
-
 from src.company.events.events import CompanyEvent
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
