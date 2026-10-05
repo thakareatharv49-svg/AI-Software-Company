@@ -13,7 +13,7 @@ from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
-from src.company.mission_jobs import MissionJob, MissionJobStatus, transition_job
+from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.persistence import MissionJobStore, ProjectStore
