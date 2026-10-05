@@ -1,12 +1,17 @@
-# AI Software Company â€” Master Milestone Roadmap
+# AI Software Company — Master Milestone Roadmap
 
 ## Purpose
 
-This file is the permanent source of truth for the AI Software Company roadmap.
+This file is the permanent source of truth for the AI Software Company.
 
-The company must progress milestone by milestone.
+The destination is **not** a collection of demos or GitHub-only modules. The destination is a real software company that can receive one human mission, autonomously turn it into software, operate that software, learn from it, and continue to the next project within human-defined safety and governance boundaries.
+
+GitHub is the engineering source of truth. The company itself must operate through its own runtime and control plane.
+
+## Completion Rule
 
 A milestone is COMPLETE only when:
+
 1. Implementation is finished.
 2. Tests are added.
 3. Ruff passes.
@@ -16,593 +21,288 @@ A milestone is COMPLETE only when:
 7. Changes are pushed to `origin/main`.
 8. Working tree is clean.
 9. Milestone status is explicitly marked COMPLETE.
+10. Where applicable, the capability is exercised through the real company path, not only through isolated unit tests.
 
-Never skip milestones without an explicit decision.
+Never mark a milestone complete merely because files were added or a PR was merged.
 
 ---
 
 # Completed Foundation
 
-## M0 â€” Foundation & Planning
+## M0 — Foundation & Planning
 Status: COMPLETE
 
-Project vision, architecture, lifecycle, engineering rules and roadmap established.
+Vision, architecture, lifecycle, engineering rules and permanent roadmap.
 
-## M1 â€” Engineering Foundation
+## M1 — Engineering Foundation
 Status: COMPLETE
 
-Core repository, Python environment, testing, linting and engineering foundation.
+Repository, Python environment, testing and linting foundation.
 
-## M2 â€” AI Runtime
+## M2 — AI Runtime
 Status: COMPLETE
 
-Initial AI runtime foundation.
+Initial AI runtime.
 
-## M3 â€” Agent Engine
+## M3 — Agent Engine
 Status: COMPLETE
 
 Agent models, registry and execution engine.
 
-## M4 â€” Task Engine
+## M4 — Task Engine
 Status: COMPLETE
 
-Task lifecycle and task state management.
+Task lifecycle and state management.
 
-## M5 â€” Master Manager
+## M5 — Master Manager
 Status: COMPLETE
 
 Company-level coordination foundation.
 
-## M6 â€” Project Engine
+## M6 — Project Engine
 Status: COMPLETE
 
-Project lifecycle and project management foundation.
+Project lifecycle and management.
 
-## M7 â€” Engineering Agents
+## M7 — Engineering Agents
 Status: COMPLETE
 
 Engineering-agent foundation.
 
-## M8 â€” Sandbox
+## M8 — Sandbox
 Status: COMPLETE
 
-Sandbox execution foundation.
+Sandboxed execution foundation.
 
-## M9 â€” QA & Autonomous Debugging
+## M9 — QA & Autonomous Debugging
 Status: COMPLETE
 
 Testing and autonomous debugging foundation.
 
-## M10 â€” Security & Code Review
+## M10 — Security & Code Review
 Status: COMPLETE
 
 Security and review foundation.
 
-## M11 â€” GitHub Automation
+## M11 — GitHub Automation
 Status: COMPLETE
 
 GitHub integration and repository automation foundation.
 
-## M12 â€” Memory & Learning
+## M12 — Memory & Learning
 Status: COMPLETE
 
 Initial memory and learning architecture.
 
-## M13 â€” Dashboard
+## M13 — Dashboard
 Status: COMPLETE
 
 Dashboard foundation.
 
-## M14 â€” Continuous Autonomous Company
+## M14 — Continuous Autonomous Company
 Status: COMPLETE
 
 Continuous-company architecture foundation.
 
-## M15 â€” Core Autonomous Company Integration
+## M15 — Core Autonomous Company Integration
 Status: COMPLETE
 
-Core pipeline integration, runtime, tools, sandbox, persistence, GitHub, QA, memory, dashboard, security and end-to-end integration.
+Core pipeline integration across runtime, tools, sandbox, persistence, GitHub, QA, memory, dashboard and security.
 
-## M16 â€” Production Runtime & Prevention Infrastructure
+## M16 — Production Runtime & Prevention Infrastructure
 Status: COMPLETE
 
-Production runtime, lifecycle, monitoring, supervision, shutdown, metrics, alerting, backpressure, resource enforcement, timeout, recovery, persistence, GitHub runtime integration, QA runner, security, observability, dashboard, failure recovery, end-to-end execution and persistent memory/context prevention.
+Production runtime, lifecycle, monitoring, supervision, shutdown, metrics, alerting, backpressure, resource enforcement, timeout, recovery, persistence, observability and prevention infrastructure.
 
 ---
 
-# Current Roadmap
+# AI Company Expansion
 
-## M17 â€” Memory Integration
-Status: NEXT
+## M17 — Memory Integration
+Status: COMPLETE
 
-Connect persistent memory to the actual company.
+Connect persistent memory to real company execution.
 
 Scope:
-- Agent memory
-- Task memory
-- Project memory
-- Mission memory
-- Decision memory
-- Failure memory
-- Recovery memory
-- QA memory
-- Execution memory
-- Context retrieval before agent execution
+- Agent, task, project and mission memory
+- Decision and failure memory
+- Execution and QA memory
+- Context retrieval before execution
 - Memory writing after execution
-- Handoff context
-- Restart context
+- Handoff and restart context
 - Cross-agent context
 
 Goal:
-The company should not lose important context between tasks, agents or executions.
+The company does not lose important context between executions.
 
----
+## M18 — Real AI Model Layer
+Status: COMPLETE
 
-## M18 â€” Real AI Model Layer
-Status: NOT STARTED
-
-Build the production model abstraction.
-
-Scope:
-- Model provider abstraction
-- Local models
-- Cloud models
-- Model routing
-- Fallback models
-- Token tracking
-- Context limits
-- Model capability registry
-- Model selection
-- Structured output
-- Streaming
-- Retry handling
-- Model health
-- Provider failure recovery
+Production model abstraction, provider routing, structured output, streaming, retries, context limits, model health and fallback behavior.
 
 Goal:
-Agents can use real AI models through a stable internal interface.
+Agents use real AI models through a stable internal interface.
 
----
+## M19 — AI CEO / Master Manager
+Status: COMPLETE
 
-## M19 â€” AI CEO / Master Manager
-Status: NOT STARTED
-
-Build the autonomous company decision-maker.
-
-Scope:
-- Mission interpretation
-- Goal decomposition
-- Project selection
-- Priority management
-- Agent assignment
-- Resource allocation
-- Task delegation
-- Progress monitoring
-- Decision memory
-- Failure handling
-- Human escalation
-- Company-level planning
+Mission interpretation, goal decomposition, planning, assignment, resource decisions, monitoring, failure handling and human escalation.
 
 Goal:
-A human gives a mission and the AI CEO converts it into executable company work.
+A human mission becomes executable company work.
 
----
+## M20 — Universal Tool System
+Status: COMPLETE
 
-## M20 â€” Universal Tool System
-Status: NOT STARTED
-
-Build the standard tool layer used by all agents.
-
-Scope:
-- Filesystem
-- Terminal
-- Git
-- GitHub
-- Web research
-- HTTP/API
-- Database
-- Python execution
-- Testing
-- Package management
-- Tool permissions
-- Tool security
-- Tool logging
-- Tool timeout
-- Tool resource limits
+Filesystem, terminal, Git, GitHub, web research, HTTP/API, database, Python, testing, package management, permissions, logging, timeout and resource controls.
 
 Goal:
-Agents can safely interact with the real development environment.
+Agents can safely interact with real development environments.
 
----
+## M21 — Real Project Factory
+Status: COMPLETE
 
-## M21 â€” Real Project Factory
-Status: NOT STARTED
-
-Build the system that turns an approved idea into a real software project.
-
-Scope:
-- Project discovery
-- Requirements
-- Product definition
-- Architecture
-- Technology selection
-- Repository creation
-- Project initialization
-- Task generation
-- Agent assignment
-- Project lifecycle
-- Project memory
+Project discovery, requirements, product definition, architecture, repository initialization, task generation and project lifecycle.
 
 Goal:
-The company can autonomously start a real software project.
+The company can start real software projects.
 
----
+## M22 — Autonomous Engineering
+Status: COMPLETE
 
-## M22 â€” Autonomous Engineering
-Status: NOT STARTED
-
-Build the engineering execution system.
-
-Scope:
-- Code generation
-- Code modification
-- File creation
-- Dependency installation
-- Git branches
-- Commits
-- Pull requests
-- Code review
-- Refactoring
-- Documentation
-- Build execution
+Code generation/modification, dependencies, branches, commits, pull requests, review, refactoring, documentation and builds.
 
 Goal:
-Agents can independently implement software tasks.
+Agents can implement software tasks.
 
----
+## M23 — Autonomous QA & Debugging 2.0
+Status: COMPLETE
 
-## M23 â€” Autonomous QA & Debugging 2.0
-Status: PARTIALLY COMPLETE
-
-Upgrade QA from a runner into an autonomous quality system.
-
-Scope:
-- Test generation
-- Test execution
-- Failure analysis
-- Root-cause detection
-- Automatic fixes
-- Regression testing
-- Quality scoring
-- Retry loops
-- Bug memory
-- QA reports
-- Release gates
+Test generation, failure analysis, root-cause detection, automatic repair, regression testing, quality scoring and release gates.
 
 Goal:
-The company can find and fix its own software failures.
+The company can find and fix its own failures.
 
----
+## M24 — Production Security & Governance
+Status: COMPLETE
 
-## M24 â€” Production Security & Governance
-Status: PARTIALLY COMPLETE
-
-Harden the company against unsafe autonomous actions.
-
-Scope:
-- Permission system
-- Agent capabilities
-- Tool allowlists
-- Secret protection
-- Data isolation
-- Sandbox policies
-- Repository protection
-- Human approval gates
-- Dangerous-operation controls
-- Audit trails
-- Policy enforcement
+Permissions, capabilities, tool allowlists, secret protection, isolation, sandbox policies, repository protection, approval gates and audit trails.
 
 Goal:
 Autonomous does not mean unrestricted.
 
----
+## M25 — Self-Healing & Recovery
+Status: COMPLETE
 
-## M25 â€” Self-Healing & Recovery
-Status: PARTIALLY COMPLETE
-
-Build company-wide recovery.
-
-Scope:
-- Runtime failure recovery
-- Agent failure recovery
-- Task retry
-- Project recovery
-- State restoration
-- Crash recovery
-- Restart recovery
-- Checkpointing
-- Failure diagnosis
-- Recovery strategies
-- Escalation
+Runtime, agent, task and project recovery, checkpointing, diagnosis, retry strategies and escalation.
 
 Goal:
-The company can recover from failures without losing its work.
+The company can recover without losing work.
 
----
+## M26 — Production Memory & Knowledge Engine
+Status: COMPLETE
 
-## M26 â€” Production Memory & Knowledge Engine
-Status: NOT STARTED
-
-Upgrade the initial memory system into production-grade knowledge infrastructure.
-
-Scope:
-- PostgreSQL persistence
-- Semantic embeddings
-- Vector search
-- Hybrid retrieval
-- Memory ranking
-- Long-term knowledge
-- Short-term context
-- Episodic memory
-- Semantic memory
-- Procedural memory
-- Memory consolidation
-- Duplicate detection
-- Memory expiration
-- Knowledge graphs
+Persistent organizational knowledge, retrieval, consolidation, ranking and durable context.
 
 Goal:
-The company develops persistent organizational knowledge.
+The company develops institutional memory.
 
----
+## M27 — Agent Registry & Agent Marketplace
+Status: COMPLETE
 
-## M27 â€” Agent Registry & Agent Marketplace
-Status: NOT STARTED
-
-Build the complete agent ecosystem.
-
-Scope:
-- Agent registry
-- Agent capabilities
-- Agent versions
-- Agent performance
-- Agent specialization
-- Agent health
-- Agent selection
-- Agent lifecycle
-- Agent templates
-- Agent composition
+Agent capabilities, versions, health, specialization, selection and composition.
 
 Goal:
-The company can dynamically select the best agent for each task.
+The company can select suitable agents dynamically.
 
----
+## M28 — Artifact & Document System
+Status: COMPLETE
 
-## M28 â€” Artifact & Document System
-Status: NOT STARTED
-
-Build centralized company artifacts.
-
-Scope:
-- Specifications
-- Architecture documents
-- Design documents
-- Research
-- Test reports
-- QA reports
-- Decisions
-- Project documentation
-- Release notes
-- Agent reports
-- Artifact versioning
+Specifications, architecture, research, QA reports, decisions, project documentation, release notes and versioned artifacts.
 
 Goal:
-Important company knowledge exists as durable artifacts.
+Important company knowledge is durable.
 
----
+## M29 — Project State & Control Plane
+Status: COMPLETE
 
-## M29 â€” Project State & Control Plane
-Status: NOT STARTED
-
-Create the authoritative state system.
-
-Scope:
-- Company state
-- Project state
-- Task state
-- Agent state
-- Runtime state
-- Dependency state
-- Release state
-- Recovery state
-- State transitions
-- Checkpoints
-- Event history
+Authoritative company, project, task, agent, runtime, dependency, release and recovery state.
 
 Goal:
-The company always knows what is happening and what must happen next.
+The company always knows what is happening and what happens next.
 
----
+## M30 — Human Control Center
+Status: COMPLETE
 
-## M30 â€” Human Control Center
-Status: NOT STARTED
-
-Create the human oversight interface.
-
-Scope:
-- Mission submission
-- Project approval
-- Agent monitoring
-- Task monitoring
-- Logs
-- Memory
-- Costs
-- Security alerts
-- Approval requests
-- Pause/resume
-- Stop
-- Override
-- Manual intervention
+Mission submission, monitoring, logs, memory, costs, security alerts, approvals, pause/resume, stop and override foundations.
 
 Goal:
 Humans remain in control while the company operates autonomously.
 
----
-
-## M31 â€” Deployment & Infrastructure Engine
-Status: NOT STARTED
-
-Build autonomous deployment.
-
-Scope:
-- Build
-- Package
-- Containers
-- Deployment
-- Environment management
-- Infrastructure provisioning
-- Health checks
-- Rollbacks
-- Deployment validation
-- Release management
-
-Goal:
-The company can take software from source code to production.
-
----
-
-## M32 â€” Real-World Research Engine
-Status: NOT STARTED
-
-Build autonomous research.
-
-Scope:
-- Web research
-- Documentation research
-- Market research
-- Technology research
-- Competitor analysis
-- Source validation
-- Fact checking
-- Research memory
-- Research reports
-
-Goal:
-The company can understand the world before building.
-
----
-
-## M33 â€” Multi-Agent Collaboration
-Status: NOT STARTED
-
-Enable agents to work together.
-
-Scope:
-- Agent communication
-- Shared context
-- Task handoffs
-- Parallel work
-- Dependency coordination
-- Peer review
-- Debate
-- Conflict resolution
-- Agent synchronization
-
-Goal:
-Multiple specialized agents operate as one engineering organization.
-
----
-
-## M34 â€” Company Dashboard
-Status: PARTIALLY COMPLETE
-
-Create the complete company control dashboard.
-
-Scope:
-- Company overview
-- Active projects
-- Agents
-- Tasks
-- Runtime
-- Memory
-- QA
-- Security
-- Costs
-- Deployments
-- Failures
-- Research
-- Metrics
-- Audit
-
-Goal:
-One place to understand the entire autonomous company.
-
----
-
-## M35 â€” Continuous Learning Engine
+## M31 — AI Execution Coordinator
 Status: COMPLETE
 
-Turn experience into improvement.
+Company-level AI execution coordination and persistent execution history.
 
-Scope:
-- Failure analysis
-- Success analysis
-- Agent performance
-- Strategy evaluation
-- Process optimization
-- Prompt improvement
-- Tool improvement
-- Workflow improvement
-- Knowledge consolidation
-- Benchmark-driven learning
+## M32 — Real-World Research Engine
+Status: COMPLETE
 
-Goal:
-The company becomes better through experience.
+Real research providers, source validation and research reports.
 
----
+## M33 — Multi-Agent Collaboration
+Status: COMPLETE
 
-## M36 â€” End-to-End Autonomous Project
-Status: NOT STARTED
+Agent communication, handoffs, shared context and dependency coordination.
 
-Run the complete company on a real software project.
+## M34 — Company Dashboard
+Status: COMPLETE
 
-Flow:
+Company-wide dashboard data boundary covering projects, agents, tasks, runtime, memory, QA, security, costs, deployments, failures, research, metrics and audit.
+
+## M35 — Continuous Learning Engine
+Status: COMPLETE
+
+Failure/success analysis, agent performance, strategy evaluation, process optimization and knowledge consolidation.
+
+## M36 — End-to-End Autonomous Project
+Status: COMPLETE
+
+Integrated path:
 
 MISSION
-â†’ AI CEO
-â†’ RESEARCH
-â†’ PRODUCT DEFINITION
-â†’ ARCHITECTURE
-â†’ TASK BREAKDOWN
-â†’ AGENT ASSIGNMENT
-â†’ ENGINEERING
-â†’ QA
-â†’ DEBUGGING
-â†’ SECURITY
-â†’ CODE REVIEW
-â†’ GITHUB
-â†’ DEPLOYMENT
-â†’ MONITORING
-â†’ FEEDBACK
-â†’ MEMORY
-â†’ IMPROVEMENT
+→ AI CEO
+→ RESEARCH
+→ RESEARCH HANDOFF
+→ PRODUCT DEFINITION
+→ ARCHITECTURE
+→ ENGINEERING
+→ QA
+→ DEBUGGING
+→ SECURITY
+→ GITHUB
+→ DEPLOYMENT
+→ MONITORING
+→ LEARNING
+→ DASHBOARD
 
-Goal:
-Build the first genuinely real project autonomously.
+Important limitation discovered:
+M36 proves a real end-to-end orchestration path, but its current request contract still contains externally prepared project/task inputs. Therefore it is not yet the final one-mission autonomy contract. That gap is intentionally addressed later rather than hidden.
 
 ---
 
-## M37 â€” Autonomous Software Company Acceptance
-Status: NOT STARTED
+# Acceptance & Production Controls
 
-Formal acceptance test for the company.
+## M37 — Autonomous Software Company Acceptance
+Status: IMPLEMENTED / FINAL VALIDATION PENDING
 
-Requirements:
+Formal acceptance checks for the autonomous company.
+
+Scope:
 - Real mission
 - Real project
 - Real repository
 - Real agents
-- Real AI models
+- Real AI execution
 - Real tools
 - Real coding
 - Real QA
@@ -615,15 +315,14 @@ Requirements:
 - Human override
 - Complete audit trail
 
+Additional final requirement:
+- Verify the one-human-mission contract is not bypassed by pre-supplied planning data.
+
 Goal:
 Prove that the system behaves as an autonomous software company.
 
----
-
-# Advanced Production Milestones
-
-## M38 â€” Billing, Cost & Budget Control
-Status: NOT STARTED
+## M38 — Billing, Cost & Budget Control
+Status: IMPLEMENTED / FINAL VALIDATION PENDING
 
 Scope:
 - Model/API costs
@@ -637,32 +336,26 @@ Scope:
 - Human approval for expensive operations
 
 Goal:
-The company can operate economically and prevent uncontrolled spending.
+Operate economically and prevent uncontrolled spending.
 
----
-
-## M39 â€” Compliance, Privacy & Data Governance
-Status: NOT STARTED
+## M39 — Compliance, Privacy & Data Governance
+Status: IMPLEMENTED / FINAL VALIDATION PENDING
 
 Scope:
 - Data classification
 - PII detection
 - Sensitive-data handling
-- Retention policies
-- Data deletion
-- Data export
+- Retention
+- Deletion/export controls
 - Audit
 - Repository isolation
-- Open-source license compliance
-- Dependency license checks
+- Dependency/license governance
 
 Goal:
-The company operates safely with real-world data and software.
+Operate safely with real-world data and software.
 
----
-
-## M40 â€” Evaluation & Benchmarking
-Status: NOT STARTED
+## M40 — Evaluation & Benchmarking
+Status: IMPLEMENTED / FINAL VALIDATION PENDING
 
 Scope:
 - Agent benchmarks
@@ -670,8 +363,7 @@ Scope:
 - QA benchmarks
 - Research benchmarks
 - Regression benchmarks
-- Model comparison
-- Agent comparison
+- Model/agent comparison
 - Autonomous-run scoring
 - Quality history
 
@@ -680,88 +372,150 @@ Measure whether the company is actually improving.
 
 ---
 
-## M41 â€” Scalability & Distributed Execution
-Status: NOT STARTED
+# Final Company Buildout
+
+## M41 — Scalability & Distributed Execution
+Status: NEXT
+
+Turn the company from a single-machine execution system into a scalable software factory.
 
 Scope:
-- Multiple workers
-- Distributed queues
-- Concurrent projects
+- Worker abstraction
+- Multiple execution workers
+- Distributed task queues
+- Concurrent task execution
+- Concurrent project execution
 - Scheduling
 - Resource allocation
-- Horizontal scaling
-- Fault-tolerant coordination
 - Worker health
+- Worker registration
+- Fault-tolerant coordination
+- Backpressure across workers
+- Retry and reassignment
+- Persistent distributed state
+- Safe concurrency limits
+- Local development mode
+- Production distributed mode
 
 Goal:
-Move from a single-machine company to a scalable software factory.
+The company can safely scale beyond one execution process without losing authoritative state or safety controls.
+
+Acceptance:
+Run multiple independent workloads concurrently and prove correct task ownership, recovery and state consistency.
 
 ---
 
-## M42 â€” Company Operations & Economics
+## M42 — Company Operations & Economics
 Status: NOT STARTED
+
+Turn technical execution into company-level decision making.
 
 Scope:
 - Project prioritization
 - Opportunity scoring
-- Development cost
+- Project cost estimation
 - Revenue estimation
-- ROI
+- ROI estimation
 - Portfolio management
-- Project abandonment
 - Resource allocation
-- Business strategy
+- Agent allocation
+- Project continuation decisions
+- Project abandonment decisions
+- Budget-aware planning
+- Economic risk analysis
+- Company-level objectives
+- Strategic decision records
 
 Goal:
-The AI company can make rational portfolio-level decisions.
+The AI company can decide **what it should build and operate**, not merely how to execute assigned tasks.
+
+Acceptance:
+Given multiple candidate opportunities and finite resources, the company produces a justified portfolio decision and executes according to that decision.
 
 ---
 
-## M43 â€” Autonomous Product Lifecycle
+## M43 — Autonomous Product Lifecycle
 Status: NOT STARTED
+
+Close the loop after the first deployment.
 
 Lifecycle:
 
 BUILD
-â†’ DEPLOY
-â†’ MONITOR
-â†’ OBSERVE
-â†’ RECEIVE FEEDBACK
-â†’ DETECT BUGS/FEATURES
-â†’ PRIORITIZE
-â†’ IMPLEMENT
-â†’ TEST
-â†’ DEPLOY
+→ DEPLOY
+→ MONITOR
+→ OBSERVE
+→ RECEIVE FEEDBACK
+→ DETECT BUGS / FEATURES
+→ RESEARCH
+→ PRIORITIZE
+→ PLAN
+→ IMPLEMENT
+→ TEST
+→ SECURITY
+→ DEPLOY
+→ MONITOR
+→ LEARN
+
+Scope:
+- Product feedback ingestion
+- User/operational feedback
+- Bug discovery
+- Feature discovery
+- Product analytics
+- Backlog generation
+- Automatic prioritization
+- Product roadmap evolution
+- Autonomous maintenance
+- Safe release gates
+- Versioning
+- Rollback
+- Product memory
 
 Goal:
-Products continuously evolve after their initial release.
+A product does not stop at its first release. The company continuously operates and improves it.
+
+Acceptance:
+A deployed product generates a maintenance/feature signal, and the company autonomously takes it through planning, implementation, validation and release.
 
 ---
 
-## M44 â€” Production Reliability / SRE
+## M44 — Production Reliability / SRE
 Status: NOT STARTED
+
+Make the company capable of operating real production systems reliably.
 
 Scope:
 - Monitoring
 - Alerting
 - Incident management
-- Logs
+- Structured logs
 - Metrics
 - Distributed tracing
 - Health checks
+- SLI/SLO/SLA definitions
+- Error budgets
 - Backups
 - Disaster recovery
 - Rollbacks
-- SLA/SLO
-- Reliability engineering
+- Capacity management
+- Incident diagnosis
+- Automated remediation
+- Post-incident learning
+- Reliability reports
 
 Goal:
-Operate autonomous software reliably in production.
+Autonomous software remains reliable after deployment.
+
+Acceptance:
+Inject controlled production failures and prove detection, diagnosis, recovery, rollback where appropriate, auditability and learning.
 
 ---
 
-## M45 â€” Final Security & Red-Team Validation
+## M45 — Final Security & Red-Team Validation
 Status: NOT STARTED
+
+Attempt to break the autonomous company before trusting it with real-world operation.
 
 Scope:
 - Prompt injection
@@ -774,20 +528,238 @@ Scope:
 - Agent manipulation
 - Data exfiltration
 - Supply-chain attacks
-- Adversarial testing
+- Unsafe autonomous GitHub actions
+- Unsafe deployment actions
+- Cross-project data leakage
+- Governance bypass
+- Cost-control bypass
+- Recovery abuse
+- Adversarial task inputs
 
 Goal:
-Attempt to break the autonomous company before trusting it with real-world operation.
+Demonstrate that the company remains inside its security, governance and human-control boundaries under adversarial conditions.
+
+Acceptance:
+All critical findings are fixed or explicitly blocked by policy, and the red-team suite passes without unsafe autonomous behavior.
 
 ---
 
-## M46+ â€” Continuous Autonomous Evolution
-Status: FUTURE
+# Productization Milestones
 
-The company becomes continuously self-improving.
+These milestones are intentionally added because the original M41–M45 roadmap described the company engine but did not explicitly define the complete user-facing product or the final one-mission operating contract.
+
+## M46 — Company Web Application & Productization
+Status: NOT STARTED
+
+Build the actual application through which a human operates the AI Software Company.
 
 Scope:
-- Continuous project generation
+
+### Mission
+- Mission submission
+- Mission history
+- Mission status
+- Mission approval/result
+- Mission cancellation
+
+### Company
+- Company overview
+- Current company state
+- Active projects
+- Completed projects
+- Company health
+
+### Projects
+- Project list
+- Project details
+- Project lifecycle
+- Releases
+- Deployments
+- Product feedback
+
+### Agents
+- Agent registry
+- Agent status
+- Current work
+- Capabilities
+- Performance
+- Health
+
+### Execution
+- Task graph
+- Live task status
+- Agent handoffs
+- Execution logs
+- Failure/recovery events
+- QA results
+- Security results
+
+### Operations
+- Costs
+- Budgets
+- Resource usage
+- Incidents
+- Alerts
+- Governance findings
+
+### GitHub
+- Repository
+- Branches
+- Commits
+- Pull requests
+- Reviews
+- Merge status
+- Release status
+
+### Human control
+- Pause
+- Resume
+- Stop
+- Override
+- Approval requests
+- Emergency shutdown
+
+### UI architecture
+- Production web frontend
+- Authenticated backend/API
+- Real-time execution updates
+- Persistent company state
+- Responsive desktop interface
+- Clean production UX
+
+Goal:
+Turn the company engine into an actual application that a human can open and operate.
+
+Acceptance:
+A user can submit one mission through the web application and observe the complete company lifecycle from the UI.
+
+---
+
+## M47 — True One-Mission Autonomous Company
+Status: NOT STARTED
+
+Remove the architectural dependency on human-prepared execution inputs.
+
+The required external input becomes:
+
+**ONE MISSION**
+
+The company itself must derive:
+
+- Research questions
+- Product requirements
+- Acceptance criteria
+- Architecture
+- Technology choices
+- Project definition
+- Task graph
+- Agent assignments
+- QA strategy
+- Security strategy
+- GitHub workflow
+- Deployment plan
+- Monitoring plan
+- Learning plan
+
+The existing M36 `AutonomousProjectRequest` contract must be replaced or wrapped by a higher-level mission controller that can derive all downstream inputs internally.
+
+Goal:
+The human does not manually tell the company how to execute the mission.
+
+Acceptance:
+A test provides only a mission and permitted company configuration. The company derives and executes the remaining workflow without manually supplied research/task/project plans.
+
+---
+
+## M48 — Autonomous Company Operations & GitHub Control
+Status: NOT STARTED
+
+Remove unnecessary human operational intervention from the company loop.
+
+Scope:
+- Autonomous branch creation
+- Autonomous commits
+- Autonomous PR creation
+- Automated review gates
+- Automated merge decision within policy
+- Protected production boundaries
+- Autonomous release management
+- Autonomous deployment triggering
+- Autonomous rollback
+- Autonomous issue creation
+- Autonomous project state updates
+- Human escalation only when policy requires it
+
+Important principle:
+The company must not be able to bypass its safety and governance controls merely because it can operate GitHub autonomously.
+
+Goal:
+The human gives the mission; the company performs its own software operations.
+
+Acceptance:
+Run a complete mission where no human manually creates branches, commits, PRs, merges, deploys or advances routine execution stages, while all policy and audit requirements remain enforced.
+
+---
+
+## M49 — Production Launch & Final Company Acceptance
+Status: NOT STARTED
+
+Final integrated launch gate.
+
+Scope:
+- Complete web application
+- Complete backend/company engine
+- One-mission autonomy
+- Autonomous GitHub operations
+- Autonomous product lifecycle
+- Distributed execution
+- Cost controls
+- Governance
+- Evaluation
+- Reliability
+- Security/red-team results
+- Backup/recovery
+- Observability
+- Documentation
+- Operational runbooks
+- Deployment
+- Final end-to-end mission
+
+Final acceptance test:
+
+YOU
+→ ONE MISSION
+→ COMPANY
+→ RESEARCH
+→ PRODUCT
+→ ARCHITECTURE
+→ TASKS
+→ AGENTS
+→ ENGINEERING
+→ QA
+→ DEBUGGING
+→ SECURITY
+→ GITHUB
+→ DEPLOYMENT
+→ MONITORING
+→ FEEDBACK
+→ IMPROVEMENT
+→ NEXT WORK
+
+No routine human orchestration between these stages.
+
+Goal:
+Prove that the project has become the actual AI Software Company we originally intended to build.
+
+---
+
+# M50+ — Continuous Autonomous Evolution
+Status: FUTURE
+
+After M49, the company enters continuous evolution rather than a fixed final feature list.
+
+Scope:
+- Continuous project discovery
 - Continuous learning
 - Agent evolution
 - Workflow evolution
@@ -795,58 +767,82 @@ Scope:
 - Infrastructure evolution
 - Self-evaluation
 - Self-optimization
-- New project discovery
 - Portfolio evolution
+- New product discovery
+- Cost optimization
+- Reliability optimization
+- Security improvement
+- Capability expansion
 
-Goal:
+Core loop:
 
 MISSION
-â†’ BUILD
-â†’ DEPLOY
-â†’ LEARN
-â†’ IMPROVE
-â†’ BUILD NEXT
-â†’ REPEAT
+→ BUILD
+→ DEPLOY
+→ OPERATE
+→ LEARN
+→ IMPROVE
+→ DISCOVER NEXT OPPORTUNITY
+→ BUILD NEXT
+→ REPEAT
 
-The company continuously evolves while remaining within human-defined safety and governance boundaries.
+The company continuously evolves while remaining within human-defined safety, governance, budget and control boundaries.
+
+---
+
+# Destination
+
+The project is COMPLETE as a product when M49 passes.
+
+The long-term company is then represented by M50+.
+
+The final product is not merely:
+
+- a Python package,
+- a collection of agents,
+- a GitHub repository,
+- a dashboard,
+- or a workflow demo.
+
+It is a real AI-operated software company with:
+
+1. A human-facing web application.
+2. A company execution engine.
+3. One-mission autonomous planning.
+4. Autonomous engineering.
+5. Autonomous QA and debugging.
+6. Autonomous security controls.
+7. Autonomous GitHub operations.
+8. Autonomous deployment and monitoring.
+9. Autonomous product evolution.
+10. Persistent company memory and learning.
+11. Cost and governance controls.
+12. Production reliability.
+13. Red-team validation.
+14. Human override and emergency control.
+
+The human provides direction.
+
+The company performs the work.
 
 ---
 
 # Milestone Execution Rule
 
-Always work on exactly one active milestone.
+Work on exactly one active implementation milestone at a time.
 
-Current milestone:
+Planning may span multiple future milestones, but implementation must have one active milestone.
 
-**M36 â€” End-to-End Autonomous Project**
+After completing a milestone:
 
-After completing a milestone, update this file:
-
-`Status: COMPLETE`
-
-Then commit and push the change before starting the next milestone.
+1. Run the complete validation gates.
+2. Update this file.
+3. Mark the milestone COMPLETE.
+4. Commit.
+5. Push to `origin/main`.
+6. Verify the working tree is clean.
+7. Only then begin the next milestone.
 
 Never rely on chat history alone for the roadmap.
 
 GitHub repository + this file are the persistent roadmap source of truth.
-M21 Agent Tool Integration â€” COMPLETE
-M22 AI Tool-Calling Integration â€” NEXT
-
-M21 Agent Tool Integration — COMPLETE
-M22 AI Tool-Calling Integration — NEXT
-
-
-M23 AI Tool-Calling Orchestration — COMPLETE
-M24 AI Tool Result Aggregation — COMPLETE
-M25 AI Tool Execution Audit — COMPLETE
-M26 AI Execution Context — COMPLETE
-M27 Bounded AI Tool-Calling Loop — COMPLETE
-M28 AI Execution Runtime — COMPLETE
-M29 AI Execution Observability — COMPLETE
-M30 AI Execution History & Persistence — COMPLETE
-M31 AI Execution Coordinator — COMPLETE
-M32 Real-World Research Engine — COMPLETE
-M33 Multi-Agent Collaboration — COMPLETE
-M34 Company Dashboard — COMPLETE
-M35 Continuous Learning Engine — COMPLETE
-M36 End-to-End Autonomous Project — NEXT
