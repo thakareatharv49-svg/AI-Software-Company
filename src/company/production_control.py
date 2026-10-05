@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Callable
+from typing import Any
 
 from .costs import CostController, UsageRecord
 from .distributed import DistributedExecutor
@@ -19,11 +20,7 @@ class ProductionCompanyControl:
     reliability: ReliabilityController
     redteam: RedTeamValidator
 
-    def prioritize(
-        self,
-        items: list[Opportunity],
-        budget: Decimal,
-    ) -> PortfolioDecision:
+    def prioritize(self, items: list[Opportunity], budget: Decimal) -> PortfolioDecision:
         return self.economics.prioritize(items, budget)
 
     def authorize_cost(self, project_id: str, estimate: Decimal) -> bool:
@@ -37,15 +34,7 @@ class ProductionCompanyControl:
         output_tokens: int,
         cost: Decimal,
     ) -> None:
-        self.costs.record(
-            UsageRecord(
-                actor,
-                project_id,
-                input_tokens,
-                output_tokens,
-                cost,
-            )
-        )
+        self.costs.record(UsageRecord(actor, project_id, input_tokens, output_tokens, cost))
 
     def run_redteam(
         self,
