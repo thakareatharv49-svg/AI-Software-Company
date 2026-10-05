@@ -13,10 +13,11 @@ from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
+from src.company.audit import MissionAuditEntry
 from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
-from src.company.persistence import MissionJobStore, ProjectStore
+from src.company.persistence import MissionAuditStore, MissionJobStore, ProjectStore
 from src.company.project_factory import ProjectFactory
 from src.runtime.providers.ollama import OllamaProvider
 from src.runtime.service import AIRuntime
@@ -52,6 +53,7 @@ class CompanyControlCenter:
         self._jobs: dict[str, MissionJob] = {}
         self._store = ProjectStore()
         self._job_store = MissionJobStore()
+        self._audit_store = MissionAuditStore()
         try:
             self._job_store.recover_running()
             for job in self._job_store.list_all():
@@ -128,6 +130,12 @@ class CompanyControlCenter:
             self._jobs[mission.id] = job
             try:
                 self._job_store.save(job)
+                self._audit(
+                    mission.id,
+                    "MISSION_CREATED",
+                    result.message,
+                    status=job.status.value,
+                )
             except SQLAlchemyError:
                 pass
             return record
@@ -161,13 +169,48 @@ class CompanyControlCenter:
             raise
         self._jobs[mission_id] = job
         self._sync_mission_from_job(job)
+        try:
+            self._audit(mission_id, "MISSION_CANCELLED", job.message, status=job.status.value)
+        except SQLAlchemyError:
+            pass
         return job
 
     def retry_mission(self, mission_id: str) -> MissionJob:
         job = self._factory.retry(mission_id)
         self._jobs[mission_id] = job
         self._sync_mission_from_job(job)
+        try:
+            self._audit(mission_id, "MISSION_REQUEUED", job.message, status=job.status.value)
+        except SQLAlchemyError:
+            pass
         return job
+
+    def audit(self, mission_id: str) -> list[MissionAuditEntry]:
+        try:
+            return self._audit_store.list_for_mission(mission_id)
+        except SQLAlchemyError:
+            return []
+
+    def _audit(
+        self,
+        mission_id: str,
+        event_type: str,
+        message: str,
+        status: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        from uuid import uuid4
+
+        self._audit_store.append(
+            MissionAuditEntry(
+                id=str(uuid4()),
+                mission_id=mission_id,
+                event_type=event_type,
+                message=message,
+                status=status,
+                metadata=metadata or {},
+            )
+        )
 
     def mission_job(self, mission_id: str) -> MissionJob | None:
         try:
