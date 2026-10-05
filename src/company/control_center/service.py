@@ -10,7 +10,8 @@ from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
-from src.company.models.contracts import AgentResult, CompanyMission, CompanyState
+from src.agents.models.contracts import AgentResult
+from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.runtime.providers.ollama import OllamaProvider
 from src.runtime.service import AIRuntime
