@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from src.company.mission_controller.models import MissionPlan
 from src.company.audit import MissionAuditEntry
+from src.company.audit import MissionAuditEntry
 from src.company.mission_jobs import MissionJob, MissionJobStatus, recover_running_job
 from src.company.models.contracts import CompanyMission
 from src.config.settings import settings
@@ -40,6 +41,19 @@ class MissionJobRow(Base):
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+
+class MissionAuditRow(Base):
+    __tablename__ = "mission_audit"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    mission_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    message: Mapped[str] = mapped_column(String(5000), nullable=False)
+    status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
 
 
 class MissionJobStore:
@@ -127,6 +141,62 @@ class MissionJobStore:
                     attempts=row.attempts,
                     created_at=row.created_at,
                     updated_at=row.updated_at,
+                )
+                for row in rows
+            ]
+
+    def close(self) -> None:
+        self._engine.dispose()
+
+
+
+class MissionAuditStore:
+    """Durable append-only mission audit history."""
+
+    def __init__(self) -> None:
+        url = settings.database_url.replace(
+            "postgresql+asyncpg://",
+            "postgresql+psycopg://",
+        )
+        self._engine = create_engine(url, pool_pre_ping=True)
+
+    def append(self, entry: MissionAuditEntry) -> None:
+        with Session(self._engine) as session:
+            session.add(
+                MissionAuditRow(
+                    id=entry.id,
+                    mission_id=entry.mission_id,
+                    event_type=entry.event_type,
+                    message=entry.message,
+                    status=entry.status,
+                    timestamp=entry.timestamp,
+                    metadata=entry.metadata,
+                )
+            )
+            session.commit()
+
+    def list_for_mission(
+        self,
+        mission_id: str,
+        event_type: str | None = None,
+        status: str | None = None,
+    ) -> list[MissionAuditEntry]:
+        with Session(self._engine) as session:
+            query = select(MissionAuditRow).where(MissionAuditRow.mission_id == mission_id)
+            if event_type:
+                query = query.where(MissionAuditRow.event_type == event_type)
+            if status:
+                query = query.where(MissionAuditRow.status == status)
+            rows = session.scalars(query.order_by(MissionAuditRow.timestamp.asc())).all()
+            return [
+                MissionAuditEntry(
+                    id=row.id,
+                    mission_id=row.mission_id,
+                    event_type=row.event_type,
+                    message=row.message,
+                    status=row.status,
+                    timestamp=row.timestamp,
+                    metadata=row.metadata,
                 )
                 for row in rows
             ]
