@@ -73,8 +73,6 @@ class ProjectFactory:
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
         plan = build_mission_plan(mission)
         job = self._load_job(mission.id)
-        if any(item.mission.id == mission.id for item in self.queue):
-            raise ValueError(f"Mission '{mission.id}' is already queued")
         if job is not None and job.status in {
             MissionJobStatus.QUEUED,
             MissionJobStatus.COMPLETED,
@@ -82,6 +80,10 @@ class ProjectFactory:
         }:
             raise ValueError(
                 f"Mission '{mission.id}' already has lifecycle state '{job.status.value}'"
+            )
+        if any(item.mission.id == mission.id for item in self.queue):
+            raise ValueError(
+                f"Mission '{mission.id}' already has lifecycle state 'queued'"
             )
         if job is not None and job.status == MissionJobStatus.RUNNING and self._running:
             raise ValueError(f"Mission '{mission.id}' is already running in the factory")
@@ -145,8 +147,7 @@ class ProjectFactory:
             raise ValueError(
                 f"Mission '{mission_id}' cannot be retried from '{job.status.value}'"
             )
-        if any(item.mission.id == mission_id for item in self.queue):
-            raise ValueError(f"Mission '{mission_id}' is already queued")
+        self.queue = [item for item in self.queue if item.mission.id != mission_id]
         queued = transition_job(
             job,
             MissionJobStatus.QUEUED,
@@ -163,7 +164,11 @@ class ProjectFactory:
         self._audit(mission_id, "MISSION_REQUEUED", queued.message, queued.status.value)
         return queued
 
-    async def run_next(self, max_stages: int | None = None, max_retries: int = 2) -> FactoryProject | None:
+    async def run_next(
+        self,
+        max_stages: int | None = None,
+        max_retries: int = 2,
+    ) -> FactoryProject | None:
         if not self.queue:
             return None
 
@@ -200,6 +205,7 @@ class ProjectFactory:
             )
         )
 
+        self._last_autonomous_result = None
         try:
             if self.autonomous_runner is not None:
                 autonomous_result = await self.autonomous_runner.run(
@@ -212,7 +218,11 @@ class ProjectFactory:
                     type(
                         "FactoryStageResult",
                         (),
-                        {"success": stage.status.value == "completed"},
+                        {
+                            "success": (
+                                getattr(stage.status, "value", stage.status) == "completed"
+                            )
+                        },
                     )()
                     for stage in autonomous_result.stages
                 ]
@@ -286,11 +296,12 @@ class ProjectFactory:
             self.queue.insert(0, project)
 
         self._save(project)
+        job = self._load_job(project.mission.id)
         self._audit(
             project.mission.id,
             event_type,
             f"Factory project {project.status}: {project.mission.name}",
-            self._load_job(project.mission.id).status.value if self._load_job(project.mission.id) else None,
+            job.status.value if job is not None else None,
             {"attempt": project.attempts, "stages_executed": project.stages_executed},
         )
         self.orchestrator.events.publish(
@@ -314,12 +325,20 @@ class ProjectFactory:
             raise ValueError("max_retries must be non-negative")
         self._running = True
         completed: list[FactoryProject] = []
+        completed_ids: set[str] = set()
         try:
-            while self.queue and (max_projects is None or len(completed) < max_projects):
-                project = await self.run_next(max_stages=max_stages, max_retries=max_retries)
+            while self.queue and (
+                max_projects is None or len(completed) < max_projects
+            ):
+                project = await self.run_next(
+                    max_stages=max_stages,
+                    max_retries=max_retries,
+                )
                 if project is None:
                     break
-                completed.append(project)
+                if project.status != "queued" and project.mission.id not in completed_ids:
+                    completed.append(project)
+                    completed_ids.add(project.mission.id)
                 if project.status == "blocked":
                     break
             self.orchestrator.events.publish(
