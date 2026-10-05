@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Protocol
-
 from uuid import uuid4
 
 from src.company.audit import MissionAuditEntry
@@ -95,6 +94,7 @@ class ProjectFactory:
         project = FactoryProject(mission=mission, plan=plan)
         self.queue.append(project)
         self._save(project)
+        self._audit(mission.id, "MISSION_QUEUED", f"Project queued: {mission.name}", MissionJobStatus.QUEUED.value)
         self.orchestrator.events.publish(
             CompanyEvent(
                 event_type="FACTORY_PROJECT_QUEUED",
@@ -126,6 +126,7 @@ class ProjectFactory:
             f"Mission cancelled: {job.mission.name}",
         )
         self._save_job(cancelled)
+        self._audit(mission_id, "MISSION_CANCELLED", cancelled.message, cancelled.status.value)
         return cancelled
 
     def retry(self, mission_id: str) -> MissionJob:
