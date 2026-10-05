@@ -11,7 +11,7 @@ def test_evaluator_scores_cases_and_categories() -> None:
         cases,
         {"coding": True, "qa": True, "research": True},
     )
-    assert report.score == 1.0
+    assert report.score == 2 / 3
     assert report.category_scores() == {"coding": 1.0, "qa": 1.0, "research": 0.0}
 
 
