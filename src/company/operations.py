@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from company.ai.context import AIExecutionContext
 from company.ai.coordinator import AIExecutionCoordinator, build_ai_execution_coordinator
 from company.ai.history import AIExecutionHistoryRecord
-from company.ai.model import AIResponse
 from company.ai.tool_calling import AIToolCallResponse
 from company.collaboration.bus import CollaborationBus, Handoff
 from company.dashboard.service import CompanyDashboard, DashboardSnapshot
@@ -191,7 +191,5 @@ class CompanyOperations:
         )
 
     @staticmethod
-    def _context(actor: str):
-        from company.ai.context import AIExecutionContext
-
+    def _context(actor: str) -> AIExecutionContext:
         return AIExecutionContext(actor=actor)
