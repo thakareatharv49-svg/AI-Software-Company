@@ -232,3 +232,59 @@ async def test_factory_rejects_duplicate_persistent_mission() -> None:
 
     with pytest.raises(ValueError, match="already has lifecycle state"):
         factory.enqueue(mission)
+
+
+def test_factory_can_cancel_queued_mission() -> None:
+    from src.company.mission_jobs import MissionJobStatus
+
+    class JobStore:
+        def __init__(self):
+            self.jobs = {}
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, job):
+            self.jobs[job.id] = job
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(orchestrator, AgentExecutor(FakeRuntime()), AgentRegistry())
+    store = JobStore()
+    factory = ProjectFactory(orchestrator, controller, pipeline, job_store=store)
+    mission = CompanyMission(name="Cancel", objective="Cancel safely")
+    factory.enqueue(mission)
+
+    job = factory.cancel(mission.id)
+
+    assert job.status == MissionJobStatus.CANCELLED
+    assert factory.queue == []
+
+
+def test_factory_can_retry_blocked_mission() -> None:
+    from src.company.mission_jobs import MissionJobStatus
+
+    class JobStore:
+        def __init__(self):
+            self.jobs = {}
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, job):
+            self.jobs[job.id] = job
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(orchestrator, AgentExecutor(FakeRuntime()), AgentRegistry())
+    store = JobStore()
+    factory = ProjectFactory(orchestrator, controller, pipeline, job_store=store)
+    mission = CompanyMission(name="Retry", objective="Retry safely")
+    factory.enqueue(mission)
+    job = store.jobs[mission.id]
+    store.jobs[mission.id] = job.model_copy(update={"status": MissionJobStatus.BLOCKED})
+
+    retried = factory.retry(mission.id)
+
+    assert retried.status == MissionJobStatus.QUEUED
+    assert factory.queue[0].mission.id == mission.id

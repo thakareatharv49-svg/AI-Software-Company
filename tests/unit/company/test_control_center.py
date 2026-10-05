@@ -97,3 +97,30 @@ def test_mission_job_api_exposes_persistent_lifecycle() -> None:
         assert any(item["id"] == mission_id for item in jobs.json())
     finally:
         app.dependency_overrides.clear()
+
+
+def test_mission_cancel_and_retry_api() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    app.dependency_overrides[get_control_center] = lambda: center
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/missions",
+            json={"name": "Recovery API", "objective": "Exercise recovery controls"},
+        )
+        assert response.status_code == 201
+        mission_id = response.json()["mission"]["id"]
+
+        cancelled = client.post(f"/api/missions/{mission_id}/cancel")
+        assert cancelled.status_code == 409
+
+        center._job_store.save(
+            center.mission_job(mission_id).model_copy(
+                update={"status": "blocked", "message": "blocked for retry"}
+            )
+        )
+        retried = client.post(f"/api/missions/{mission_id}/retry")
+        assert retried.status_code == 200
+        assert retried.json()["status"] == "queued"
+    finally:
+        app.dependency_overrides.clear()

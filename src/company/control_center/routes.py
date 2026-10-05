@@ -46,6 +46,32 @@ def submit_mission(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.post("/missions/{mission_id}/cancel", response_model=MissionJob)
+def cancel_mission(
+    mission_id: str,
+    center: CompanyControlCenter = ControlCenter,
+) -> MissionJob:
+    try:
+        return center.cancel_mission(mission_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission job not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/missions/{mission_id}/retry", response_model=MissionJob)
+def retry_mission(
+    mission_id: str,
+    center: CompanyControlCenter = ControlCenter,
+) -> MissionJob:
+    try:
+        return center.retry_mission(mission_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission job not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.get("/missions/{mission_id}/job", response_model=MissionJob)
 def mission_job(
     mission_id: str,

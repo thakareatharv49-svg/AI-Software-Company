@@ -45,6 +45,16 @@ class MissionJob(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+def recover_running_job(job: MissionJob) -> MissionJob:
+    if job.status != MissionJobStatus.RUNNING:
+        return job
+    return transition_job(
+        job,
+        MissionJobStatus.QUEUED,
+        "Recovered after process restart; awaiting explicit factory execution.",
+    )
+
+
 def transition_job(job: MissionJob, target: MissionJobStatus, message: str) -> MissionJob:
     if target == job.status:
         return job.model_copy(update={"message": message, "updated_at": datetime.now(UTC)})
