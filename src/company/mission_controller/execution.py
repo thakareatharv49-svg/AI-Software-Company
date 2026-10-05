@@ -112,6 +112,46 @@ class MissionExecutionPipeline:
             )
             return result
 
+    async def execute_mission(
+        self,
+        mission: CompanyMission,
+        plan: MissionPlan,
+        max_stages: int | None = None,
+    ) -> list[AgentResult]:
+        """Continuously execute planned stages until completion or a safe stop."""
+        results: list[AgentResult] = []
+        completed = 0
+        self.orchestrator.events.publish(
+            CompanyEvent(
+                event_type="MISSION_EXECUTION_STARTED",
+                message=f"Autonomous execution started: {mission.name}",
+                project_id=self.orchestrator.state.current_project_id,
+            )
+        )
+
+        while self.orchestrator.state.status.value == "running":
+            if max_stages is not None and completed >= max_stages:
+                break
+            result = await self.execute_next(mission, plan)
+            results.append(result)
+            if not result.success:
+                break
+            completed += 1
+            if self.orchestrator.state.last_decision is not None and self.orchestrator.state.last_decision.value == "complete_project":
+                break
+
+        if self.orchestrator.state.status.value == "running" and completed == 0:
+            self.orchestrator.block("Autonomous execution made no progress")
+
+        self.orchestrator.events.publish(
+            CompanyEvent(
+                event_type="MISSION_EXECUTION_STOPPED",
+                message=f"Autonomous execution stopped after {completed} stage(s)",
+                project_id=self.orchestrator.state.current_project_id,
+            )
+        )
+        return results
+
         step.status = "completed"
         self.orchestrator.complete_task()
         self.orchestrator.events.publish(
