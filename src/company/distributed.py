@@ -10,10 +10,14 @@ class WorkItem: id:str; payload:object; attempt:int=0
 @dataclass(frozen=True)
 class WorkResult: work_id:str; worker_id:str; success:bool; value:object=None; error:str|None=None
 @dataclass
-class Worker: id:str; status:WorkerStatus=WorkerStatus.READY; completed:int=0; failed:int=0
+class Worker:
+    id:str; status:WorkerStatus=WorkerStatus.READY; completed:int=0; failed:int=0
+    def __post_init__(self)->None:
+        if not isinstance(self.status,WorkerStatus): self.status=WorkerStatus(self.status)
 class DistributedExecutor:
     def __init__(self,workers:tuple[Worker,...]|None=None,max_attempts:int=2)->None:
-        self.workers=list(workers or ()); self.max_attempts=max_attempts; self._cursor=0; self.results=[]
+        if max_attempts<1: raise ValueError("max_attempts must be positive")
+        self.workers=list(workers or ()); self.max_attempts=max_attempts; self._cursor=0; self.results:list[WorkResult]=[]
     def register(self,worker:Worker)->None:
         if any(w.id==worker.id for w in self.workers): raise ValueError("worker already registered")
         self.workers.append(worker)
