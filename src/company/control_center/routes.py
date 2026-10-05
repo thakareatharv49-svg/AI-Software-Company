@@ -71,7 +71,6 @@ async def execute_mission_stage(
 async def execute_mission(
     mission_id: str,
     max_stages: int | None = Query(default=None, ge=1, le=12),
-    max_retries: int = Query(default=2, ge=0, le=5),
     center: CompanyControlCenter = ControlCenter,
 ) -> list[AgentResult]:
     try:
@@ -97,6 +96,7 @@ def block_company(
 async def run_factory(
     mission_id: str,
     max_stages: int | None = Query(default=None, ge=1, le=12),
+    max_retries: int = Query(default=2, ge=0, le=5),
     center: CompanyControlCenter = ControlCenter,
 ) -> dict[str, object]:
     try:
@@ -110,5 +110,5 @@ async def run_factory(
 
 
 @router.get("/factory/status")
-def factory_status(center: CompanyControlCenter = ControlCenter) -> dict[str, bool]:
-    return {"running": center.factory_running()}
+def factory_status(center: CompanyControlCenter = ControlCenter) -> dict[str, object]:
+    return {"running": center.factory_running(), "queued_projects": len(center._factory.queue)}
