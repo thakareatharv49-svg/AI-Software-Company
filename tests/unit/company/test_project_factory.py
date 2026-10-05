@@ -158,3 +158,77 @@ async def test_factory_rejects_duplicate_run() -> None:
 
     with pytest.raises(RuntimeError, match="already running"):
         await factory.run()
+
+
+
+@pytest.mark.asyncio
+async def test_factory_persists_mission_job_lifecycle() -> None:
+    from src.company.mission_jobs import MissionJobStatus
+
+    class JobStore:
+        def __init__(self):
+            self.jobs = {}
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, job):
+            self.jobs[job.id] = job
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    store = JobStore()
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        job_store=store,
+    )
+    mission = CompanyMission(name="Lifecycle", objective="Persist lifecycle")
+    project = factory.enqueue(mission)
+
+    assert store.jobs[mission.id].status == MissionJobStatus.QUEUED
+
+    result = await factory.run(max_projects=1, max_stages=12, max_retries=0)
+
+    assert result == [project]
+    assert store.jobs[mission.id].status == MissionJobStatus.COMPLETED
+    assert store.jobs[mission.id].attempts == 1
+
+
+@pytest.mark.asyncio
+async def test_factory_rejects_duplicate_persistent_mission() -> None:
+    class JobStore:
+        def __init__(self):
+            self.jobs = {}
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, job):
+            self.jobs[job.id] = job
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    store = JobStore()
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        job_store=store,
+    )
+    mission = CompanyMission(name="Duplicate", objective="Reject duplicate")
+    factory.enqueue(mission)
+
+    with pytest.raises(ValueError, match="already has lifecycle state"):
+        factory.enqueue(mission)
