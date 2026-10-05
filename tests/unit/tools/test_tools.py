@@ -1,90 +1,188 @@
-from src.agents.execution.context import AgentExecutionContext
-from src.agents.models.contracts import AgentDefinition
-from src.agents.models.enums import AgentPermission
-from src.tools.execution.executor import ToolExecutor
-from src.tools.models.contracts import ToolDefinition, ToolRequest
-from src.tools.models.enums import ToolPermission
-from src.tools.registry.registry import ToolRegistry
+﻿from company.tools import (
+    AddTool,
+    EchoTool,
+    ToolDefinition,
+    ToolExecutor,
+    ToolPermissionEngine,
+    ToolPermissionPolicy,
+    ToolRegistry,
+    ToolRequest,
+    ToolRisk,
+    ToolStatus,
+)
 
 
-def test_tool_registry():
+def build_registry() -> ToolRegistry:
     registry = ToolRegistry()
-
-    tool = ToolDefinition(
-        name="echo",
-        description="Echo text",
-        permission=ToolPermission.READ_FILES,
-        handler=lambda text: text,
-    )
-
-    registry.register(tool)
-
-    assert registry.get("echo") is tool
-    assert len(registry.list_tools()) == 1
+    registry.register(EchoTool())
+    registry.register(AddTool())
+    return registry
 
 
-def test_tool_executor_allows_granted_permission():
+def test_tool_registry_registers_and_lists_tools() -> None:
+    registry = build_registry()
+    assert registry.names() == ("echo", "add")
+    assert "echo" in registry
+    assert "add" in registry
+
+
+def test_registry_rejects_duplicate_tools() -> None:
     registry = ToolRegistry()
-    registry.register(
-        ToolDefinition(
-            name="echo",
-            description="Echo text",
-            permission=ToolPermission.READ_FILES,
-            handler=lambda text: text,
-        )
-    )
+    registry.register(EchoTool())
 
-    agent = AgentDefinition(
-        name="engineer",
-        role="engineer",
-        capabilities=["coding"],
-        permissions={AgentPermission.READ_FILES},
-    )
+    try:
+        registry.register(EchoTool())
+        raise AssertionError("Expected duplicate registration to fail")
+    except ValueError as exc:
+        assert "already registered" in str(exc)
 
-    context = AgentExecutionContext(
-        agent=agent,
-        allowed_permissions={AgentPermission.READ_FILES},
-    )
 
-    result = ToolExecutor(registry).execute(
-        context,
+def test_tool_executor_runs_authorized_tool() -> None:
+    executor = ToolExecutor(build_registry())
+
+    result = executor.execute(
         ToolRequest(
             tool_name="echo",
             arguments={"text": "hello"},
-        ),
-    )
-
-    assert result.success is True
-    assert result.output == "hello"
-
-
-def test_tool_executor_blocks_missing_permission():
-    registry = ToolRegistry()
-    registry.register(
-        ToolDefinition(
-            name="danger",
-            description="Restricted operation",
-            permission=ToolPermission.GIT_PUSH,
-            handler=lambda: "pushed",
         )
     )
 
-    agent = AgentDefinition(
-        name="engineer",
-        role="engineer",
-        capabilities=["coding"],
-        permissions={AgentPermission.READ_FILES},
+    assert result.status == ToolStatus.SUCCESS
+    assert result.output == "hello"
+
+
+def test_add_tool_is_deterministic() -> None:
+    executor = ToolExecutor(build_registry())
+
+    result = executor.execute(
+        ToolRequest(
+            tool_name="add",
+            arguments={"a": 10, "b": 32},
+        )
     )
 
-    context = AgentExecutionContext(
-        agent=agent,
-        allowed_permissions={AgentPermission.READ_FILES},
+    assert result.status == ToolStatus.SUCCESS
+    assert result.output == 42
+
+
+def test_unknown_tool_returns_failure() -> None:
+    executor = ToolExecutor(build_registry())
+
+    result = executor.execute(
+        ToolRequest(tool_name="missing")
     )
 
-    result = ToolExecutor(registry).execute(
-        context,
-        ToolRequest(tool_name="danger"),
+    assert result.status == ToolStatus.FAILURE
+    assert result.error is not None
+
+
+def test_permission_engine_denies_write_risk() -> None:
+    definition = ToolDefinition(
+        name="dangerous",
+        description="test",
+        risk=ToolRisk.WRITE,
     )
 
-    assert result.success is False
-    assert "does not have permission" in result.error
+    engine = ToolPermissionEngine(
+        ToolPermissionPolicy(
+            allowed_risks=frozenset({ToolRisk.READ})
+        )
+    )
+
+    try:
+        engine.authorize(
+            definition,
+            ToolRequest(tool_name="dangerous"),
+        )
+        raise AssertionError("Expected permission denial")
+    except PermissionError:
+        pass
+
+
+def test_permission_engine_allows_explicit_tool() -> None:
+    definition = ToolDefinition(
+        name="approved-write",
+        description="test",
+        risk=ToolRisk.WRITE,
+    )
+
+    engine = ToolPermissionEngine(
+        ToolPermissionPolicy(
+            allowed_risks=frozenset({ToolRisk.READ}),
+            allowed_tools=frozenset({"approved-write"}),
+        )
+    )
+
+    engine.authorize(
+        definition,
+        ToolRequest(tool_name="approved-write"),
+    )
+
+
+def test_permission_engine_deny_list_wins() -> None:
+    definition = ToolDefinition(
+        name="echo",
+        description="test",
+        risk=ToolRisk.READ,
+    )
+
+    engine = ToolPermissionEngine(
+        ToolPermissionPolicy(
+            allowed_risks=frozenset({ToolRisk.READ}),
+            deny_tools=frozenset({"echo"}),
+        )
+    )
+
+    try:
+        engine.authorize(
+            definition,
+            ToolRequest(tool_name="echo"),
+        )
+        raise AssertionError("Denied tool should not execute")
+    except PermissionError:
+        pass
+
+
+def test_executor_returns_denied_result() -> None:
+    executor = ToolExecutor(
+        build_registry(),
+        ToolPermissionEngine(
+            ToolPermissionPolicy(allowed_risks=frozenset())
+        ),
+    )
+
+    result = executor.execute(
+        ToolRequest(
+            tool_name="echo",
+            arguments={"text": "blocked"},
+        )
+    )
+
+    assert result.status == ToolStatus.DENIED
+    assert result.output is None
+    assert result.error is not None
+
+
+def test_invalid_arguments_return_failure() -> None:
+    executor = ToolExecutor(build_registry())
+
+    result = executor.execute(
+        ToolRequest(
+            tool_name="add",
+            arguments={"a": 10},
+        )
+    )
+
+    assert result.status == ToolStatus.FAILURE
+    assert result.error is not None
+
+
+def test_tool_definition_is_provider_independent() -> None:
+    definition = ToolDefinition(
+        name="example",
+        description="provider-independent tool",
+        risk=ToolRisk.READ,
+    )
+
+    assert definition.name == "example"
+    assert definition.risk == ToolRisk.READ
