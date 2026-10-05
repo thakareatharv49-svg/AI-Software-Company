@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import JSON, DateTime, Integer, String, create_engine, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
+from src.company.audit import MissionAuditEntry
 from src.company.mission_controller.models import MissionPlan
 from src.company.project_outputs import ProjectOutputManifest
-from src.company.audit import MissionAuditEntry
 from src.company.mission_jobs import MissionJob, MissionJobStatus, recover_running_job
 from src.company.models.contracts import CompanyMission
 from src.config.settings import settings
