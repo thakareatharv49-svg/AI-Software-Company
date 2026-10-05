@@ -7,9 +7,8 @@ Create Date: 2026-10-03
 
 from collections.abc import Sequence
 
-import sqlalchemy as sa
-
 from alembic import op
+import sqlalchemy as sa
 
 revision: str = "initial_schema"
 down_revision: str | Sequence[str] | None = None
