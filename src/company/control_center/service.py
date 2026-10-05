@@ -49,7 +49,12 @@ class CompanyControlCenter:
         )
         self._missions: dict[str, MissionRecord] = {}
         self._store = ProjectStore()
-        self._factory = ProjectFactory(self._orchestrator, self._mission_controller, self._execution_pipeline, store=self._store)
+        self._factory = ProjectFactory(
+            self._orchestrator,
+            self._mission_controller,
+            self._execution_pipeline,
+            store=self._store,
+        )
         try:
             self._factory.restore()
         except SQLAlchemyError:
@@ -97,11 +102,15 @@ class CompanyControlCenter:
             self._missions[mission.id] = record
             return record
 
-    async def run_factory(self, max_projects: int | None = None, max_stages: int | None = None) -> None:
+    async def run_factory(self, max_projects: int | None = None, max_stages: int | None = None, max_retries: int = 2) -> None:
         if self._factory_task is not None and not self._factory_task.done():
             raise RuntimeError("Factory is already running")
         async def runner() -> None:
-            await self._factory.run(max_projects=max_projects, max_stages=max_stages)
+            await self._factory.run(
+                max_projects=max_projects,
+                max_stages=max_stages,
+                max_retries=max_retries,
+            )
         self._factory_task = asyncio.create_task(runner())
 
     def factory_running(self) -> bool:

@@ -12,7 +12,6 @@ from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 
 
-@dataclass
 class FactoryStore(Protocol):
     def save(self, project: FactoryProject) -> None: ...
     def load_pending(self) -> list[dict]: ...
@@ -24,17 +23,20 @@ class FactoryProject:
     plan: MissionPlan
     status: str = "queued"
     stages_executed: int = 0
+    attempts: int = 0
+    last_error: str | None = None
 
 
 @dataclass
 class ProjectFactory:
-    """Persistent, sequential project factory."""
+    """Persistent, sequential project factory with bounded retry scheduling."""
 
     orchestrator: CompanyOrchestrator
     controller: MissionController
     pipeline: MissionExecutionPipeline
     store: FactoryStore | None = None
     queue: list[FactoryProject] = field(default_factory=list)
+    _running: bool = field(default=False, init=False, repr=False)
 
     def restore(self) -> int:
         if self.store is None:
@@ -58,12 +60,14 @@ class ProjectFactory:
         )
         return project
 
-    async def run_next(self, max_stages: int | None = None) -> FactoryProject | None:
+    async def run_next(self, max_stages: int | None = None, max_retries: int = 2) -> FactoryProject | None:
         if not self.queue:
             return None
 
         project = self.queue.pop(0)
         project.status = "running"
+        project.attempts += 1
+        project.last_error = None
         self._save(project)
 
         if self.orchestrator.state.status.value != "running":
@@ -77,11 +81,15 @@ class ProjectFactory:
             )
         )
 
-        results = await self.pipeline.execute_mission(
-            project.mission,
-            project.plan,
-            max_stages=max_stages,
-        )
+        try:
+            results = await self.pipeline.execute_mission(
+                project.mission,
+                project.plan,
+                max_stages=max_stages,
+            )
+        except Exception as exc:
+            project.last_error = str(exc)
+            results = []
         project.stages_executed += len(results)
 
         if all(result.success for result in results) and all(
@@ -91,8 +99,25 @@ class ProjectFactory:
             self.orchestrator.stop()
             event_type = "FACTORY_PROJECT_COMPLETED"
         elif self.orchestrator.state.status.value == "blocked":
-            project.status = "blocked"
-            event_type = "FACTORY_PROJECT_BLOCKED"
+            project.last_error = project.last_error or "Project execution blocked"
+            if project.attempts <= max_retries:
+                project.status = "queued"
+                self.queue.insert(0, project)
+                self.orchestrator.stop()
+                event_type = "FACTORY_PROJECT_RETRY_QUEUED"
+            else:
+                project.status = "blocked"
+                event_type = "FACTORY_PROJECT_BLOCKED"
+        elif project.last_error:
+            if project.attempts <= max_retries:
+                project.status = "queued"
+                self.queue.insert(0, project)
+                self.orchestrator.stop()
+                event_type = "FACTORY_PROJECT_RETRY_QUEUED"
+            else:
+                project.status = "blocked"
+                self.orchestrator.block(project.last_error)
+                event_type = "FACTORY_PROJECT_BLOCKED"
         else:
             project.status = "queued"
             event_type = "FACTORY_PROJECT_PAUSED"
@@ -112,23 +137,31 @@ class ProjectFactory:
         self,
         max_projects: int | None = None,
         max_stages: int | None = None,
+        max_retries: int = 2,
     ) -> list[FactoryProject]:
+        if self._running:
+            raise RuntimeError("Factory is already running")
+        if max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
+        self._running = True
         completed: list[FactoryProject] = []
-        while self.queue and (max_projects is None or len(completed) < max_projects):
-            project = await self.run_next(max_stages=max_stages)
-            if project is None:
-                break
-            completed.append(project)
-            if project.status == "blocked":
-                break
-
-        self.orchestrator.events.publish(
-            CompanyEvent(
-                event_type="FACTORY_RUN_COMPLETED",
-                message=f"Factory run completed: {len(completed)} project(s)",
+        try:
+            while self.queue and (max_projects is None or len(completed) < max_projects):
+                project = await self.run_next(max_stages=max_stages, max_retries=max_retries)
+                if project is None:
+                    break
+                completed.append(project)
+                if project.status == "blocked":
+                    break
+            self.orchestrator.events.publish(
+                CompanyEvent(
+                    event_type="FACTORY_RUN_COMPLETED",
+                    message=f"Factory run completed: {len(completed)} project(s)",
+                )
             )
-        )
-        return completed
+            return completed
+        finally:
+            self._running = False
 
     def _save(self, project: FactoryProject) -> None:
         if self.store is not None:

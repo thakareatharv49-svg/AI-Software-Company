@@ -23,6 +23,7 @@ class FactoryProjectRow(Base):
     plan: Mapped[dict] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     stages_executed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -45,6 +46,7 @@ class ProjectStore:
                 "plan": project.plan.model_dump(mode="json"),
                 "status": project.status,
                 "stages_executed": project.stages_executed,
+                "attempts": project.attempts,
                 "updated_at": now,
             }
             if row is None:
@@ -67,6 +69,8 @@ class ProjectStore:
                     "plan": MissionPlan.model_validate(row.plan),
                     "status": "queued" if row.status == "running" else row.status,
                     "stages_executed": row.stages_executed,
+                    "attempts": row.attempts,
+                    "last_error": None,
                 }
                 for row in rows
             ]
