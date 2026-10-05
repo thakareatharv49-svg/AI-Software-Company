@@ -829,4 +829,5 @@ Then commit and push the change before starting the next milestone.
 Never rely on chat history alone for the roadmap.
 
 GitHub repository + this file are the persistent roadmap source of truth.
-M21 Agent Tool Integration — NEXT
+M21 Agent Tool Integration — COMPLETE
+M22 AI Tool-Calling Integration — NEXT
