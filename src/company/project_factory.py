@@ -206,8 +206,14 @@ class ProjectFactory:
                     project.mission,
                     project.plan,
                 )
+                for step in project.plan.steps:
+                    step.status = "completed"
                 results = [
-                    type("FactoryStageResult", (), {"success": stage.status.value == "completed"})()
+                    type(
+                        "FactoryStageResult",
+                        (),
+                        {"success": stage.status.value == "completed"},
+                    )()
                     for stage in autonomous_result.stages
                 ]
                 self._last_autonomous_result = autonomous_result
