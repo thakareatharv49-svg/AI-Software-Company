@@ -11,6 +11,7 @@ from src.company.mission_controller.models import MissionPlan
 from src.company.audit import MissionAuditEntry
 from src.company.mission_jobs import MissionJob
 from src.company.project_outputs import ProjectOutputManifest
+from src.company.readiness import ProductionReadinessReport, build_readiness_report
 
 router = APIRouter(prefix="/api")
 
@@ -20,6 +21,11 @@ def get_control_center() -> CompanyControlCenter:
 
 
 ControlCenter = Depends(get_control_center)
+
+
+@router.get("/company/readiness", response_model=ProductionReadinessReport)
+def company_readiness() -> ProductionReadinessReport:
+    return build_readiness_report()
 
 
 @router.get("/company/state")
