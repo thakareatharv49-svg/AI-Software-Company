@@ -1,4 +1,4 @@
-﻿# AI Software Company — Master Milestone Roadmap
+# AI Software Company — Master Milestone Roadmap
 
 ## Purpose
 
