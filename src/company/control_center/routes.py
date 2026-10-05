@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.agents.models.contracts import AgentResult
 from src.company.control_center.service import (
@@ -63,6 +63,18 @@ async def execute_mission_stage(
 ) -> AgentResult:
     try:
         return await center.execute_next_stage(mission_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/missions/{mission_id}/execute-all", response_model=list[AgentResult])
+async def execute_mission(
+    mission_id: str,
+    max_stages: int | None = Query(default=None, ge=1, le=12),
+    center: CompanyControlCenter = ControlCenter,
+) -> list[AgentResult]:
+    try:
+        return await center.execute_mission(mission_id, max_stages=max_stages)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

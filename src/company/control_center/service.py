@@ -6,11 +6,11 @@ from threading import Lock
 from pydantic import BaseModel, Field
 
 from src.agents.execution.executor import AgentExecutor
+from src.agents.models.contracts import AgentResult
 from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
-from src.agents.models.contracts import AgentResult
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.runtime.providers.ollama import OllamaProvider
@@ -87,25 +87,31 @@ class CompanyControlCenter:
             return record
 
     async def execute_next_stage(self, mission_id: str) -> AgentResult:
-        with self._lock:
-            record = self._missions.get(mission_id)
-        if record is None:
-            raise KeyError(f"Mission '{mission_id}' not found")
+        record = self._get_mission(mission_id)
+        result = await self._execution_pipeline.execute_next(record.mission, record.plan)
+        self._update_record(record, result)
+        return result
 
-        result = await self._execution_pipeline.execute_next(
+    async def execute_mission(
+        self,
+        mission_id: str,
+        max_stages: int | None = None,
+    ) -> list[AgentResult]:
+        record = self._get_mission(mission_id)
+        results = await self._execution_pipeline.execute_mission(
             record.mission,
             record.plan,
+            max_stages=max_stages,
         )
-        with self._lock:
-            self._missions[mission_id] = record.model_copy(
-                update={
-                    "status": self._orchestrator.state.status.value,
-                    "message": result.output if result.success else result.error or "Stage failed",
-                    "updated_at": datetime.now(UTC),
-                    "plan": record.plan,
-                }
-            )
-        return result
+        message = (
+            f"Executed {len(results)} stage(s)"
+            if results
+            else "No stages executed"
+        )
+        if results and not results[-1].success:
+            message = results[-1].error or "Mission execution failed"
+        self._update_record(record, results[-1] if results else None, message=message)
+        return results
 
     def stop(self) -> CompanyState:
         self._orchestrator.stop()
@@ -116,6 +122,32 @@ class CompanyControlCenter:
         self._orchestrator.block(reason)
         self._sync_latest()
         return self.state
+
+    def _get_mission(self, mission_id: str) -> MissionRecord:
+        with self._lock:
+            record = self._missions.get(mission_id)
+        if record is None:
+            raise KeyError(f"Mission '{mission_id}' not found")
+        return record
+
+    def _update_record(
+        self,
+        record: MissionRecord,
+        result: AgentResult | None,
+        message: str | None = None,
+    ) -> None:
+        with self._lock:
+            self._missions[record.mission.id] = record.model_copy(
+                update={
+                    "status": self._orchestrator.state.status.value,
+                    "message": (
+                        message
+                        or (result.output if result and result.success else result.error if result else "Execution stopped")
+                    ),
+                    "updated_at": datetime.now(UTC),
+                    "plan": record.plan,
+                }
+            )
 
     def _sync_latest(self) -> None:
         with self._lock:
