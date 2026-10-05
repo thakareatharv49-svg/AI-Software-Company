@@ -7,7 +7,7 @@ from sqlalchemy import JSON, DateTime, Integer, String, create_engine, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from src.company.mission_controller.models import MissionPlan
-from src.company.audit import MissionAuditEntry
+from src.company.project_outputs import ProjectOutputManifest
 from src.company.audit import MissionAuditEntry
 from src.company.mission_jobs import MissionJob, MissionJobStatus, recover_running_job
 from src.company.models.contracts import CompanyMission
@@ -27,6 +27,22 @@ class FactoryProjectRow(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     stages_executed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProjectOutputRow(Base):
+    __tablename__ = "project_outputs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    mission_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    output_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    repository: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    github_message: Mapped[str | None] = mapped_column(String(5000), nullable=True)
+    memory_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -148,6 +164,66 @@ class MissionJobStore:
     def close(self) -> None:
         self._engine.dispose()
 
+
+
+class ProjectOutputStore:
+    """Durable project output manifests."""
+
+    def __init__(self) -> None:
+        url = settings.database_url.replace(
+            "postgresql+asyncpg://",
+            "postgresql+psycopg://",
+        )
+        self._engine = create_engine(url, pool_pre_ping=True)
+
+    def save(self, manifest: ProjectOutputManifest) -> None:
+        with Session(self._engine) as session:
+            row = session.get(ProjectOutputRow, manifest.id)
+            values = {
+                "mission_id": manifest.mission_id,
+                "project_id": manifest.project_id,
+                "name": manifest.name,
+                "status": manifest.status,
+                "output_type": manifest.output_type,
+                "repository": manifest.repository,
+                "github_message": manifest.github_message,
+                "memory_id": manifest.memory_id,
+                "created_at": manifest.created_at,
+                "updated_at": manifest.updated_at,
+            }
+            if row is None:
+                session.add(ProjectOutputRow(id=manifest.id, **values))
+            else:
+                for key, value in values.items():
+                    setattr(row, key, value)
+            session.commit()
+
+    def get_for_mission(self, mission_id: str) -> list[ProjectOutputManifest]:
+        with Session(self._engine) as session:
+            rows = session.scalars(
+                select(ProjectOutputRow)
+                .where(ProjectOutputRow.mission_id == mission_id)
+                .order_by(ProjectOutputRow.created_at.desc())
+            ).all()
+            return [self._model(row) for row in rows]
+
+    def _model(self, row: ProjectOutputRow) -> ProjectOutputManifest:
+        return ProjectOutputManifest(
+            id=row.id,
+            mission_id=row.mission_id,
+            project_id=row.project_id,
+            name=row.name,
+            status=row.status,
+            output_type=row.output_type,
+            repository=row.repository,
+            github_message=row.github_message,
+            memory_id=row.memory_id,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
+    def close(self) -> None:
+        self._engine.dispose()
 
 
 class MissionAuditStore:
