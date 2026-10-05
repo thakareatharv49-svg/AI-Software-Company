@@ -18,7 +18,8 @@ from src.github.automation.automation import GitHubAutomation
 from src.github.client.memory import InMemoryGitHubClient
 from src.github.models.contracts import GitHubRepository
 from src.manager.manager import MasterManager
-from src.manager.models.contracts import Mission as ManagerMission, TaskPlanItem
+from src.manager.models.contracts import Mission as ManagerMission
+from src.manager.models.contracts import TaskPlanItem
 from src.memory.service.service import MemoryService
 from src.projects.engine.project_engine import ProjectEngine
 from src.projects.models.contracts import ProjectCreateRequest
