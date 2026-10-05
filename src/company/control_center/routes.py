@@ -26,6 +26,14 @@ def company_state(center: ControlCenter) -> CompanyState:
     return center.state
 
 
+@router.get("/missions/{mission_id}/plan")
+def mission_plan(mission_id: str, center: ControlCenter):
+    plan = center.mission_plan(mission_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Mission plan not found")
+    return plan
+
+
 @router.get("/missions", response_model=list[MissionRecord])
 def list_missions(center: ControlCenter) -> list[MissionRecord]:
     return center.missions()
