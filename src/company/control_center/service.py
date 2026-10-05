@@ -13,9 +13,10 @@ from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
+from src.company.mission_jobs import MissionJob, MissionJobStatus, transition_job
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
-from src.company.persistence import ProjectStore
+from src.company.persistence import MissionJobStore, ProjectStore
 from src.company.project_factory import ProjectFactory
 from src.runtime.providers.ollama import OllamaProvider
 from src.runtime.service import AIRuntime
@@ -48,12 +49,28 @@ class CompanyControlCenter:
             AgentRegistry(),
         )
         self._missions: dict[str, MissionRecord] = {}
+        self._jobs: dict[str, MissionJob] = {}
         self._store = ProjectStore()
+        self._job_store = MissionJobStore()
+        try:
+            for job in self._job_store.list_all():
+                self._jobs[job.id] = job
+                self._missions[job.id] = MissionRecord(
+                    mission=job.mission,
+                    status=job.status.value,
+                    message=job.message,
+                    created_at=job.created_at,
+                    updated_at=job.updated_at,
+                    plan=job.plan,
+                )
+        except SQLAlchemyError:
+            pass
         self._factory = ProjectFactory(
             self._orchestrator,
             self._mission_controller,
             self._execution_pipeline,
             store=self._store,
+            job_store=self._job_store,
         )
         try:
             self._factory.restore()
@@ -100,6 +117,18 @@ class CompanyControlCenter:
                 plan=plan,
             )
             self._missions[mission.id] = record
+            job = MissionJob(
+                id=mission.id,
+                mission=mission,
+                plan=plan,
+                status=MissionJobStatus.RUNNING,
+                message=result.message,
+            )
+            self._jobs[mission.id] = job
+            try:
+                self._job_store.save(job)
+            except SQLAlchemyError:
+                pass
             return record
 
     async def run_factory(self, max_projects: int | None = None, max_stages: int | None = None, max_retries: int = 2) -> None:
@@ -119,6 +148,33 @@ class CompanyControlCenter:
     def enqueue_factory_mission(self, mission_id: str) -> None:
         record = self._get_mission(mission_id)
         self._factory.enqueue(record.mission)
+        job = self._job_store.get(mission_id)
+        if job is not None:
+            self._jobs[mission_id] = job
+            self._sync_mission_from_job(job)
+
+    def mission_job(self, mission_id: str) -> MissionJob | None:
+        try:
+            job = self._job_store.get(mission_id)
+        except SQLAlchemyError:
+            job = self._jobs.get(mission_id)
+        if job is not None:
+            self._jobs[mission_id] = job
+        return job
+
+    def mission_jobs(self) -> list[MissionJob]:
+        try:
+            jobs = self._job_store.list_all()
+        except SQLAlchemyError:
+            jobs = sorted(
+                self._jobs.values(),
+                key=lambda item: item.created_at,
+                reverse=True,
+            )
+        for job in jobs:
+            self._jobs[job.id] = job
+            self._sync_mission_from_job(job)
+        return jobs
 
     async def execute_next_stage(self, mission_id: str) -> AgentResult:
         record = self._get_mission(mission_id)
@@ -163,6 +219,19 @@ class CompanyControlCenter:
         if record is None:
             raise KeyError(f"Mission '{mission_id}' not found")
         return record
+
+    def _sync_mission_from_job(self, job: MissionJob) -> None:
+        with self._lock:
+            record = self._missions.get(job.id)
+            if record is not None:
+                self._missions[job.id] = record.model_copy(
+                    update={
+                        "status": job.status.value,
+                        "message": job.message,
+                        "updated_at": job.updated_at,
+                        "plan": job.plan,
+                    }
+                )
 
     def _update_record(
         self,
