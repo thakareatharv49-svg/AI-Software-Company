@@ -31,3 +31,31 @@ __all__ = [
     "DeterministicAIModel",
     "build_ai_tool_calling_engine",
 ]
+from company.ai.orchestration import (
+    AIOrchestrationResult,
+    AIOrchestrationStep,
+    AIToolOrchestrator,
+    build_ai_tool_orchestrator,
+)
+
+__all__ = [
+    "AIOrchestrationResult",
+    "AIOrchestrationStep",
+    "AIToolOrchestrator",
+    "build_ai_tool_orchestrator",
+]
+from company.ai.aggregation import (
+    AIToolResultAggregator,
+    AIToolSummary,
+)
+
+__all__ = [
+    "AIToolResultAggregator",
+    "AIToolSummary",
+]
+from company.ai.audit import AIToolAuditEvent, AIToolAuditRecorder
+
+__all__ = [
+    "AIToolAuditEvent",
+    "AIToolAuditRecorder",
+]
