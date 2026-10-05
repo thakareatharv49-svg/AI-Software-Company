@@ -12,11 +12,13 @@ from src.company.events.events import CompanyEvent
 from src.company.models.contracts import CompanyState
 
 router = APIRouter(prefix="/api", tags=["company-control"])
-ControlCenter = Annotated[CompanyControlCenter, Depends(lambda: control_center)]
 
 
 def get_control_center() -> CompanyControlCenter:
     return control_center
+
+
+ControlCenter = Annotated[CompanyControlCenter, Depends(get_control_center)]
 
 
 @router.get("/company/state", response_model=CompanyState)
@@ -52,7 +54,7 @@ def stop_company(center: ControlCenter) -> CompanyState:
 
 @router.post("/company/block", response_model=CompanyState)
 def block_company(
+    center: ControlCenter,
     reason: str = "Paused by operator",
-    center: ControlCenter = None,
 ) -> CompanyState:
     return center.block(reason)
