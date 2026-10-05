@@ -8,8 +8,8 @@ from src.company.control_center.service import (
     control_center,
 )
 from src.company.mission_controller.models import MissionPlan
-from src.company.mission_jobs import MissionJob
 from src.company.audit import MissionAuditEntry
+from src.company.mission_jobs import MissionJob
 
 router = APIRouter(prefix="/api")
 
