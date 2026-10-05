@@ -73,3 +73,28 @@ def test_mission_plan_api_exposes_internal_pipeline() -> None:
         assert plan.json()["steps"][0]["stage"] == "research"
     finally:
         app.dependency_overrides.clear()
+
+
+
+def test_mission_job_api_exposes_persistent_lifecycle() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    app.dependency_overrides[get_control_center] = lambda: center
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/missions",
+            json={"name": "Lifecycle API", "objective": "Expose job state"},
+        )
+        assert response.status_code == 201
+        mission_id = response.json()["mission"]["id"]
+
+        job = client.get(f"/api/missions/{mission_id}/job")
+        assert job.status_code == 200
+        assert job.json()["id"] == mission_id
+        assert job.json()["status"] == "running"
+
+        jobs = client.get("/api/mission-jobs")
+        assert jobs.status_code == 200
+        assert any(item["id"] == mission_id for item in jobs.json())
+    finally:
+        app.dependency_overrides.clear()
