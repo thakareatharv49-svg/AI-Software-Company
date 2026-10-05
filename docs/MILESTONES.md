@@ -472,7 +472,7 @@ The company can take software from source code to production.
 ---
 
 ## M32 â€” Real-World Research Engine
-Status: NOT STARTED
+Status: COMPLETE
 
 Build autonomous research.
 
@@ -493,7 +493,7 @@ The company can understand the world before building.
 ---
 
 ## M33 â€” Multi-Agent Collaboration
-Status: NOT STARTED
+Status: COMPLETE
 
 Enable agents to work together.
 
@@ -514,7 +514,7 @@ Multiple specialized agents operate as one engineering organization.
 ---
 
 ## M34 â€” Company Dashboard
-Status: PARTIALLY COMPLETE
+Status: NEXT
 
 Create the complete company control dashboard.
 
@@ -818,7 +818,7 @@ Always work on exactly one active milestone.
 
 Current milestone:
 
-**M17 â€” Memory Integration**
+**M34 â€” Company Dashboard**
 
 After completing a milestone, update this file:
 
@@ -845,4 +845,6 @@ M28 AI Execution Runtime — COMPLETE
 M29 AI Execution Observability — COMPLETE
 M30 AI Execution History & Persistence — COMPLETE
 M31 AI Execution Coordinator — COMPLETE
-M32 NEXT
+M32 Real-World Research Engine — COMPLETE
+M33 Multi-Agent Collaboration — COMPLETE
+M34 Company Dashboard — NEXT
