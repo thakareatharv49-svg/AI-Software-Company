@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from src.company.events.events import CompanyEvent
+from src.company.mission_controller.controller import MissionController
+from src.company.mission_controller.execution import MissionExecutionPipeline
+from src.company.mission_controller.models import MissionPlan
+from src.company.mission_controller.planner import build_mission_plan
+from src.company.models.contracts import CompanyMission
+from src.company.orchestration.orchestrator import CompanyOrchestrator
+
+
+@dataclass
+class FactoryProject:
+    mission: CompanyMission
+    plan: MissionPlan
+    status: str = "queued"
+    stages_executed: int = 0
+
+
+@dataclass
+class ProjectFactory:
+    """Queues missions and runs projects sequentially through the company pipeline."""
+
+    orchestrator: CompanyOrchestrator
+    controller: MissionController
+    pipeline: MissionExecutionPipeline
+    queue: list[FactoryProject] = field(default_factory=list)
+
+    def enqueue(self, mission: CompanyMission) -> FactoryProject:
+        plan = build_mission_plan(mission)
+        project = FactoryProject(mission=mission, plan=plan)
+        self.queue.append(project)
+        self.orchestrator.events.publish(
+            CompanyEvent(
+                event_type="FACTORY_PROJECT_QUEUED",
+                message=f"Project queued: {mission.name}",
+                project_id=f"project:{mission.id}",
+            )
+        )
+        return project
+
+    async def run_next(self, max_stages: int | None = None) -> FactoryProject | None:
+        if not self.queue:
+            return None
+
+        project = self.queue.pop(0)
+        project.status = "running"
+        if self.orchestrator.state.status.value != "running":
+            self.controller.start(project.mission)
+
+        self.orchestrator.events.publish(
+            CompanyEvent(
+                event_type="FACTORY_PROJECT_STARTED",
+                message=f"Factory started project: {project.mission.name}",
+                project_id=f"project:{project.mission.id}",
+            )
+        )
+
+        results = await self.pipeline.execute_mission(
+            project.mission,
+            project.plan,
+            max_stages=max_stages,
+        )
+        project.stages_executed = len(results)
+
+        if all(result.success for result in results) and all(
+            step.status == "completed" for step in project.plan.steps
+        ):
+            project.status = "completed"
+            self.orchestrator.stop()
+            self.orchestrator.events.publish(
+                CompanyEvent(
+                    event_type="FACTORY_PROJECT_COMPLETED",
+                    message=f"Factory completed project: {project.mission.name}",
+                    project_id=f"project:{project.mission.id}",
+                )
+            )
+        elif self.orchestrator.state.status.value == "blocked":
+            project.status = "blocked"
+            self.orchestrator.events.publish(
+                CompanyEvent(
+                    event_type="FACTORY_PROJECT_BLOCKED",
+                    message=f"Factory blocked project: {project.mission.name}",
+                    project_id=f"project:{project.mission.id}",
+                )
+            )
+        else:
+            project.status = "stopped"
+
+        return project
+
+    async def run(self, max_projects: int | None = None, max_stages: int | None = None) -> list[FactoryProject]:
+        completed: list[FactoryProject] = []
+        while self.queue and (max_projects is None or len(completed) < max_projects):
+            project = await self.run_next(max_stages=max_stages)
+            if project is None:
+                break
+            completed.append(project)
+            if project.status == "blocked":
+                break
+
+        self.orchestrator.events.publish(
+            CompanyEvent(
+                event_type="FACTORY_RUN_COMPLETED",
+                message=f"Factory run completed: {len(completed)} project(s)",
+            )
+        )
+        return completed

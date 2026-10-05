@@ -8,6 +8,7 @@ from src.company.models.enums import (
     CompanyStatus,
 )
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.company.project_factory import FactoryProject, ProjectFactory
 
 __all__ = [
     "CompanyCycleResult",
@@ -16,4 +17,6 @@ __all__ = [
     "CompanyOrchestrator",
     "CompanyState",
     "CompanyStatus",
+    "FactoryProject",
+    "ProjectFactory",
 ]
