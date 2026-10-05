@@ -53,6 +53,7 @@ class CompanyControlCenter:
         self._store = ProjectStore()
         self._job_store = MissionJobStore()
         try:
+            self._job_store.recover_running()
             for job in self._job_store.list_all():
                 self._jobs[job.id] = job
                 self._missions[job.id] = MissionRecord(
@@ -152,6 +153,21 @@ class CompanyControlCenter:
         if job is not None:
             self._jobs[mission_id] = job
             self._sync_mission_from_job(job)
+
+    def cancel_mission(self, mission_id: str) -> MissionJob:
+        try:
+            job = self._factory.cancel(mission_id)
+        except SQLAlchemyError:
+            raise
+        self._jobs[mission_id] = job
+        self._sync_mission_from_job(job)
+        return job
+
+    def retry_mission(self, mission_id: str) -> MissionJob:
+        job = self._factory.retry(mission_id)
+        self._jobs[mission_id] = job
+        self._sync_mission_from_job(job)
+        return job
 
     def mission_job(self, mission_id: str) -> MissionJob | None:
         try:
