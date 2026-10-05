@@ -141,3 +141,19 @@ def test_mission_audit_api_supports_filters() -> None:
         assert missing.status_code == 404
     finally:
         app.dependency_overrides.clear()
+
+
+def test_project_outputs_api() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    app.dependency_overrides[get_control_center] = lambda: center
+    try:
+        client = TestClient(app)
+        response = client.post("/api/missions", json={"name": "Outputs API", "objective": "Expose project outputs"})
+        assert response.status_code == 201
+        mission_id = response.json()["mission"]["id"]
+        outputs = client.get(f"/api/missions/{mission_id}/outputs")
+        assert outputs.status_code == 200
+        assert outputs.json() == []
+        assert client.get("/api/missions/missing/outputs").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
