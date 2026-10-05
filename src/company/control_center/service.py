@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from threading import Lock
 
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentResult
@@ -13,6 +15,8 @@ from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.company.persistence import ProjectStore
+from src.company.project_factory import ProjectFactory
 from src.runtime.providers.ollama import OllamaProvider
 from src.runtime.service import AIRuntime
 
@@ -44,6 +48,13 @@ class CompanyControlCenter:
             AgentRegistry(),
         )
         self._missions: dict[str, MissionRecord] = {}
+        self._store = ProjectStore()
+        self._factory = ProjectFactory(self._orchestrator, self._mission_controller, self._execution_pipeline, store=self._store)
+        try:
+            self._factory.restore()
+        except SQLAlchemyError:
+            pass
+        self._factory_task: asyncio.Task[None] | None = None
         self._lock = Lock()
 
     @property
@@ -85,6 +96,20 @@ class CompanyControlCenter:
             )
             self._missions[mission.id] = record
             return record
+
+    async def run_factory(self, max_projects: int | None = None, max_stages: int | None = None) -> None:
+        if self._factory_task is not None and not self._factory_task.done():
+            raise RuntimeError("Factory is already running")
+        async def runner() -> None:
+            await self._factory.run(max_projects=max_projects, max_stages=max_stages)
+        self._factory_task = asyncio.create_task(runner())
+
+    def factory_running(self) -> bool:
+        return self._factory_task is not None and not self._factory_task.done()
+
+    def enqueue_factory_mission(self, mission_id: str) -> None:
+        record = self._get_mission(mission_id)
+        self._factory.enqueue(record.mission)
 
     async def execute_next_stage(self, mission_id: str) -> AgentResult:
         record = self._get_mission(mission_id)
