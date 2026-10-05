@@ -75,7 +75,6 @@ def test_mission_plan_api_exposes_internal_pipeline() -> None:
         app.dependency_overrides.clear()
 
 
-
 def test_mission_job_api_exposes_persistent_lifecycle() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
