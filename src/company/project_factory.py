@@ -5,7 +5,6 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from src.company.audit import MissionAuditEntry
-
 from src.company.events.events import CompanyEvent
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
@@ -14,6 +13,7 @@ from src.company.mission_controller.planner import build_mission_plan
 from src.company.mission_jobs import MissionJob, MissionJobStatus, transition_job
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.company.project_outputs import ProjectOutputManifest
 
 
 class FactoryStore(Protocol):
@@ -23,6 +23,10 @@ class FactoryStore(Protocol):
 
 class MissionAuditStoreProtocol(Protocol):
     def append(self, entry: MissionAuditEntry) -> None: ...
+
+
+class ProjectOutputStoreProtocol(Protocol):
+    def save(self, manifest: ProjectOutputManifest) -> None: ...
 
 
 class MissionJobStoreProtocol(Protocol):
@@ -50,6 +54,7 @@ class ProjectFactory:
     store: FactoryStore | None = None
     job_store: MissionJobStoreProtocol | None = None
     audit_store: MissionAuditStoreProtocol | None = None
+    output_store: ProjectOutputStoreProtocol | None = None
     queue: list[FactoryProject] = field(default_factory=list)
     _running: bool = field(default=False, init=False, repr=False)
 
@@ -208,6 +213,7 @@ class ProjectFactory:
         ):
             project.status = "completed"
             self.orchestrator.stop()
+            self._save_output_manifest(project, "completed")
             self._transition_job(
                 project,
                 MissionJobStatus.COMPLETED,
@@ -305,6 +311,19 @@ class ProjectFactory:
             return completed
         finally:
             self._running = False
+
+    def _save_output_manifest(self, project: FactoryProject, status: str) -> None:
+        if self.output_store is None:
+            return
+        self.output_store.save(
+            ProjectOutputManifest(
+                id=str(uuid4()),
+                mission_id=project.mission.id,
+                project_id=f"project:{project.mission.id}",
+                name=project.mission.name,
+                status=status,
+            )
+        )
 
     def _audit(
         self,

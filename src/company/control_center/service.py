@@ -17,7 +17,13 @@ from src.company.audit import MissionAuditEntry
 from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
-from src.company.persistence import MissionAuditStore, MissionJobStore, ProjectStore
+from src.company.persistence import (
+    MissionAuditStore,
+    MissionJobStore,
+    ProjectOutputStore,
+    ProjectStore,
+)
+from src.company.project_outputs import ProjectOutputManifest
 from src.company.project_factory import ProjectFactory
 from src.runtime.providers.ollama import OllamaProvider
 from src.runtime.service import AIRuntime
@@ -54,6 +60,7 @@ class CompanyControlCenter:
         self._store = ProjectStore()
         self._job_store = MissionJobStore()
         self._audit_store = MissionAuditStore()
+        self._output_store = ProjectOutputStore()
         try:
             self._job_store.recover_running()
             for job in self._job_store.list_all():
@@ -75,6 +82,7 @@ class CompanyControlCenter:
             store=self._store,
             job_store=self._job_store,
             audit_store=self._audit_store,
+            output_store=self._output_store,
         )
         try:
             self._factory.restore()
@@ -185,6 +193,12 @@ class CompanyControlCenter:
         except SQLAlchemyError:
             pass
         return job
+
+    def project_outputs(self, mission_id: str) -> list[ProjectOutputManifest]:
+        try:
+            return self._output_store.get_for_mission(mission_id)
+        except SQLAlchemyError:
+            return []
 
     def audit(
         self,
