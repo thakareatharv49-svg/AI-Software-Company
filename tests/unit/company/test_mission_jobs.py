@@ -60,3 +60,17 @@ def test_recovery_does_not_change_non_running_job() -> None:
     from src.company.mission_jobs import recover_running_job
     job = make_job(MissionJobStatus.BLOCKED)
     assert recover_running_job(job) == job
+
+
+def test_audit_entry_defaults_are_valid() -> None:
+    from src.company.audit import MissionAuditEntry
+
+    entry = MissionAuditEntry(
+        id="audit-1",
+        mission_id="mission-1",
+        event_type="MISSION_CREATED",
+        message="created",
+    )
+
+    assert entry.status is None
+    assert entry.metadata == {}
