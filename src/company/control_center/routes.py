@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from src.company.control_center.service import CompanyControlCenter, MissionRecord, MissionSubmission, control_center
+from src.company.events.events import CompanyEvent
 from src.company.models.contracts import CompanyState
 
 router = APIRouter(prefix="/api", tags=["company-control"])
@@ -11,28 +12,39 @@ def get_control_center() -> CompanyControlCenter:
 
 
 @router.get("/company/state", response_model=CompanyState)
-def company_state() -> CompanyState:
-    return get_control_center().state
+def company_state(center: CompanyControlCenter = Depends(get_control_center)) -> CompanyState:
+    return center.state
 
 
 @router.get("/missions", response_model=list[MissionRecord])
-def list_missions() -> list[MissionRecord]:
-    return get_control_center().missions()
+def list_missions(center: CompanyControlCenter = Depends(get_control_center)) -> list[MissionRecord]:
+    return center.missions()
+
+
+@router.get("/company/events", response_model=list[CompanyEvent])
+def company_events(center: CompanyControlCenter = Depends(get_control_center)) -> list[CompanyEvent]:
+    return center.events()
 
 
 @router.post("/missions", response_model=MissionRecord, status_code=201)
-def submit_mission(submission: MissionSubmission) -> MissionRecord:
+def submit_mission(
+    submission: MissionSubmission,
+    center: CompanyControlCenter = Depends(get_control_center),
+) -> MissionRecord:
     try:
-        return get_control_center().submit_mission(submission)
+        return center.submit_mission(submission)
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/company/stop", response_model=CompanyState)
-def stop_company() -> CompanyState:
-    return get_control_center().stop()
+def stop_company(center: CompanyControlCenter = Depends(get_control_center)) -> CompanyState:
+    return center.stop()
 
 
 @router.post("/company/block", response_model=CompanyState)
-def block_company(reason: str = "Paused by operator") -> CompanyState:
-    return get_control_center().block(reason)
+def block_company(
+    reason: str = "Paused by operator",
+    center: CompanyControlCenter = Depends(get_control_center),
+) -> CompanyState:
+    return center.block(reason)
