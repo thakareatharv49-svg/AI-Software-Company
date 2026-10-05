@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
 from src.company.audit import MissionAuditEntry
-from src.company.autonomous_factory_runner import FactoryAutonomousRunner
 from src.company.events.events import CompanyEvent
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
@@ -15,6 +14,9 @@ from src.company.mission_jobs import MissionJob, MissionJobStatus, transition_jo
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.project_outputs import ProjectOutputManifest
+
+if TYPE_CHECKING:
+    from src.company.autonomous_factory_runner import FactoryAutonomousRunner
 
 
 class FactoryStore(Protocol):
