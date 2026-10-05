@@ -74,6 +74,7 @@ class CompanyControlCenter:
             self._execution_pipeline,
             store=self._store,
             job_store=self._job_store,
+            audit_store=self._audit_store,
         )
         try:
             self._factory.restore()
