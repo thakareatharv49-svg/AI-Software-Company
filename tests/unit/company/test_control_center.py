@@ -124,3 +124,20 @@ def test_mission_cancel_and_retry_api() -> None:
         assert retried.json()["status"] == "queued"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_mission_audit_api_supports_filters() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    app.dependency_overrides[get_control_center] = lambda: center
+    try:
+        client = TestClient(app)
+        response = client.post("/api/missions", json={"name": "Audit API", "objective": "Inspect lifecycle history"})
+        assert response.status_code == 201
+        mission_id = response.json()["mission"]["id"]
+        audit = client.get(f"/api/missions/{mission_id}/audit", params={"event_type": "MISSION_CREATED", "status": "running"})
+        assert audit.status_code == 200
+        assert isinstance(audit.json(), list)
+        missing = client.get("/api/missions/missing/audit")
+        assert missing.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
