@@ -42,6 +42,9 @@ class CompanyControlCenter:
     def events(self):
         return self._orchestrator.events.list_events()
 
+    def mission_plan(self, mission_id: str) -> MissionPlan | None:
+        return self._mission_controller.get_plan(mission_id)
+
     def missions(self) -> list[MissionRecord]:
         with self._lock:
             return sorted(self._missions.values(), key=lambda item: item.created_at, reverse=True)
