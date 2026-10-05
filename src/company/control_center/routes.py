@@ -9,6 +9,7 @@ from src.company.control_center.service import (
 )
 from src.company.mission_controller.models import MissionPlan
 from src.company.mission_jobs import MissionJob
+from src.company.audit import MissionAuditEntry
 
 router = APIRouter(prefix="/api")
 
@@ -70,6 +71,16 @@ def retry_mission(
         raise HTTPException(status_code=404, detail="Mission job not found") from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/missions/{mission_id}/audit", response_model=list[MissionAuditEntry])
+def mission_audit(
+    mission_id: str,
+    center: CompanyControlCenter = ControlCenter,
+) -> list[MissionAuditEntry]:
+    if center.mission_job(mission_id) is None:
+        raise HTTPException(status_code=404, detail="Mission job not found")
+    return center.audit(mission_id)
 
 
 @router.get("/missions/{mission_id}/job", response_model=MissionJob)
