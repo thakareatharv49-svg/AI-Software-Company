@@ -514,7 +514,7 @@ Multiple specialized agents operate as one engineering organization.
 ---
 
 ## M34 â€” Company Dashboard
-Status: COMPLETE
+Status: PARTIALLY COMPLETE
 
 Create the complete company control dashboard.
 
@@ -540,7 +540,7 @@ One place to understand the entire autonomous company.
 ---
 
 ## M35 â€” Continuous Learning Engine
-Status: NEXT
+Status: COMPLETE
 
 Turn experience into improvement.
 
@@ -818,7 +818,7 @@ Always work on exactly one active milestone.
 
 Current milestone:
 
-**M35 â€” Continuous Learning Engine**
+**M36 â€” End-to-End Autonomous Project**
 
 After completing a milestone, update this file:
 
@@ -848,4 +848,5 @@ M31 AI Execution Coordinator — COMPLETE
 M32 Real-World Research Engine — COMPLETE
 M33 Multi-Agent Collaboration — COMPLETE
 M34 Company Dashboard — COMPLETE
-M35 Continuous Learning Engine — NEXT
+M35 Continuous Learning Engine — COMPLETE
+M36 End-to-End Autonomous Project — NEXT
