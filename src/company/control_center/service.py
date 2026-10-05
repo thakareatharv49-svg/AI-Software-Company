@@ -5,6 +5,8 @@ from threading import Lock
 
 from pydantic import BaseModel, Field
 
+from src.company.mission_controller.controller import MissionController
+from src.company.mission_controller.models import MissionPlan
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 
@@ -21,6 +23,7 @@ class MissionRecord(BaseModel):
     message: str
     created_at: datetime
     updated_at: datetime
+    plan: MissionPlan
 
 
 class CompanyControlCenter:
@@ -28,6 +31,7 @@ class CompanyControlCenter:
 
     def __init__(self, orchestrator: CompanyOrchestrator | None = None) -> None:
         self._orchestrator = orchestrator or CompanyOrchestrator()
+        self._mission_controller = MissionController(self._orchestrator)
         self._missions: dict[str, MissionRecord] = {}
         self._lock = Lock()
 
@@ -51,7 +55,7 @@ class CompanyControlCenter:
                 objective=submission.objective.strip(),
                 constraints=[item.strip() for item in submission.constraints if item.strip()],
             )
-            result = self._orchestrator.start(mission)
+            plan, result = self._mission_controller.start(mission)
             now = datetime.now(UTC)
             record = MissionRecord(
                 mission=mission,
@@ -59,6 +63,7 @@ class CompanyControlCenter:
                 message=result.message,
                 created_at=now,
                 updated_at=now,
+                plan=plan,
             )
             self._missions[mission.id] = record
             return record
