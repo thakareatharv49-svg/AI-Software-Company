@@ -56,6 +56,36 @@ async def test_execute_next_runs_agent_and_advances_stage() -> None:
 
 
 @pytest.mark.asyncio
+async def test_execute_mission_runs_multiple_stages() -> None:
+    orchestrator = CompanyOrchestrator()
+    mission = CompanyMission(name="Build X", objective="Create X")
+    controller = MissionController(orchestrator)
+    plan, _ = controller.start(mission)
+
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+
+    results = await pipeline.execute_mission(mission, plan, max_stages=3)
+
+    assert len(results) == 3
+    assert all(result.success for result in results)
+    assert [step.status for step in plan.steps[:3]] == ["completed"] * 3
+    assert plan.steps[3].status == "planned"
+    assert orchestrator.state.completed_tasks == 3
+    assert any(
+        event.event_type == "MISSION_EXECUTION_STARTED"
+        for event in orchestrator.events.list_events()
+    )
+    assert any(
+        event.event_type == "MISSION_EXECUTION_STOPPED"
+        for event in orchestrator.events.list_events()
+    )
+
+
+@pytest.mark.asyncio
 async def test_failed_stage_blocks_company() -> None:
     class FailingRuntime:
         async def generate(self, request):
