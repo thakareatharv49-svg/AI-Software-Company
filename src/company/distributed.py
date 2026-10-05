@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Callable, TypeVar
+from typing import TypeVar
 from uuid import uuid4
 
 T = TypeVar("T")
@@ -63,11 +64,7 @@ class DistributedExecutor:
     def submit(self, payload: object) -> WorkItem:
         return WorkItem(str(uuid4()), payload)
 
-    def execute(
-        self,
-        item: WorkItem,
-        handler: Callable[[object], T],
-    ) -> WorkResult:
+    def execute(self, item: WorkItem, handler: Callable[[object], T]) -> WorkResult:
         ready = [worker for worker in self.workers if worker.status == WorkerStatus.READY]
         if not ready:
             raise RuntimeError("no ready workers")
@@ -86,11 +83,7 @@ class DistributedExecutor:
         self.results.append(result)
         return result
 
-    def execute_with_retry(
-        self,
-        item: WorkItem,
-        handler: Callable[[object], T],
-    ) -> WorkResult:
+    def execute_with_retry(self, item: WorkItem, handler: Callable[[object], T]) -> WorkResult:
         last: WorkResult | None = None
         for attempt in range(self.max_attempts):
             result = self.execute(WorkItem(item.id, item.payload, attempt), handler)
