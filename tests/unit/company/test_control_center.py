@@ -9,7 +9,9 @@ from src.main import app
 
 def test_submit_mission_starts_company() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
-    record = center.submit_mission(MissionSubmission(name="Build X", objective="Create X for users"))
+    record = center.submit_mission(
+        MissionSubmission(name="Build X", objective="Create X for users")
+    )
     assert record.status == "running"
     assert record.mission.objective == "Create X for users"
     assert center.state.status.value == "running"
