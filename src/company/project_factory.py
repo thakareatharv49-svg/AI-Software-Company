@@ -52,15 +52,18 @@ class ProjectFactory:
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
         plan = build_mission_plan(mission)
         job = self._load_job(mission.id)
+        if any(item.mission.id == mission.id for item in self.queue):
+            raise ValueError(f"Mission '{mission.id}' is already queued")
         if job is not None and job.status in {
             MissionJobStatus.QUEUED,
-            MissionJobStatus.RUNNING,
             MissionJobStatus.COMPLETED,
             MissionJobStatus.CANCELLED,
         }:
             raise ValueError(
                 f"Mission '{mission.id}' already has lifecycle state '{job.status.value}'"
             )
+        if job is not None and job.status == MissionJobStatus.RUNNING and self._running:
+            raise ValueError(f"Mission '{mission.id}' is already running in the factory")
         if job is None:
             self._save_job(
                 MissionJob(
