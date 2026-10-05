@@ -172,7 +172,10 @@ class MissionExecutionPipeline:
             if not result.success:
                 break
             completed += 1
-            if self.orchestrator.state.last_decision is not None and self.orchestrator.state.last_decision.value == "complete_project":
+            if (
+                self.orchestrator.state.last_decision is not None
+                and self.orchestrator.state.last_decision.value == "complete_project"
+            ):
                 break
 
         if self.orchestrator.state.status.value == "running" and completed == 0:
