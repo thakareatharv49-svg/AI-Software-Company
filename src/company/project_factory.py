@@ -6,6 +6,7 @@ from src.company.events.events import CompanyEvent
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
+from src.company.mission_controller.planner import build_mission_plan
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 
@@ -28,11 +29,8 @@ class ProjectFactory:
     queue: list[FactoryProject] = field(default_factory=list)
 
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
-        plan = self.controller.start(mission)[0]
+        plan = build_mission_plan(mission)
         project = FactoryProject(mission=mission, plan=plan)
-        # A queued factory project must not consume the running company slot.
-        if self.orchestrator.state.status.value == "running":
-            self.orchestrator.stop()
         self.queue.append(project)
         self.orchestrator.events.publish(
             CompanyEvent(
