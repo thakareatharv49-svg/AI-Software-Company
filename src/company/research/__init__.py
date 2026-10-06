@@ -10,8 +10,8 @@ from company.research.engine import (
 
 from src.company.research.advanced import AdvancedResearchEngine, ResearchPlan
 from src.company.research.market import (
-    CompetitorProfile,
     CompetitiveIntelligence,
+    CompetitorProfile,
     MarketSignal,
 )
 from src.company.research.product_discovery import ProductCandidate, ProductDiscovery
