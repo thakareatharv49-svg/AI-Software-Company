@@ -242,6 +242,14 @@ class ProjectFactory:
                 )
                 for step in project.plan.steps:
                     step.status = "completed"
+                # The autonomous runner's returned pipeline is the authoritative
+                # completion signal. Stage telemetry is useful metadata, but an empty
+                # telemetry list must not turn a successfully returned pipeline into a
+                # paused/re-queued factory project.
+                if getattr(autonomous_result, "pipeline", None) is None:
+                    raise RuntimeError(
+                        "Autonomous runner returned no pipeline result"
+                    )
                 results = [
                     type(
                         "FactoryStageResult",
@@ -254,6 +262,14 @@ class ProjectFactory:
                     )()
                     for stage in autonomous_result.stages
                 ]
+                if not results:
+                    results = [
+                        type(
+                            "FactoryStageResult",
+                            (),
+                            {"success": True},
+                        )()
+                    ]
                 self._last_autonomous_result = autonomous_result
             else:
                 results = await self.pipeline.execute_mission(
