@@ -67,8 +67,12 @@ class ProjectFactory:
         if self.store is None:
             return 0
         restored = 0
+        known_ids = {item.mission.id for item in self.queue}
         for item in self.store.load_pending():
+            if item["mission"].id in known_ids:
+                continue
             self.queue.append(FactoryProject(**item))
+            known_ids.add(item["mission"].id)
             restored += 1
         return restored
 
