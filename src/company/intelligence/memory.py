@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from threading import RLock
 
@@ -11,7 +11,7 @@ class MemoryInsight:
     value: str
     project_id: str | None = None
     importance: float = 1.0
-    created_at: datetime = datetime.now(UTC)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class CrossProjectMemory:
