@@ -275,6 +275,8 @@ class ProjectFactory:
             )
             event_type = "FACTORY_PROJECT_COMPLETED"
         elif self.orchestrator.state.status.value == "blocked":
+            # Preserve the real exception when an inner stage blocked the orchestrator.
+            # The previous fallback masked the actionable failure as a generic block.
             project.last_error = project.last_error or "Project execution blocked"
             if project.attempts <= max_retries:
                 project.status = "queued"
