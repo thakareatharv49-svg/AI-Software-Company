@@ -1,4 +1,6 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.agents.models.contracts import AgentResult
 from src.company.audit import MissionAuditEntry
@@ -46,13 +48,12 @@ def company_events(center: CompanyControlCenter = ControlCenter):
 @router.post("/missions", status_code=status.HTTP_201_CREATED)
 async def submit_mission(
     submission: MissionSubmission,
-    background_tasks: BackgroundTasks,
     center: CompanyControlCenter = ControlCenter,
 ) -> MissionRecord:
     try:
         record = center.submit_mission(submission)
         center.enqueue_factory_mission(record.mission.id)
-        background_tasks.add_task(center.run_factory, max_projects=1, max_retries=2)
+        asyncio.create_task(center.run_factory(max_projects=1, max_retries=2))
         return record
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
