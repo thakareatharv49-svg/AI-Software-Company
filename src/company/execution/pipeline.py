@@ -242,11 +242,17 @@ class CompanyExecutionPipeline:
                     clone_result = await self.github_native.clone(github_repository, workspace)
                     if not clone_result.success:
                         raise RuntimeError(clone_result.message)
-                    branch_result = await self.github_native.create_branch(workspace, pull_request_head)
+                    branch_result = await self.github_native.create_branch(
+                        workspace,
+                        pull_request_head,
+                    )
                     if not branch_result.success:
                         raise RuntimeError(branch_result.message)
                     await self.github_native.write_files(workspace, files)
-                    commit_result = await self.github_native.commit(workspace, f"feat: complete {project.name}")
+                    commit_result = await self.github_native.commit(
+                        workspace,
+                        f"feat: complete {project.name}",
+                    )
                     if not commit_result.success:
                         raise RuntimeError(commit_result.message)
                     push_result = await self.github_native.push(workspace, pull_request_head)
