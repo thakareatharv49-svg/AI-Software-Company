@@ -6,6 +6,7 @@ from runtime.models.messages import ModelResponse
 from src.agents.execution.executor import AgentExecutor
 from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
+from src.company.mission_controller.planner import build_mission_plan
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
