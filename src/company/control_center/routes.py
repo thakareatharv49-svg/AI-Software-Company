@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.agents.models.contracts import AgentResult
+from src.company.audit import MissionAuditEntry
 from src.company.control_center.service import (
     CompanyControlCenter,
     MissionRecord,
@@ -8,7 +9,6 @@ from src.company.control_center.service import (
     control_center,
 )
 from src.company.mission_controller.models import MissionPlan
-from src.company.audit import MissionAuditEntry
 from src.company.mission_jobs import MissionJob
 from src.company.project_outputs import ProjectOutputManifest
 from src.company.readiness import ProductionReadinessReport, build_readiness_report
@@ -49,7 +49,8 @@ def submit_mission(
     center: CompanyControlCenter = ControlCenter,
 ) -> MissionRecord:
     try:
-        return center.submit_mission(submission)
+        record = center.submit_mission(submission)
+        return record
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
