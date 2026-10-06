@@ -1,5 +1,3 @@
-import asyncio
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.agents.models.contracts import AgentResult
@@ -46,18 +44,12 @@ def company_events(center: CompanyControlCenter = ControlCenter):
 
 
 @router.post("/missions", status_code=status.HTTP_201_CREATED)
-async def submit_mission(
+def submit_mission(
     submission: MissionSubmission,
     center: CompanyControlCenter = ControlCenter,
 ) -> MissionRecord:
     try:
         record = center.submit_mission(submission)
-        center.enqueue_factory_mission(record.mission.id)
-        async def start_factory() -> None:
-            await asyncio.sleep(0.1)
-            await center.run_factory(max_projects=1, max_retries=2)
-
-        asyncio.create_task(start_factory())
         return record
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
