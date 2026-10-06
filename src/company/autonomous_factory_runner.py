@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Protocol
@@ -52,16 +53,15 @@ class FactoryAutonomousRunner:
             for path, content in request.files.items():
                 workspace.write_file(path, content)
 
-            request = request.__class__(
-                **{
-                    **request.__dict__,
-                    "qa_request": request.qa_request.model_copy(
+            if request.qa_request is not None:
+                request = replace(
+                    request,
+                    qa_request=request.qa_request.model_copy(
                         update={
                             "working_directory": str(workspace.root),
                         }
                     ),
-                }
-            )
+                )
             return await self.runner.run(request)
         finally:
             workspace.destroy()
