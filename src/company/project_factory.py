@@ -83,10 +83,16 @@ class ProjectFactory:
             raise ValueError(
                 f"Mission '{mission.id}' already has lifecycle state '{job.status.value}'"
             )
-        if any(item.mission.id == mission.id for item in self.queue):
-            raise ValueError(
-                f"Mission '{mission.id}' already has lifecycle state 'queued'"
-            )
+        existing = next(
+            (item for item in self.queue if item.mission.id == mission.id),
+            None,
+        )
+        if existing is not None:
+            # A repeated factory-run request should execute this mission next,
+            # rather than failing because it is already queued.
+            self.queue.remove(existing)
+            self.queue.insert(0, existing)
+            return existing
         if job is not None and job.status == MissionJobStatus.RUNNING and self._running:
             raise ValueError(f"Mission '{mission.id}' is already running in the factory")
         if job is None:
