@@ -84,6 +84,11 @@ class GitHubNativeService:
         output = (result.stdout + result.stderr).strip()
         return GitOperationResult(
             result.returncode == 0,
-            output or ("Git operation completed" if result.returncode == 0 else "Git operation failed"),
+            output
+            or (
+                "Git operation completed"
+                if result.returncode == 0
+                else "Git operation failed"
+            ),
             output,
         )
