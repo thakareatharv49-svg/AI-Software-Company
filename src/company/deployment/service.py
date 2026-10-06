@@ -85,7 +85,7 @@ class DeploymentService:
                 process.communicate(),
                 timeout=config.timeout_seconds,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             process.kill()
             await process.wait()
             return _CompletedProcess(124, b"", b"Deployment timed out.")
