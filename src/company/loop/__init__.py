@@ -1,8 +1,56 @@
-from src.company.loop.lifecycle import LifecycleState, ProjectLifecycle
 from src.company.loop.concurrency import ConcurrentProjectRunner, ProjectRunResult
-from src.company.loop.self_repair import HealingAction, SelfHealingService
 from src.company.loop.discovery import Opportunity, OpportunityDiscovery
-from src.company.loop.operating import CompanyOperatingLoop, CompanyCycleResult
+from src.company.loop.lifecycle import LifecycleState, ProjectLifecycle
+from src.company.loop.operating import CompanyCycleResult, CompanyOperatingLoop
+
+
+class HealingAction:
+    def __init__(self, project_id, action, attempt, success, reason):
+        self.project_id = project_id
+        self.action = action
+        self.attempt = attempt
+        self.success = success
+        self.reason = reason
+
+
+class SelfHealingService:
+    def __init__(self, max_attempts: int = 3):
+        self.max_attempts = max_attempts
+        self._attempts = {}
+        self._history = []
+
+    async def heal(self, project_id, operation):
+        attempt = self._attempts.get(project_id, 0) + 1
+        if attempt > self.max_attempts:
+            action = HealingAction(
+                project_id,
+                "blocked",
+                attempt,
+                False,
+                "Maximum recovery attempts reached.",
+            )
+            self._history.append(action)
+            return action
+        self._attempts[project_id] = attempt
+        try:
+            await operation()
+        except Exception as exc:
+            action = HealingAction(project_id, "retry", attempt, False, str(exc))
+        else:
+            action = HealingAction(
+                project_id,
+                "retry",
+                attempt,
+                True,
+                "Recovery succeeded.",
+            )
+            self._attempts.pop(project_id, None)
+        self._history.append(action)
+        return action
+
+    def history(self):
+        return list(self._history)
+
 
 __all__ = [
     "LifecycleState",
@@ -16,15 +64,3 @@ __all__ = [
     "CompanyOperatingLoop",
     "CompanyCycleResult",
 ]
-
-
-class CompanyOperatingLoop:
-    """Coordinates a bounded company operating cycle."""
-
-    def select(self, project_ids: list[str], capacity: int = 1) -> tuple[str, ...]:
-        if capacity < 1:
-            return ()
-        return tuple(project_ids[:capacity])
-
-    def report(self, selected: list[str], completed: list[str]) -> dict[str, tuple[str, ...]]:
-        return {"selected": tuple(selected), "completed": tuple(completed)}
