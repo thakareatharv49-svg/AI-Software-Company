@@ -106,7 +106,12 @@ class ProjectFactory:
         project = FactoryProject(mission=mission, plan=plan)
         self.queue.append(project)
         self._save(project)
-        self._audit(mission.id, "MISSION_QUEUED", f"Project queued: {mission.name}", MissionJobStatus.QUEUED.value)
+        self._audit(
+            mission.id,
+            "MISSION_QUEUED",
+            f"Project queued: {mission.name}",
+            MissionJobStatus.QUEUED.value,
+        )
         self.orchestrator.events.publish(
             CompanyEvent(
                 event_type="FACTORY_PROJECT_QUEUED",
