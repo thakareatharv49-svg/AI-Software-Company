@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
+
 
 @dataclass(frozen=True, slots=True)
 class DebugAttempt:
@@ -9,8 +10,10 @@ class DebugAttempt:
     success: bool
     error: str = ""
 
+
 class DebuggingService:
     """Runs bounded repair attempts while preserving failure history."""
+
     def __init__(self, max_attempts: int = 3):
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
