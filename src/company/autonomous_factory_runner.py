@@ -11,9 +11,9 @@ from src.company.autonomous_project import (
     AutonomousProjectResult,
     AutonomousProjectRunner,
 )
-from src.company.workspace import ProjectExecutionService
-from src.company.models.contracts import CompanyMission
 from src.company.mission_controller.models import MissionPlan
+from src.company.models.contracts import CompanyMission
+from src.company.workspace import ProjectExecutionService
 
 
 class AutonomousProjectRunnerProtocol(Protocol):
