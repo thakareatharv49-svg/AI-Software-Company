@@ -80,14 +80,14 @@ class ProjectFactory:
             None,
         )
         if existing is not None:
-            # An explicit factory-run request is allowed to re-trigger a queued
-            # mission. Move it to the front so stale restored work cannot delay it.
-            self.queue.remove(existing)
-            self.queue.insert(0, existing)
+            # factory-run is idempotent: an already queued mission is already
+            # scheduled. Do not move it or create another execution cycle.
             return existing
         if job is not None and job.status in {
             MissionJobStatus.COMPLETED,
             MissionJobStatus.CANCELLED,
+            MissionJobStatus.FAILED,
+            MissionJobStatus.BLOCKED,
         }:
             raise ValueError(
                 f"Mission '{mission.id}' already has lifecycle state '{job.status.value}'"
