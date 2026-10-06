@@ -42,11 +42,6 @@ class LearningEngine:
     def lessons(self, category: str | None = None) -> list[str]:
         signals = self.signals(category)
         if not signals:
-            return []
-        grouped: dict[str, list[float]] = {}
-        for signal in signals:
-            grouped.setdefault(signal.outcome, []).append(signal.value)
-        return [
-            f"{outcome}: average={mean(values):.3f}, samples={len(values)}"
-            for outcome, values in sorted(grouped.items())
-        ]
+            lessons = [(outcome, mean(values), f"{outcome}: average={mean(values):.3f}, samples={len(values)}") for outcome, values in grouped.items()]
+        lessons.sort(key=lambda item: item[1], reverse=True)
+        return [lesson[2] for lesson in lessons]
