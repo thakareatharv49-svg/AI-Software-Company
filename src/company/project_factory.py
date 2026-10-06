@@ -104,7 +104,9 @@ class ProjectFactory:
                 transition_job(job, MissionJobStatus.QUEUED, f"Project re-queued: {mission.name}")
             )
         project = FactoryProject(mission=mission, plan=plan)
-        self.queue.append(project)
+        # A newly submitted mission is an explicit run request. Prioritize it over
+        # restored/stale queued work so the factory-run API executes the requested mission.
+        self.queue.insert(0, project)
         self._save(project)
         self._audit(
             mission.id,
