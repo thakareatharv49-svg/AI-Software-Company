@@ -6,7 +6,6 @@ from company.research.engine import (
     ResearchSource,
     StaticResearchProvider,
 )
-
 from company.research.market import (
     CompetitiveIntelligence,
     CompetitorProfile,
