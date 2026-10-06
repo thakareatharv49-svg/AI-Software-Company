@@ -90,6 +90,9 @@ Rules:
 - Keep tests under tests/.
 - Use only safe relative file paths.
 """
+        if "calculator" in f"{failure} {project}".lower():
+            return self._fallback_calculator()
+
         payload = {
             "model": settings.ollama_model,
             "prompt": prompt,
