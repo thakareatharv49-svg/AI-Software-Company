@@ -12,11 +12,19 @@ from src.agents.models.contracts import AgentResult
 from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
+from src.company.autonomous_factory_runner import FactoryAutonomousRunner
+from src.company.autonomous_project import AutonomousProjectRequest, AutonomousProjectRunner
+from src.company.project_generator import OllamaProjectGenerator
+from src.company.research.engine import StaticResearchProvider
+from src.company.ceo.models import Mission as CEOMission
+from src.projects.models.contracts import ProjectCreateRequest
+from src.qa.models.contracts import QATestRequest
 from src.company.mission_controller.models import MissionPlan
 from src.company.audit import MissionAuditEntry
 from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.manager.models.contracts import Mission as ManagerMission, TaskPlanItem
 from src.company.persistence import (
     MissionAuditStore,
     MissionJobStore,
@@ -75,6 +83,17 @@ class CompanyControlCenter:
                 )
         except SQLAlchemyError:
             pass
+        self._generator = OllamaProjectGenerator()
+        autonomous_runner = AutonomousProjectRunner(
+            research_provider=StaticResearchProvider(),
+            pipeline=CompanyExecutionPipeline(),
+            deployment=lambda pipeline: f"Validated locally: {pipeline.project.name}",
+            monitoring=lambda pipeline: f"Monitoring initialized for {pipeline.project.name}",
+        )
+        self._autonomous_factory_runner = FactoryAutonomousRunner(
+            autonomous_runner,
+            self._build_autonomous_request,
+        )
         self._factory = ProjectFactory(
             self._orchestrator,
             self._mission_controller,
@@ -83,6 +102,7 @@ class CompanyControlCenter:
             job_store=self._job_store,
             audit_store=self._audit_store,
             output_store=self._output_store,
+            autonomous_runner=self._autonomous_factory_runner,
         )
         try:
             self._factory.restore()
@@ -295,6 +315,42 @@ class CompanyControlCenter:
         self._orchestrator.block(reason)
         self._sync_latest()
         return self.state
+
+    async def _build_autonomous_request(
+        self,
+        mission: CompanyMission,
+        plan: MissionPlan,
+    ) -> AutonomousProjectRequest:
+        generated = await self._generator.generate(mission.name, mission.objective)
+        return AutonomousProjectRequest(
+            mission=CEOMission(
+                mission_id=mission.id,
+                objective=mission.objective,
+                constraints=tuple(mission.constraints),
+            ),
+            research_query=mission.objective,
+            project_request=ProjectCreateRequest(
+                name=mission.name,
+                description=mission.objective,
+                objective=mission.objective,
+            ),
+            manager_mission=ManagerMission(
+                name=mission.name,
+                objective=mission.objective,
+            ),
+            tasks=(
+                TaskPlanItem(
+                    title=f"Implement {mission.name}",
+                    description=mission.objective,
+                    priority="high",
+                ),
+            ),
+            qa_request=QATestRequest(
+                command=generated.test_command,
+                working_directory=".",
+            ),
+            files=generated.files,
+        )
 
     def _get_mission(self, mission_id: str) -> MissionRecord:
         with self._lock:
