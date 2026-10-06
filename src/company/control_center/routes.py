@@ -175,7 +175,12 @@ async def run_factory(
 ) -> dict[str, object]:
     try:
         center.enqueue_factory_mission(mission_id)
-        await center.run_factory(max_projects=1, max_stages=max_stages, max_retries=max_retries)
+        await center.run_factory(
+            max_projects=1,
+            max_stages=max_stages,
+            max_retries=max_retries,
+            mission_id=mission_id,
+        )
         return {"status": "started", "mission_id": mission_id}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
