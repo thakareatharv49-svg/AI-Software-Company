@@ -170,7 +170,12 @@ class CompanyControlCenter:
                 pass
             return record
 
-    async def run_factory(self, max_projects: int | None = None, max_stages: int | None = None, max_retries: int = 2) -> None:
+    async def run_factory(
+        self,
+        max_projects: int | None = None,
+        max_stages: int | None = None,
+        max_retries: int = 2,
+    ) -> None:
         if self._factory_task is not None and not self._factory_task.done():
             raise RuntimeError("Factory is already running")
         async def runner() -> None:
@@ -385,7 +390,11 @@ class CompanyControlCenter:
                     "status": self._orchestrator.state.status.value,
                     "message": (
                         message
-                        or (result.output if result and result.success else result.error if result else "Execution stopped")
+                        or (
+                            result.output
+                            if result and result.success
+                            else result.error if result else "Execution stopped"
+                        )
                     ),
                     "updated_at": datetime.now(UTC),
                     "plan": record.plan,
