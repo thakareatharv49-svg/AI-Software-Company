@@ -1,10 +1,13 @@
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
 from src.company.gates.quality import ProductionQualityGate
+from src.company.github_native.service import GitHubNativeService
 from src.company.observability.service import ObservabilityService
 from src.company.recovery.service import RecoveryService
 from src.events.models.contracts import CompanyEvent
@@ -47,6 +50,7 @@ class CompanyExecutionPipeline:
         debugger: AutonomousDebugger | None = None,
         reviewer: CodeReviewer | None = None,
         github: GitHubAutomation | None = None,
+        github_native: GitHubNativeService | None = None,
         memory: MemoryService | None = None,
     ) -> None:
         self.event_service = get_event_service()
@@ -58,6 +62,7 @@ class CompanyExecutionPipeline:
         )
         self.reviewer = reviewer or CodeReviewer()
         self.github = github
+        self.github_native = github_native
         self.memory = memory or MemoryService()
         self.recovery = RecoveryService()
         self.quality_gate = ProductionQualityGate()
@@ -231,6 +236,23 @@ class CompanyExecutionPipeline:
             and github_repository is not None
             and pull_request_head is not None
         ):
+            if self.github_native is not None:
+                with TemporaryDirectory(prefix="ai-company-github-") as temporary:
+                    workspace = Path(temporary) / github_repository.name
+                    clone_result = await self.github_native.clone(github_repository, workspace)
+                    if not clone_result.success:
+                        raise RuntimeError(clone_result.message)
+                    branch_result = await self.github_native.create_branch(workspace, pull_request_head)
+                    if not branch_result.success:
+                        raise RuntimeError(branch_result.message)
+                    await self.github_native.write_files(workspace, files)
+                    commit_result = await self.github_native.commit(workspace, f"feat: complete {project.name}")
+                    if not commit_result.success:
+                        raise RuntimeError(commit_result.message)
+                    push_result = await self.github_native.push(workspace, pull_request_head)
+                    if not push_result.success:
+                        raise RuntimeError(push_result.message)
+
             github_result = await self.github.open_pull_request(
                 github_repository,
                 title=f"feat: complete {project.name}",
