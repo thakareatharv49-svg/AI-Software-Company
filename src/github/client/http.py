@@ -54,9 +54,15 @@ class GitHubHttpClient(GitHubClient):
 
     async def get_repository(self, owner: str, name: str) -> GitHubRepository:
         data = await self._request("GET", f"/repos/{owner}/{name}")
-        return GitHubRepository(owner=owner, name=name, default_branch=data.get("default_branch", "main"))
+        return GitHubRepository(
+            owner=owner,
+            name=name,
+            default_branch=data.get("default_branch", "main"),
+        )
 
-    async def create_issue(self, repository: GitHubRepository, issue: GitHubIssue) -> GitHubActionResult:
+    async def create_issue(
+        self, repository: GitHubRepository, issue: GitHubIssue
+    ) -> GitHubActionResult:
         data = await self._request(
             "POST", f"/repos/{repository.owner}/{repository.name}/issues", issue.model_dump()
         )
@@ -118,7 +124,11 @@ class GitHubHttpClient(GitHubClient):
             f"/repos/{repository.owner}/{repository.name}/contents/{path}",
             payload,
         )
-        return GitHubActionResult(True, "File committed to GitHub", data.get("commit", {}).get("sha"))
+        return GitHubActionResult(
+            True,
+            "File committed to GitHub",
+            data.get("commit", {}).get("sha"),
+        )
 
     async def get_check_runs(
         self, repository: GitHubRepository, ref: str
