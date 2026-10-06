@@ -16,3 +16,15 @@ __all__ = [
     "CompanyOperatingLoop",
     "CompanyCycleResult",
 ]
+
+
+class CompanyOperatingLoop:
+    """Coordinates a bounded company operating cycle."""
+
+    def select(self, project_ids: list[str], capacity: int = 1) -> tuple[str, ...]:
+        if capacity < 1:
+            return ()
+        return tuple(project_ids[:capacity])
+
+    def report(self, selected: list[str], completed: list[str]) -> dict[str, tuple[str, ...]]:
+        return {"selected": tuple(selected), "completed": tuple(completed)}
