@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
+from src.company.gates.quality import ProductionQualityGate
 from src.company.observability.service import ObservabilityService
 from src.company.recovery.service import RecoveryService
 from src.events.models.contracts import CompanyEvent
@@ -59,6 +60,7 @@ class CompanyExecutionPipeline:
         self.github = github
         self.memory = memory or MemoryService()
         self.recovery = RecoveryService()
+        self.quality_gate = ProductionQualityGate()
         self.observability = ObservabilityService()
         self._active_run_id: str | None = None
 
@@ -198,6 +200,29 @@ class CompanyExecutionPipeline:
             )
 
         self.project_engine.transition(project.id, ProjectStatus.REVIEW)
+
+        gate = self.quality_gate.evaluate(
+            qa_passed=qa_result.status == QATestStatus.PASSED,
+            security_approved=review_result.approved,
+            github_ready=(
+                self.github is not None
+                and github_repository is not None
+                and pull_request_head is not None
+            ) or (
+                self.github is None
+                and github_repository is None
+                and pull_request_head is None
+            ),
+            deployment_ready=True,
+        )
+        self._publish_event(
+            "production.gate.evaluated",
+            project_id=project.id,
+            payload={"allowed": gate.allowed, "checks": gate.checks},
+        )
+        if not gate.allowed:
+            self.project_engine.transition(project.id, ProjectStatus.BLOCKED)
+            raise RuntimeError(gate.reason)
 
         github_message = None
 
