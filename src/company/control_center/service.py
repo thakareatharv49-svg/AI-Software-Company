@@ -31,7 +31,8 @@ from src.company.project_factory import ProjectFactory
 from src.company.project_generator import OllamaProjectGenerator
 from src.company.project_outputs import ProjectOutputManifest
 from src.company.research.engine import StaticResearchProvider
-from src.manager.models.contracts import Mission as ManagerMission, TaskPlanItem
+from src.manager.models.contracts import Mission as ManagerMission
+from src.manager.models.contracts import TaskPlanItem
 from src.projects.models.contracts import ProjectCreateRequest
 from src.qa.models.contracts import QATestRequest
 from src.runtime.providers.ollama import OllamaProvider
