@@ -208,7 +208,7 @@ class CompanyExecutionPipeline:
 
         gate = self.quality_gate.evaluate(
             qa_passed=qa_result.status == QATestStatus.PASSED,
-            security_approved=review_result.approved,
+            security_approved=review_result.status.value == "approved",
             github_ready=(
                 self.github is not None
                 and github_repository is not None
