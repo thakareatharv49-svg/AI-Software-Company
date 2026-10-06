@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+from company.research.advanced import AdvancedResearchEngine, ResearchPlan
 from company.research.engine import (
     ResearchEngine,
     ResearchFinding,
@@ -7,6 +6,13 @@ from company.research.engine import (
     ResearchSource,
     StaticResearchProvider,
 )
+from company.research.market import (
+    CompetitiveIntelligence,
+    CompetitorProfile,
+    MarketSignal,
+)
+from company.research.product_discovery import ProductCandidate, ProductDiscovery
+from company.research.roadmap import RoadmapGenerator, RoadmapItem
 
 __all__ = [
     "ResearchEngine",
@@ -14,4 +20,13 @@ __all__ = [
     "ResearchReport",
     "ResearchSource",
     "StaticResearchProvider",
+    "AdvancedResearchEngine",
+    "ResearchPlan",
+    "CompetitorProfile",
+    "CompetitiveIntelligence",
+    "MarketSignal",
+    "ProductCandidate",
+    "ProductDiscovery",
+    "RoadmapGenerator",
+    "RoadmapItem",
 ]
