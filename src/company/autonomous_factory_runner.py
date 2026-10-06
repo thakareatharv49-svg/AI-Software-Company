@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
+from tempfile import gettempdir
 from typing import Protocol
 
 from src.company.autonomous_project import (
@@ -8,6 +10,7 @@ from src.company.autonomous_project import (
     AutonomousProjectResult,
     AutonomousProjectRunner,
 )
+from src.company.workspace import ProjectExecutionService
 from src.company.models.contracts import CompanyMission
 from src.company.mission_controller.models import MissionPlan
 
@@ -29,9 +32,13 @@ class FactoryAutonomousRunner:
         self,
         runner: AutonomousProjectRunner,
         request_builder: AutonomousProjectRequestBuilder,
+        workspace_service: ProjectExecutionService | None = None,
     ) -> None:
         self.runner = runner
         self.request_builder = request_builder
+        self.workspace_service = workspace_service or ProjectExecutionService(
+            Path(gettempdir()) / "ai-software-company-workspaces"
+        )
 
     async def run(
         self,
@@ -39,4 +46,22 @@ class FactoryAutonomousRunner:
         plan: MissionPlan,
     ) -> AutonomousProjectResult:
         request = self.request_builder(mission, plan)
-        return await self.runner.run(request)
+        workspace = self.workspace_service.create_workspace(mission.id)
+
+        try:
+            for path, content in request.files.items():
+                workspace.write_file(path, content)
+
+            request = request.__class__(
+                **{
+                    **request.__dict__,
+                    "qa_request": request.qa_request.model_copy(
+                        update={
+                            "working_directory": str(workspace.root),
+                        }
+                    ),
+                }
+            )
+            return await self.runner.run(request)
+        finally:
+            workspace.destroy()
