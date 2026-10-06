@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from pathlib import Path
 from tempfile import gettempdir
@@ -22,7 +22,7 @@ class AutonomousProjectRunnerProtocol(Protocol):
 
 AutonomousProjectRequestBuilder = Callable[
     [CompanyMission, MissionPlan],
-    AutonomousProjectRequest,
+    AutonomousProjectRequest | Awaitable[AutonomousProjectRequest],
 ]
 
 
@@ -47,6 +47,8 @@ class FactoryAutonomousRunner:
         plan: MissionPlan,
     ) -> AutonomousProjectResult:
         request = self.request_builder(mission, plan)
+        if hasattr(request, "__await__"):
+            request = await request
         workspace = self.workspace_service.create_workspace(mission.id)
 
         try:
