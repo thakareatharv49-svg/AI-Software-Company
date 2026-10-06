@@ -51,6 +51,18 @@ class SelfHealingService:
         return list(self._history)
 
 
+class CompanyOperatingLoop:
+    """Coordinates a bounded company operating cycle."""
+
+    def select(self, project_ids, capacity: int = 1):
+        if capacity < 1:
+            return ()
+        return tuple(project_ids[:capacity])
+
+    def report(self, selected, completed):
+        return {"selected": tuple(selected), "completed": tuple(completed)}
+
+
 __all__ = [
     "LifecycleState",
     "ProjectLifecycle",
