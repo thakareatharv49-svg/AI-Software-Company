@@ -14,7 +14,12 @@ def engine():
     provider = StaticResearchProvider(
         (
             ResearchSource("1", "AI market", "https://example.com", content="market evidence"),
-            ResearchSource("2", "AI market alternatives", "https://example.org", content="alternative evidence"),
+            ResearchSource(
+                "2",
+                "AI market alternatives",
+                "https://example.org",
+                content="alternative evidence",
+            ),
         )
     )
     return ResearchEngine(provider)
@@ -39,7 +44,7 @@ def test_m77_compares_competitors_and_finds_gaps():
 
 
 def test_m78_discovers_products_from_research():
-    reports = advanced_reports = AdvancedResearchEngine(engine()).research("AI market")
+    reports = AdvancedResearchEngine(engine()).research("AI market")
     products = ProductDiscovery().discover(list(reports), "developers")
     assert products
     assert products[0].target_user == "developers"
