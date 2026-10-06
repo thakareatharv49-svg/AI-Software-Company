@@ -74,7 +74,7 @@ class CompanyExecutionPipeline:
         self.memory = memory or MemoryService()
         self.cross_project_memory = cross_project_memory or CrossProjectMemory()
         self.learning = learning or LearningEngine()
-        self.recovery = RecoveryService()
+        self.recovery = RecoveryService(max_attempts=1)
         self.quality_gate = ProductionQualityGate()
         self.observability = ObservabilityService()
         self._active_run_id: str | None = None
