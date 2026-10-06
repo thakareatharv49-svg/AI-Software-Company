@@ -11,6 +11,7 @@ from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentResult
 from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
+from src.company.execution.pipeline import CompanyExecutionPipeline
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.autonomous_factory_runner import FactoryAutonomousRunner
 from src.company.autonomous_project import AutonomousProjectRequest, AutonomousProjectRunner
