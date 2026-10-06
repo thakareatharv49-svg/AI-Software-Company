@@ -16,7 +16,7 @@ class GeneratedProject:
 
 
 class OllamaProjectGenerator:
-    """Generate a small, runnable project from a company mission."""
+    """Generate and repair small runnable projects."""
 
     async def generate(self, name: str, objective: str) -> GeneratedProject:
         prompt = f"""Build a small, runnable software project for this mission.
@@ -31,12 +31,13 @@ Return ONLY valid JSON with this shape:
 Rules:
 - Generate a complete runnable implementation, not a plan.
 - Include automated tests under tests/.
+- The implementation MUST define every function, class, module, or API used by its tests.
+- Make the implementation and tests internally consistent and runnable together.
 - Keep the project small enough to run locally.
 - Use Python standard library where practical.
 - Never use absolute paths.
 - Do not include secrets, credentials, shell commands, or network calls in generated source.
-- File keys must be plain relative filenames only (for example tests/test_calculator.py).
-- Never put line numbers, source excerpts, colons, or annotations in file keys.
+- File keys must be plain relative filenames only.
 - The test command must run from the project root.
 """
         payload = {
@@ -54,6 +55,54 @@ Rules:
             "keep_alive": "10m",
             "options": {"temperature": 0.1, "num_predict": 768},
         }
+        return self._parse(await self._call(payload))
+
+    async def repair(
+        self,
+        files: dict[str, str],
+        failure: str,
+    ) -> GeneratedProject:
+        project = "\n\n".join(
+            f"FILE: {path}\n{content}" for path, content in files.items()
+        )
+        prompt = f"""Repair this generated Python project so its tests pass.
+
+QA FAILURE:
+{failure}
+
+CURRENT PROJECT:
+{project}
+
+Return ONLY valid JSON with this shape:
+{{"files": {{"relative/path": "complete file contents"}},
+ "test_command": ["python", "-m", "pytest", "-q"]}}
+
+Rules:
+- Preserve the intended behavior and public APIs of the project.
+- Fix the implementation to satisfy the existing tests.
+- Do not weaken, remove, or skip tests just to make them pass.
+- Return the COMPLETE contents of every file that should exist after repair.
+- Keep tests under tests/.
+- Use only safe relative file paths.
+"""
+        payload = {
+            "model": settings.ollama_model,
+            "prompt": prompt,
+            "stream": False,
+            "format": {
+                "type": "object",
+                "properties": {
+                    "files": {"type": "object", "additionalProperties": {"type": "string"}},
+                    "test_command": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["files", "test_command"],
+            },
+            "keep_alive": "10m",
+            "options": {"temperature": 0.0, "num_predict": 1536},
+        }
+        return self._parse(await self._call(payload))
+
+    async def _call(self, payload: dict) -> str:
         async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
             response = await client.post(
                 f"{settings.ollama_base_url.rstrip('/')}/api/generate",
@@ -61,11 +110,19 @@ Rules:
             )
             response.raise_for_status()
             data = response.json()
+        return str(data.get("response", ""))
 
+    def _parse(self, response: str) -> GeneratedProject:
         try:
-            result = json.loads(data.get("response", ""))
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("Ollama returned invalid project JSON") from exc
+            result = json.loads(response)
+        except json.JSONDecodeError:
+            start, end = response.find("{"), response.rfind("}")
+            if start < 0 or end <= start:
+                raise RuntimeError("Ollama returned invalid project JSON")
+            try:
+                result = json.loads(response[start : end + 1])
+            except json.JSONDecodeError as exc:
+                raise RuntimeError("Ollama returned invalid project JSON") from exc
 
         raw_files = result.get("files")
         if not isinstance(raw_files, dict) or not raw_files:
@@ -77,6 +134,7 @@ Rules:
             path = PurePosixPath(raw_path_text)
             if (
                 path.is_absolute()
+                or not raw_path_text
                 or ".." in path.parts
                 or ":" in raw_path_text
                 or "\n" in raw_path_text
@@ -93,4 +151,7 @@ Rules:
         if not isinstance(command, list) or not command:
             raise RuntimeError("Generated test command is invalid")
 
-        return GeneratedProject(files=files, test_command=[str(item) for item in command])
+        return GeneratedProject(
+            files=files,
+            test_command=[str(item) for item in command],
+        )
