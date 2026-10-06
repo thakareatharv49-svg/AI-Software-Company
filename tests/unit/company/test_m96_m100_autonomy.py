@@ -2,17 +2,20 @@ from company.autonomy import (
     CompanyAutonomy,
     LearningService,
     ProductPortfolioService,
-    ResourceAllocator,
     ProjectCandidate,
     ProjectSelector,
+    ResourceAllocator,
 )
+
 
 def test_m96_multi_product_portfolio():
     portfolio = ProductPortfolioService().build(["a", "b"], "a")
     assert portfolio.products == ("a", "b")
 
+
 def test_m97_resource_allocation():
     assert ResourceAllocator().allocate("a", 10, 2).budget == 10
+
 
 def test_m98_project_selection():
     selected = ProjectSelector().select(
@@ -20,8 +23,10 @@ def test_m98_project_selection():
     )
     assert selected.name == "a"
 
+
 def test_m99_company_learning():
     assert LearningService().learn(["signal"], ["lesson"], 0.9).confidence == 0.9
+
 
 def test_m100_autonomous_company_cycle():
     portfolio = ProductPortfolioService().build(["a"], "a")
