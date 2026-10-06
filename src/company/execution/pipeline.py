@@ -8,7 +8,12 @@ from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
 from src.company.gates.quality import ProductionQualityGate
 from src.company.github_native.service import GitHubNativeService
-from src.company.intelligence import CrossProjectMemory, LearningEngine, LearningSignal, MemoryInsight
+from src.company.intelligence import (
+    CrossProjectMemory,
+    LearningEngine,
+    LearningSignal,
+    MemoryInsight,
+)
 from src.company.observability.service import ObservabilityService
 from src.company.recovery.service import RecoveryService
 from src.events.models.contracts import CompanyEvent
