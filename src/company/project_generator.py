@@ -24,8 +24,9 @@ class OllamaProjectGenerator:
 Project: {name}
 Objective: {objective}
 
-Return ONLY valid JSON with this exact shape:
-{{"files": {{"relative/path": "complete file contents"}}, "test_command": ["python", "-m", "pytest", "-q"]}}
+Return ONLY valid JSON with this shape:
+{"files": {"relative/path": "complete file contents"},
+ "test_command": ["python", "-m", "pytest", "-q"]}
 
 Rules:
 - Generate a complete runnable implementation, not a plan.
