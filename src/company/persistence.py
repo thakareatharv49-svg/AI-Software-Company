@@ -88,7 +88,7 @@ class MissionJobStore:
             values = {
                 "mission": job.mission.model_dump(mode="json"),
                 "plan": job.plan.model_dump(mode="json"),
-                "status": job.status.value,
+                "status": getattr(job.status, "value", job.status),
                 "message": job.message,
                 "attempts": job.attempts,
                 "created_at": job.created_at,
