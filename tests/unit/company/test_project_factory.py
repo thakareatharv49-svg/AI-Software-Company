@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from runtime.models.messages import ModelResponse
@@ -5,6 +7,7 @@ from src.agents.execution.executor import AgentExecutor
 from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
+from src.company.mission_controller.planner import build_mission_plan
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.project_factory import ProjectFactory
@@ -400,3 +403,62 @@ async def test_factory_can_use_real_m36_runner_adapter() -> None:
     assert output_store.manifests[0].repository == "owner/real-project"
     assert output_store.manifests[0].github_message == "pull request created"
     assert output_store.manifests[0].memory_id == "memory-1"
+
+
+@pytest.mark.asyncio
+async def test_factory_autonomous_runner_materializes_project_workspace(tmp_path) -> None:
+    from src.company.autonomous_factory_runner import FactoryAutonomousRunner
+    from src.company.autonomous_project import AutonomousProjectRequest
+    from src.company.workspace import ProjectExecutionService
+    from src.qa.models.contracts import QATestRequest
+
+    class Stage:
+        def __init__(self, status: str):
+            self.status = status
+
+    class Pipeline:
+        project = type("Project", (), {"id": "workspace-project", "repository": None})()
+        github_message = None
+        memory_id = None
+
+    class Result:
+        stages = tuple(Stage("completed") for _ in range(12))
+        pipeline = Pipeline()
+
+    class Runner:
+        async def run(self, request: AutonomousProjectRequest):
+            workspace = Path(request.qa_request.working_directory)
+            assert workspace.is_dir()
+            assert (workspace / "src" / "main.py").read_text(encoding="utf-8") == "print('hello')"
+            return Result()
+
+    def build_request(mission, plan):
+        from company.ceo.models import Mission as CEOMission
+
+        return AutonomousProjectRequest.model_construct(
+            mission=CEOMission(mission_id=mission.id, objective=mission.objective),
+            research_query=mission.objective,
+            project_request=None,
+            manager_mission=None,
+            tasks=(),
+            qa_request=QATestRequest(
+                command=["python", "-c", "print('ok')"],
+                working_directory="unused",
+            ),
+            files={"src/main.py": "print('hello')"},
+        )
+
+    service = ProjectExecutionService(tmp_path)
+    adapter = FactoryAutonomousRunner(
+        Runner(),
+        build_request,
+        workspace_service=service,
+    )
+
+    mission = CompanyMission(name="Workspace", objective="Execute in isolation")
+    plan = build_mission_plan(mission)
+
+    result = await adapter.run(mission, plan)
+
+    assert result.pipeline.project.id == "workspace-project"
+    assert tuple(tmp_path.iterdir()) == ()

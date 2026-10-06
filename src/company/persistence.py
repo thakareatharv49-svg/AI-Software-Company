@@ -8,9 +8,9 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from src.company.audit import MissionAuditEntry
 from src.company.mission_controller.models import MissionPlan
-from src.company.project_outputs import ProjectOutputManifest
 from src.company.mission_jobs import MissionJob, MissionJobStatus, recover_running_job
 from src.company.models.contracts import CompanyMission
+from src.company.project_outputs import ProjectOutputManifest
 from src.config.settings import settings
 from src.db.base import Base
 
@@ -88,7 +88,7 @@ class MissionJobStore:
             values = {
                 "mission": job.mission.model_dump(mode="json"),
                 "plan": job.plan.model_dump(mode="json"),
-                "status": job.status.value,
+                "status": getattr(job.status, "value", job.status),
                 "message": job.message,
                 "attempts": job.attempts,
                 "created_at": job.created_at,
