@@ -214,13 +214,47 @@ class CompanyControlCenter:
                 pass
 
         async def runner() -> None:
-            await self._factory.run(
-                max_projects=max_projects,
-                max_stages=max_stages,
-                max_retries=max_retries,
-            )
+            try:
+                await self._factory.run(
+                    max_projects=max_projects,
+                    max_stages=max_stages,
+                    max_retries=max_retries,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                # Never let an unobserved background exception leave a mission
+                # permanently stuck in RUNNING/QUEUED with no durable explanation.
+                if mission_id is not None:
+                    job = self._job_store.get(mission_id)
+                    if job is not None and job.status in {
+                        MissionJobStatus.QUEUED,
+                        MissionJobStatus.RUNNING,
+                    }:
+                        from src.company.mission_jobs import transition_job
+
+                        failed = transition_job(
+                            job,
+                            MissionJobStatus.FAILED,
+                            f"Factory execution failed: {exc}",
+                        )
+                        self._job_store.save(failed)
+                        self._jobs[mission_id] = failed
+                        self._sync_mission_from_job(failed)
+                        self._audit(
+                            mission_id,
+                            "FACTORY_EXECUTION_FAILED",
+                            failed.message,
+                            status=failed.status.value,
+                            metadata={"error": str(exc)},
+                        )
+                raise
 
         self._factory_task = asyncio.create_task(runner())
+        # Give the factory one event-loop turn before returning the HTTP response.
+        # This guarantees the requested mission can transition out of QUEUED
+        # immediately and makes startup failures observable.
+        await asyncio.sleep(0)
 
     def factory_running(self) -> bool:
         return self._factory_task is not None and not self._factory_task.done()
