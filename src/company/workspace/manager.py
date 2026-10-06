@@ -41,7 +41,7 @@ class ProjectWorkspace:
         workspace_root: Path | str,
         project_id: str,
         **limits: object,
-    ) -> "ProjectWorkspace":
+    ) -> ProjectWorkspace:
         parent = Path(workspace_root).resolve()
         parent.mkdir(parents=True, exist_ok=True)
 
