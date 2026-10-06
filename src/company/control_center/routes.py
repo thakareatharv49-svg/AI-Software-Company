@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 
 from src.agents.models.contracts import AgentResult
 from src.company.control_center.service import (
@@ -44,12 +44,16 @@ def company_events(center: CompanyControlCenter = ControlCenter):
 
 
 @router.post("/missions", status_code=status.HTTP_201_CREATED)
-def submit_mission(
+async def submit_mission(
     submission: MissionSubmission,
+    background_tasks: BackgroundTasks,
     center: CompanyControlCenter = ControlCenter,
 ) -> MissionRecord:
     try:
-        return center.submit_mission(submission)
+        record = center.submit_mission(submission)
+        center.enqueue_factory_mission(record.mission.id)
+        background_tasks.add_task(center.run_factory, max_projects=1, max_retries=2)
+        return record
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
