@@ -53,7 +53,7 @@ class AutonomousProjectRequest:
     pull_request_head: str | None = None
 
     @classmethod
-    def model_construct(cls, **values: object) -> "AutonomousProjectRequest":
+    def model_construct(cls, **values: object) -> AutonomousProjectRequest:
         """Provide Pydantic-style construction compatibility for legacy callers."""
         return cls(**values)
 
