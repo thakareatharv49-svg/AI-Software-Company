@@ -1,6 +1,7 @@
 ﻿import asyncio
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -111,7 +112,26 @@ class SandboxExecutor:
             errors="replace",
         )
 
+    @staticmethod
+    def _normalize_python_command(command: list[str]) -> list[str]:
+        """Run Python/pytest with the interpreter hosting this application."""
+        if not command:
+            return command
+
+        executable = Path(command[0]).name.lower()
+
+        if executable in {"python", "python.exe"}:
+            return [sys.executable, *command[1:]]
+
+        if executable in {"pytest", "pytest.exe"}:
+            return [sys.executable, "-m", "pytest", *command[1:]]
+
+        return command
+
     async def execute(self, request: SandboxRequest) -> SandboxResult:
+        request = request.model_copy(
+            update={"command": self._normalize_python_command(request.command)}
+        )
         working_directory = self._validate(request)
 
         started = time.perf_counter()
@@ -167,6 +187,9 @@ class SandboxExecutor:
         )
 
     def execute_sync(self, request: SandboxRequest) -> SandboxResult:
+        request = request.model_copy(
+            update={"command": self._normalize_python_command(request.command)}
+        )
         working_directory = self._validate(request)
 
         started = time.perf_counter()
