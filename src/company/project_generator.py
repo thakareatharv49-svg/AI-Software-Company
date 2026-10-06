@@ -44,7 +44,8 @@ Rules:
             "prompt": prompt,
             "stream": False,
             "format": "json",
-            "options": {"temperature": 0.1},
+            "keep_alive": "10m",
+            "options": {"temperature": 0.1, "num_predict": 768},
         }
         async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
             response = await client.post(
