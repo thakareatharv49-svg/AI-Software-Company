@@ -7,6 +7,7 @@ from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
 from src.company.gates.quality import ProductionQualityGate
+from src.company.project_generator import OllamaProjectGenerator
 from src.company.github_native.service import GitHubNativeService
 from src.company.intelligence import (
     CrossProjectMemory,
@@ -60,6 +61,7 @@ class CompanyExecutionPipeline:
         memory: MemoryService | None = None,
         cross_project_memory: CrossProjectMemory | None = None,
         learning: LearningEngine | None = None,
+        project_generator: OllamaProjectGenerator | None = None,
     ) -> None:
         self.event_service = get_event_service()
         self.project_engine = project_engine or ProjectEngine()
@@ -74,6 +76,8 @@ class CompanyExecutionPipeline:
         self.memory = memory or MemoryService()
         self.cross_project_memory = cross_project_memory or CrossProjectMemory()
         self.learning = learning or LearningEngine()
+        self.project_generator = project_generator or OllamaProjectGenerator()
+        self._active_generated_files: dict[str, str] = {}
         self.recovery = RecoveryService(max_attempts=1)
         self.quality_gate = ProductionQualityGate()
         self.observability = ObservabilityService()
@@ -117,6 +121,7 @@ class CompanyExecutionPipeline:
         github_repository: GitHubRepository | None = None,
         pull_request_head: str | None = None,
     ) -> PipelineResult:
+        self._active_generated_files = files
         project = self.project_engine.create(project_request)
 
         self._publish_event(
@@ -443,7 +448,21 @@ class CompanyExecutionPipeline:
         executor: Callable | AgentExecutor | None,
     ) -> Callable | None:
         if executor is None:
-            return None
+            async def generated_project_repair(request: QATestRequest, diagnosis) -> bool:
+                repaired = await self.project_generator.repair(
+                    files=self._active_generated_files,
+                    failure=diagnosis.error,
+                )
+                self._active_generated_files.clear()
+                self._active_generated_files.update(repaired.files)
+                root = Path(request.working_directory)
+                for path, content in repaired.files.items():
+                    target = root / path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(content, encoding="utf-8")
+                return True
+
+            return generated_project_repair
 
         if isinstance(executor, AgentExecutor):
             executor = self._agent_executor_adapter(executor)
