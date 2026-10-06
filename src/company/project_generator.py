@@ -43,7 +43,14 @@ Rules:
             "model": settings.ollama_model,
             "prompt": prompt,
             "stream": False,
-            "format": "json",
+            "format": {
+                "type": "object",
+                "properties": {
+                    "files": {"type": "object", "additionalProperties": {"type": "string"}},
+                    "test_command": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["files", "test_command"],
+            },
             "keep_alive": "10m",
             "options": {"temperature": 0.1, "num_predict": 768},
         }
