@@ -8,6 +8,7 @@ from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
 from src.company.gates.quality import ProductionQualityGate
 from src.company.github_native.service import GitHubNativeService
+from src.company.intelligence import CrossProjectMemory, LearningEngine, LearningSignal, MemoryInsight
 from src.company.observability.service import ObservabilityService
 from src.company.recovery.service import RecoveryService
 from src.events.models.contracts import CompanyEvent
@@ -52,6 +53,8 @@ class CompanyExecutionPipeline:
         github: GitHubAutomation | None = None,
         github_native: GitHubNativeService | None = None,
         memory: MemoryService | None = None,
+        cross_project_memory: CrossProjectMemory | None = None,
+        learning: LearningEngine | None = None,
     ) -> None:
         self.event_service = get_event_service()
         self.project_engine = project_engine or ProjectEngine()
@@ -64,6 +67,8 @@ class CompanyExecutionPipeline:
         self.github = github
         self.github_native = github_native
         self.memory = memory or MemoryService()
+        self.cross_project_memory = cross_project_memory or CrossProjectMemory()
+        self.learning = learning or LearningEngine()
         self.recovery = RecoveryService()
         self.quality_gate = ProductionQualityGate()
         self.observability = ObservabilityService()
@@ -288,6 +293,27 @@ class CompanyExecutionPipeline:
                 ),
                 project_id=project.id,
             )
+        )
+
+        self.cross_project_memory.remember(MemoryInsight(
+            key="completed-project",
+            value=(
+                f"{project.name}: completed with {len(task_ids)} tasks; "
+                f"QA={qa_result.status.value}; security={review_result.status.value}."
+            ),
+            project_id=project.id,
+            importance=1.0,
+        ))
+        self.learning.record(LearningSignal(
+            category="project-execution",
+            outcome="completed",
+            value=1.0,
+            project_id=project.id,
+        ))
+        self._publish_event(
+            "company.intelligence.learned",
+            project_id=project.id,
+            payload={"category": "project-execution", "outcome": "completed"},
         )
 
         self._publish_event(
