@@ -1,7 +1,6 @@
 from src.company.loop.concurrency import ConcurrentProjectRunner, ProjectRunResult
 from src.company.loop.discovery import Opportunity, OpportunityDiscovery
 from src.company.loop.lifecycle import LifecycleState, ProjectLifecycle
-from src.company.loop.operating import CompanyCycleResult, CompanyOperatingLoop
 
 
 class HealingAction:
@@ -62,5 +61,4 @@ __all__ = [
     "Opportunity",
     "OpportunityDiscovery",
     "CompanyOperatingLoop",
-    "CompanyCycleResult",
 ]
