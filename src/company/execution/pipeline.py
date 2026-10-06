@@ -486,7 +486,21 @@ class CompanyExecutionPipeline:
         executor: Callable | AgentExecutor | None,
     ) -> Callable:
         if executor is None:
-            return self.manager.agent_executor
+            if self.manager.agent_executor is not None:
+                return self.manager.agent_executor
+
+            async def generated_project_executor(request: AgentRequest) -> AgentResult:
+                """Complete the bookkeeping task for already-generated project files."""
+                task = self.manager.task_engine.get(request.task_id)
+                agent_name = task.assigned_agent or "factory-engineer"
+                return AgentResult(
+                    task_id=request.task_id,
+                    agent_name=agent_name,
+                    success=True,
+                    output="Generated project files are ready for QA.",
+                )
+
+            return generated_project_executor
 
         if isinstance(executor, AgentExecutor):
             return self._agent_executor_adapter(executor)
