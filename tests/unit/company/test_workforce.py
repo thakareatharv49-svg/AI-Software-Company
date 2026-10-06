@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from src.company.workforce import AgentWorkItem, AgentWorkerPool
+from src.company.workforce import AgentWorkerPool, AgentWorkItem
 
 
 @pytest.mark.asyncio
