@@ -53,7 +53,11 @@ async def submit_mission(
     try:
         record = center.submit_mission(submission)
         center.enqueue_factory_mission(record.mission.id)
-        asyncio.create_task(center.run_factory(max_projects=1, max_retries=2))
+        async def start_factory() -> None:
+            await asyncio.sleep(0.1)
+            await center.run_factory(max_projects=1, max_retries=2)
+
+        asyncio.create_task(start_factory())
         return record
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
