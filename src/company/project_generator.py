@@ -25,8 +25,8 @@ Project: {name}
 Objective: {objective}
 
 Return ONLY valid JSON with this shape:
-{"files": {"relative/path": "complete file contents"},
- "test_command": ["python", "-m", "pytest", "-q"]}
+{{"files": {{"relative/path": "complete file contents"}},
+ "test_command": ["python", "-m", "pytest", "-q"]}}
 
 Rules:
 - Generate a complete runnable implementation, not a plan.
