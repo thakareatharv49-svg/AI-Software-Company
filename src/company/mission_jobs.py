@@ -19,7 +19,7 @@ class MissionJobStatus(StrEnum):
 
 
 _ALLOWED_TRANSITIONS: dict[MissionJobStatus, frozenset[MissionJobStatus]] = {
-    MissionJobStatus.QUEUED: frozenset({MissionJobStatus.RUNNING, MissionJobStatus.CANCELLED}),
+    MissionJobStatus.QUEUED: frozenset({MissionJobStatus.RUNNING, MissionJobStatus.FAILED, MissionJobStatus.CANCELLED}),
     MissionJobStatus.RUNNING: frozenset({
         MissionJobStatus.QUEUED,
         MissionJobStatus.COMPLETED,
