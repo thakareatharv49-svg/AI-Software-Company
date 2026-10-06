@@ -321,12 +321,18 @@ class ProjectFactory:
 
         self._save(project)
         job = self._load_job(project.mission.id)
+        audit_metadata = {
+            "attempt": project.attempts,
+            "stages_executed": project.stages_executed,
+        }
+        if project.last_error:
+            audit_metadata["error"] = project.last_error
         self._audit(
             project.mission.id,
             event_type,
             f"Factory project {project.status}: {project.mission.name}",
             job.status.value if job is not None else None,
-            {"attempt": project.attempts, "stages_executed": project.stages_executed},
+            audit_metadata,
         )
         self.orchestrator.events.publish(
             CompanyEvent(
