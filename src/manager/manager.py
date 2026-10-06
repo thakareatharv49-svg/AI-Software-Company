@@ -1,6 +1,6 @@
 from collections.abc import Callable, Sequence
 
-from src.agents.models.contracts import AgentRequest
+from src.agents.models.contracts import AgentDefinition, AgentRequest
 from src.agents.models.enums import AgentStatus
 from src.agents.registry.registry import AgentRegistry
 from src.manager.models.contracts import ManagerDecision, Mission, TaskPlanItem
@@ -19,6 +19,14 @@ class MasterManager:
     ) -> None:
         self.task_engine = task_engine or TaskEngine()
         self.agent_registry = agent_registry or AgentRegistry()
+        if not self.agent_registry.list_agents():
+            self.agent_registry.register(
+                AgentDefinition(
+                    name="factory-engineer",
+                    role="software engineer",
+                    capabilities=["python", "implementation", "testing"],
+                )
+            )
         self.agent_executor = agent_executor
         self.status = ManagerStatus.IDLE
         self.mission: Mission | None = None
