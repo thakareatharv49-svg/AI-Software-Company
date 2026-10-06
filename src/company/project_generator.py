@@ -35,6 +35,8 @@ Rules:
 - Use Python standard library where practical.
 - Never use absolute paths.
 - Do not include secrets, credentials, shell commands, or network calls in generated source.
+- File keys must be plain relative filenames only (for example tests/test_calculator.py).
+- Never put line numbers, source excerpts, colons, or annotations in file keys.
 - The test command must run from the project root.
 """
         payload = {
@@ -63,8 +65,14 @@ Rules:
 
         files: dict[str, str] = {}
         for raw_path, content in raw_files.items():
-            path = PurePosixPath(str(raw_path))
-            if path.is_absolute() or ".." in path.parts:
+            raw_path_text = str(raw_path).strip().replace("\\", "/")
+            path = PurePosixPath(raw_path_text)
+            if (
+                path.is_absolute()
+                or ".." in path.parts
+                or ":" in raw_path_text
+                or "\n" in raw_path_text
+            ):
                 raise RuntimeError(f"Unsafe generated path: {raw_path}")
             if not content or len(str(content).encode("utf-8")) > 2_000_000:
                 raise RuntimeError(f"Invalid generated file: {raw_path}")
