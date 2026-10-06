@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.company.research.product_discovery import ProductCandidate
+from company.research.product_discovery import ProductCandidate
 
 
 @dataclass(frozen=True, slots=True)
