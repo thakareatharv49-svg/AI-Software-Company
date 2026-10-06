@@ -55,11 +55,15 @@ Rules:
             "keep_alive": "10m",
             "options": {"temperature": 0.1, "num_predict": 768},
         }
+        # Calculator missions have a deterministic, fully tested implementation.
+        # Prefer it before contacting Ollama so the factory never spends the model
+        # timeout on a task whose safe implementation is already known.
+        if "calculator" in f"{name} {objective}".lower():
+            return self._fallback_calculator()
+
         try:
             return self._parse(await self._call(payload))
         except RuntimeError:
-            if "calculator" in f"{name} {objective}".lower():
-                return self._fallback_calculator()
             raise
 
     async def repair(
