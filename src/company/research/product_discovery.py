@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.company.research.engine import ResearchReport
+from company.research.engine import ResearchReport
 
 
 @dataclass(frozen=True, slots=True)
