@@ -166,6 +166,16 @@ class ProjectFactory:
         self._audit(mission_id, "MISSION_REQUEUED", queued.message, queued.status.value)
         return queued
 
+    def _reset_for_retry(self, project: FactoryProject) -> None:
+        """Reset transient execution state before retrying a project."""
+        for step in project.plan.steps:
+            if step.status in {"failed", "running"}:
+                step.status = "planned"
+
+        project.last_error = None
+        self._last_autonomous_result = None
+        self.orchestrator.stop()
+
     async def run_next(
         self,
         max_stages: int | None = None,
@@ -256,8 +266,8 @@ class ProjectFactory:
             project.last_error = project.last_error or "Project execution blocked"
             if project.attempts <= max_retries:
                 project.status = "queued"
+                self._reset_for_retry(project)
                 self.queue.insert(0, project)
-                self.orchestrator.stop()
                 self._transition_job(
                     project,
                     MissionJobStatus.QUEUED,
@@ -270,8 +280,8 @@ class ProjectFactory:
         elif project.last_error:
             if project.attempts <= max_retries:
                 project.status = "queued"
+                self._reset_for_retry(project)
                 self.queue.insert(0, project)
-                self.orchestrator.stop()
                 self._transition_job(
                     project,
                     MissionJobStatus.QUEUED,

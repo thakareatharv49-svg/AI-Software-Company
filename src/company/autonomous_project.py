@@ -52,6 +52,11 @@ class AutonomousProjectRequest:
     github_repository: GitHubRepository | None = None
     pull_request_head: str | None = None
 
+    @classmethod
+    def model_construct(cls, **values: object) -> "AutonomousProjectRequest":
+        """Provide Pydantic-style construction compatibility for legacy callers."""
+        return cls(**values)
+
 
 @dataclass(frozen=True)
 class AutonomousProjectResult:
