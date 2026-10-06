@@ -31,6 +31,8 @@ jobs:
           python-version: "3.13"
       - name: Install
         run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+      - name: Database migrations
+        run: alembic upgrade head
       - name: Ruff
         run: |
           files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.sha }}" -- '*.py')
