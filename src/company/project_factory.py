@@ -75,24 +75,23 @@ class ProjectFactory:
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
         plan = build_mission_plan(mission)
         job = self._load_job(mission.id)
+        existing = next(
+            (item for item in self.queue if item.mission.id == mission.id),
+            None,
+        )
+        if existing is not None:
+            # An explicit factory-run request is allowed to re-trigger a queued
+            # mission. Move it to the front so stale restored work cannot delay it.
+            self.queue.remove(existing)
+            self.queue.insert(0, existing)
+            return existing
         if job is not None and job.status in {
-            MissionJobStatus.QUEUED,
             MissionJobStatus.COMPLETED,
             MissionJobStatus.CANCELLED,
         }:
             raise ValueError(
                 f"Mission '{mission.id}' already has lifecycle state '{job.status.value}'"
             )
-        existing = next(
-            (item for item in self.queue if item.mission.id == mission.id),
-            None,
-        )
-        if existing is not None:
-            # A repeated factory-run request should execute this mission next,
-            # rather than failing because it is already queued.
-            self.queue.remove(existing)
-            self.queue.insert(0, existing)
-            return existing
         if job is not None and job.status == MissionJobStatus.RUNNING and self._running:
             raise ValueError(f"Mission '{mission.id}' is already running in the factory")
         if job is None:
