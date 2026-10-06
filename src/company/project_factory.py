@@ -306,7 +306,10 @@ class ProjectFactory:
                 self._transition_job(
                     project,
                     MissionJobStatus.BLOCKED,
-                    f"Project blocked after retries: {project.mission.name}",
+                    (
+                        f"Project blocked after retries: {project.mission.name}. "
+                        f"Last error: {project.last_error}"
+                    ),
                 )
                 event_type = "FACTORY_PROJECT_BLOCKED"
         else:
