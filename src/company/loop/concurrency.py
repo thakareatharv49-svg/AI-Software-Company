@@ -30,7 +30,10 @@ class ConcurrentProjectRunner:
     ) -> list[ProjectRunResult]:
         semaphore = asyncio.Semaphore(self.max_concurrency)
 
-        async def execute(project_id: str, operation: Callable[[], Awaitable[Any]]) -> ProjectRunResult:
+        async def execute(
+            project_id: str,
+            operation: Callable[[], Awaitable[Any]],
+        ) -> ProjectRunResult:
             started = perf_counter()
             async with semaphore:
                 try:
