@@ -1,6 +1,10 @@
 from company.autonomy import (
-    CompanyAutonomy, LearningService, ProductCandidate if False else ProjectCandidate,
-    ProductPortfolioService, ResourceAllocator, ProjectSelector,
+    CompanyAutonomy,
+    LearningService,
+    ProductPortfolioService,
+    ResourceAllocator,
+    ProjectCandidate,
+    ProjectSelector,
 )
 
 def test_m96_multi_product_portfolio():
@@ -8,18 +12,16 @@ def test_m96_multi_product_portfolio():
     assert portfolio.products == ("a", "b")
 
 def test_m97_resource_allocation():
-    allocation = ResourceAllocator().allocate("a", 10, 2)
-    assert allocation.budget == 10
+    assert ResourceAllocator().allocate("a", 10, 2).budget == 10
 
 def test_m98_project_selection():
-    selected = ProjectSelector().select([
-        ProjectCandidate("a", 8, 1), ProjectCandidate("b", 5, 0)
-    ])
+    selected = ProjectSelector().select(
+        [ProjectCandidate("a", 8, 1), ProjectCandidate("b", 5, 0)]
+    )
     assert selected.name == "a"
 
 def test_m99_company_learning():
-    learning = LearningService().learn(["signal"], ["lesson"], 0.9)
-    assert learning.confidence == 0.9
+    assert LearningService().learn(["signal"], ["lesson"], 0.9).confidence == 0.9
 
 def test_m100_autonomous_company_cycle():
     portfolio = ProductPortfolioService().build(["a"], "a")
