@@ -8,7 +8,6 @@ from src.company.models.enums import (
     CompanyStatus,
 )
 from src.company.orchestration.orchestrator import CompanyOrchestrator
-from src.company.project_factory import FactoryProject, ProjectFactory
 
 __all__ = [
     "CompanyCycleResult",
@@ -20,3 +19,12 @@ __all__ = [
     "FactoryProject",
     "ProjectFactory",
 ]
+
+
+def __getattr__(name: str):
+    """Lazily expose factory classes to avoid the package import cycle."""
+    if name in {"FactoryProject", "ProjectFactory"}:
+        from src.company.project_factory import FactoryProject, ProjectFactory
+
+        return {"FactoryProject": FactoryProject, "ProjectFactory": ProjectFactory}[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
