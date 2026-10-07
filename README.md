@@ -37,8 +37,8 @@ GitHub delivery can be enabled with a GitHub token and target repository:
     GITHUB_TOKEN=your_token
     GITHUB_ALLOW_WRITES=true
     GITHUB_REPOSITORY_OWNER=thakareatharv49-svg
-    GITHUB_REPOSITORY_NAME=AI-Software-Company
-    GITHUB_DEFAULT_BRANCH=main
+# GITHUB_REPOSITORY_NAME is not required; each mission gets its own repository.
+        GITHUB_DEFAULT_BRANCH=main
     GITHUB_BRANCH_PREFIX=factory
 
 With these settings, a successful factory run creates a branch, publishes the generated project files, opens a pull request, and records the repository/PR result in the mission output.
