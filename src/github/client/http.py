@@ -60,6 +60,37 @@ class GitHubHttpClient(GitHubClient):
             default_branch=data.get("default_branch", "main"),
         )
 
+    async def create_repository(
+        self,
+        owner: str,
+        name: str,
+        description: str = "",
+        private: bool = False,
+    ) -> GitHubRepository:
+        # /user/repos creates a repository for the authenticated account.
+        # owner is validated against the returned GitHub owner to prevent
+        # accidentally publishing to a different account.
+        data = await self._request(
+            "POST",
+            "/user/repos",
+            {
+                "name": name,
+                "description": description,
+                "private": private,
+                "auto_init": True,
+            },
+        )
+        actual_owner = data.get("owner", {}).get("login", owner)
+        if actual_owner != owner:
+            raise RuntimeError(
+                f"GitHub created repository under '{actual_owner}', expected '{owner}'"
+            )
+        return GitHubRepository(
+            owner=actual_owner,
+            name=data.get("name", name),
+            default_branch=data.get("default_branch", "main"),
+        )
+
     async def create_issue(
         self, repository: GitHubRepository, issue: GitHubIssue
     ) -> GitHubActionResult:
