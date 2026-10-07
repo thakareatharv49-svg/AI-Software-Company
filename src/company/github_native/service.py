@@ -55,6 +55,49 @@ class GitHubNativeService:
     async def push(self, workspace: Path, branch: str) -> GitOperationResult:
         return await self._git(["push", "--set-upstream", "origin", branch], workspace)
 
+    async def publish_files(
+        self,
+        repository: GitHubRepository,
+        branch: str,
+        files: dict[str, str],
+        message: str,
+    ) -> GitOperationResult:
+        """Create a branch and publish generated files through the GitHub API."""
+        try:
+            base = await self.github.client.get_branch(
+                repository,
+                repository.default_branch,
+            )
+            branch_result = await self.github.client.create_branch(
+                repository,
+                branch,
+                base.sha,
+            )
+            if not branch_result.success:
+                return GitOperationResult(False, branch_result.message)
+
+            commit_ids: list[str] = []
+            for path, content in files.items():
+                result = await self.github.client.write_file(
+                    repository,
+                    path,
+                    content,
+                    message,
+                    branch,
+                )
+                if not result.success:
+                    return GitOperationResult(False, result.message)
+                if result.identifier:
+                    commit_ids.append(result.identifier)
+
+            return GitOperationResult(
+                True,
+                f"Published {len(files)} file(s) to {repository.owner}/{repository.name}:{branch}",
+                commit_ids[-1] if commit_ids else None,
+            )
+        except Exception as exc:
+            return GitOperationResult(False, str(exc))
+
     async def open_pull_request(
         self,
         repository: GitHubRepository,
