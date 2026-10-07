@@ -32,4 +32,15 @@ The default model is `llama3.2`. Start Ollama and make sure the model is availab
     ollama serve
     ollama pull llama3.2
 
+GitHub delivery can be enabled with a GitHub token and target repository:
+
+    GITHUB_TOKEN=your_token
+    GITHUB_ALLOW_WRITES=true
+    GITHUB_REPOSITORY_OWNER=thakareatharv49-svg
+    GITHUB_REPOSITORY_NAME=AI-Software-Company
+    GITHUB_DEFAULT_BRANCH=main
+    GITHUB_BRANCH_PREFIX=factory
+
+With these settings, a successful factory run creates a branch, publishes the generated project files, opens a pull request, and records the repository/PR result in the mission output.
+
 GitHub and deployment integrations remain optional and are protected by the existing gates.
