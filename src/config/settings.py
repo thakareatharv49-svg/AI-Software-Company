@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     github_allow_writes: bool = False
     github_repository_owner: str = ""
     github_repository_name: str = ""
+    github_project_private: bool = False
     github_default_branch: str = "main"
     github_branch_prefix: str = "factory"
 
