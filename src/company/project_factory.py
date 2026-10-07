@@ -282,9 +282,19 @@ class ProjectFactory:
             results = []
         project.stages_executed += len(results)
 
-        if all(result.success for result in results) and all(
-            step.status == "completed" for step in project.plan.steps
-        ):
+        autonomous_pipeline_succeeded = (
+            self._last_autonomous_result is not None
+            and getattr(self._last_autonomous_result, "pipeline", None) is not None
+        )
+        execution_succeeded = (
+            all(result.success for result in results)
+            and (
+                autonomous_pipeline_succeeded
+                or all(step.status == "completed" for step in project.plan.steps)
+            )
+        )
+
+        if execution_succeeded:
             project.status = "completed"
             self.orchestrator.stop()
             self._save_output_manifest(project, "completed")
