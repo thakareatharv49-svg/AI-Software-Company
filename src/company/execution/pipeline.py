@@ -18,6 +18,7 @@ from src.company.recovery.service import RecoveryService
 from src.events.models.contracts import CompanyEvent
 from src.events.service.factory import get_event_service
 from src.github.automation.automation import GitHubAutomation
+from src.github.client.http import GitHubHttpClient
 from src.github.models.contracts import GitHubRepository
 from src.manager.manager import MasterManager
 from src.manager.models.contracts import Mission, TaskPlanItem
@@ -75,7 +76,6 @@ class CompanyExecutionPipeline:
             settings.github_allow_writes
             and settings.github_token
             and settings.github_repository_owner
-            and settings.github_repository_name
         ):
             github_client = GitHubHttpClient(
                 token=settings.github_token,
