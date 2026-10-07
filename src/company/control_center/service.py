@@ -250,11 +250,11 @@ class CompanyControlCenter:
                         )
                 raise
 
+        # Start the factory in the background and return control to the HTTP
+        # request immediately. The task owns all long-running autonomous work;
+        # its failures are persisted by runner() so callers can inspect /job
+        # instead of waiting for the factory to finish.
         self._factory_task = asyncio.create_task(runner())
-        # Give the factory one event-loop turn before returning the HTTP response.
-        # This guarantees the requested mission can transition out of QUEUED
-        # immediately and makes startup failures observable.
-        await asyncio.sleep(0)
 
     def factory_running(self) -> bool:
         return self._factory_task is not None and not self._factory_task.done()
