@@ -1,13 +1,11 @@
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from pathlib import Path
-from tempfile import TemporaryDirectory
-
 from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
 from src.company.gates.quality import ProductionQualityGate
 from src.company.project_generator import OllamaProjectGenerator
+from src.config.settings import settings
 from src.company.github_native.service import GitHubNativeService
 from src.company.intelligence import (
     CrossProjectMemory,
@@ -71,8 +69,25 @@ class CompanyExecutionPipeline:
             qa_runner=self.qa_runner,
         )
         self.reviewer = reviewer or CodeReviewer()
-        self.github = github
-        self.github_native = github_native
+        configured_github = None
+        configured_github_native = None
+        if (
+            settings.github_allow_writes
+            and settings.github_token
+            and settings.github_repository_owner
+            and settings.github_repository_name
+        ):
+            github_client = GitHubHttpClient(
+                token=settings.github_token,
+                api_url=settings.github_api_base_url,
+            )
+            configured_github = GitHubAutomation(github_client)
+            configured_github_native = GitHubNativeService(
+                github=configured_github,
+            )
+
+        self.github = github or configured_github
+        self.github_native = github_native or configured_github_native
         self.memory = memory or MemoryService()
         self.cross_project_memory = cross_project_memory or CrossProjectMemory()
         self.learning = learning or LearningEngine()
@@ -252,27 +267,14 @@ class CompanyExecutionPipeline:
             and pull_request_head is not None
         ):
             if self.github_native is not None:
-                with TemporaryDirectory(prefix="ai-company-github-") as temporary:
-                    workspace = Path(temporary) / github_repository.name
-                    clone_result = await self.github_native.clone(github_repository, workspace)
-                    if not clone_result.success:
-                        raise RuntimeError(clone_result.message)
-                    branch_result = await self.github_native.create_branch(
-                        workspace,
-                        pull_request_head,
-                    )
-                    if not branch_result.success:
-                        raise RuntimeError(branch_result.message)
-                    await self.github_native.write_files(workspace, files)
-                    commit_result = await self.github_native.commit(
-                        workspace,
-                        f"feat: complete {project.name}",
-                    )
-                    if not commit_result.success:
-                        raise RuntimeError(commit_result.message)
-                    push_result = await self.github_native.push(workspace, pull_request_head)
-                    if not push_result.success:
-                        raise RuntimeError(push_result.message)
+                publish_result = await self.github_native.publish_files(
+                    github_repository,
+                    pull_request_head,
+                    files,
+                    f"feat: complete {project.name}",
+                )
+                if not publish_result.success:
+                    raise RuntimeError(publish_result.message)
 
             github_result = await self.github.open_pull_request(
                 github_repository,
