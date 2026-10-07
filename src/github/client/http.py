@@ -174,6 +174,67 @@ class GitHubHttpClient(GitHubClient):
             identifier=data.get("commit", {}).get("sha"),
         )
 
+    async def create_blob(self, repository: GitHubRepository, content: str) -> str:
+        data = await self._request(
+            "POST",
+            f"/repos/{repository.owner}/{repository.name}/git/blobs",
+            {
+                "content": content,
+                "encoding": "utf-8",
+            },
+        )
+        return data["sha"]
+
+    async def create_tree(
+        self,
+        repository: GitHubRepository,
+        base_tree_sha: str,
+        entries: list[dict[str, str]],
+    ) -> str:
+        data = await self._request(
+            "POST",
+            f"/repos/{repository.owner}/{repository.name}/git/trees",
+            {
+                "base_tree": base_tree_sha,
+                "tree": entries,
+            },
+        )
+        return data["sha"]
+
+    async def create_commit(
+        self,
+        repository: GitHubRepository,
+        message: str,
+        tree_sha: str,
+        parent_sha: str,
+    ) -> str:
+        data = await self._request(
+            "POST",
+            f"/repos/{repository.owner}/{repository.name}/git/commits",
+            {
+                "message": message,
+                "tree": tree_sha,
+                "parents": [parent_sha],
+            },
+        )
+        return data["sha"]
+
+    async def update_branch_ref(
+        self,
+        repository: GitHubRepository,
+        branch: str,
+        commit_sha: str,
+        expected_sha: str,
+    ) -> None:
+        await self._request(
+            "PATCH",
+            f"/repos/{repository.owner}/{repository.name}/git/refs/heads/{branch}",
+            {
+                "sha": commit_sha,
+                "force": False,
+            },
+        )
+
     async def get_check_runs(
         self, repository: GitHubRepository, ref: str
     ) -> list[GitHubCheckRun]:
