@@ -32,6 +32,7 @@ from src.company.project_factory import ProjectFactory
 from src.company.project_generator import OllamaProjectGenerator
 from src.company.project_outputs import ProjectOutputManifest
 from src.company.research.engine import StaticResearchProvider
+from src.config.settings import settings
 from src.manager.models.contracts import Mission as ManagerMission
 from src.manager.models.contracts import TaskPlanItem
 from src.projects.models.contracts import ProjectCreateRequest
@@ -407,6 +408,26 @@ class CompanyControlCenter:
         plan: MissionPlan,
     ) -> AutonomousProjectRequest:
         generated = await self._generator.generate(mission.name, mission.objective)
+
+        github_repository = None
+        pull_request_head = None
+        repository_name = None
+        if (
+            settings.github_allow_writes
+            and settings.github_token
+            and settings.github_repository_owner
+            and settings.github_repository_name
+        ):
+            github_repository = GitHubRepository(
+                owner=settings.github_repository_owner,
+                name=settings.github_repository_name,
+                default_branch=settings.github_default_branch,
+            )
+            pull_request_head = f"{settings.github_branch_prefix}/{mission.id}"
+            repository_name = (
+                f"{settings.github_repository_owner}/{settings.github_repository_name}"
+            )
+
         return AutonomousProjectRequest(
             mission=CEOMission(
                 mission_id=mission.id,
@@ -418,6 +439,7 @@ class CompanyControlCenter:
                 name=mission.name,
                 description=mission.objective,
                 objective=mission.objective,
+                repository=repository_name,
             ),
             manager_mission=ManagerMission(
                 name=mission.name,
@@ -435,6 +457,8 @@ class CompanyControlCenter:
                 working_directory=".",
             ),
             files=generated.files,
+            github_repository=github_repository,
+            pull_request_head=pull_request_head,
         )
 
     def _get_mission(self, mission_id: str) -> MissionRecord:
