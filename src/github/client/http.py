@@ -67,9 +67,6 @@ class GitHubHttpClient(GitHubClient):
         description: str = "",
         private: bool = False,
     ) -> GitHubRepository:
-        # /user/repos creates a repository for the authenticated account.
-        # owner is validated against the returned GitHub owner to prevent
-        # accidentally publishing to a different account.
         data = await self._request(
             "POST",
             "/user/repos",
@@ -95,17 +92,29 @@ class GitHubHttpClient(GitHubClient):
         self, repository: GitHubRepository, issue: GitHubIssue
     ) -> GitHubActionResult:
         data = await self._request(
-            "POST", f"/repos/{repository.owner}/{repository.name}/issues", issue.model_dump()
+            "POST",
+            f"/repos/{repository.owner}/{repository.name}/issues",
+            issue.model_dump(),
         )
-        return GitHubActionResult(True, "Issue created", str(data.get("number")))
+        return GitHubActionResult(
+            success=True,
+            message="Issue created",
+            identifier=str(data.get("number")),
+        )
 
     async def create_pull_request(
         self, repository: GitHubRepository, pull_request: GitHubPullRequest
     ) -> GitHubActionResult:
         data = await self._request(
-            "POST", f"/repos/{repository.owner}/{repository.name}/pulls", pull_request.model_dump()
+            "POST",
+            f"/repos/{repository.owner}/{repository.name}/pulls",
+            pull_request.model_dump(),
         )
-        return GitHubActionResult(True, "Pull request created", str(data.get("number")))
+        return GitHubActionResult(
+            success=True,
+            message="Pull request created",
+            identifier=str(data.get("number")),
+        )
 
     async def get_branch(self, repository: GitHubRepository, branch: str) -> GitHubBranch:
         data = await self._request(
@@ -121,7 +130,11 @@ class GitHubHttpClient(GitHubClient):
             f"/repos/{repository.owner}/{repository.name}/git/refs",
             {"ref": f"refs/heads/{branch}", "sha": source_sha},
         )
-        return GitHubActionResult(True, "Branch created", data.get("ref"))
+        return GitHubActionResult(
+            success=True,
+            message="Branch created",
+            identifier=data.get("ref"),
+        )
 
     async def get_file(
         self, repository: GitHubRepository, path: str, branch: str | None = None
@@ -156,9 +169,9 @@ class GitHubHttpClient(GitHubClient):
             payload,
         )
         return GitHubActionResult(
-            True,
-            "File committed to GitHub",
-            data.get("commit", {}).get("sha"),
+            success=True,
+            message="File committed to GitHub",
+            identifier=data.get("commit", {}).get("sha"),
         )
 
     async def get_check_runs(
