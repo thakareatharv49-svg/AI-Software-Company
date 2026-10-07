@@ -215,11 +215,20 @@ class CompanyControlCenter:
 
         async def runner() -> None:
             try:
-                await self._factory.run(
-                    max_projects=max_projects,
-                    max_stages=max_stages,
-                    max_retries=max_retries,
-                )
+                # The factory performs synchronous database/file operations while
+                # orchestrating async work. Run the whole factory loop outside
+                # FastAPI's event-loop thread so long-running project execution
+                # can never block health/status/job HTTP requests.
+                def run_factory_sync() -> None:
+                    asyncio.run(
+                        self._factory.run(
+                            max_projects=max_projects,
+                            max_stages=max_stages,
+                            max_retries=max_retries,
+                        )
+                    )
+
+                await asyncio.to_thread(run_factory_sync)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
