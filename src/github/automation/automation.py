@@ -11,6 +11,20 @@ class GitHubAutomation:
     def __init__(self, client: GitHubClient) -> None:
         self.client = client
 
+    async def create_project_repository(
+        self,
+        owner: str,
+        name: str,
+        description: str,
+        private: bool = False,
+    ) -> GitHubRepository:
+        return await self.client.create_repository(
+            owner,
+            name,
+            description=description,
+            private=private,
+        )
+
     async def open_task_issue(
         self,
         repository: GitHubRepository,
