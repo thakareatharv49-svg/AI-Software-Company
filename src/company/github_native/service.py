@@ -84,11 +84,21 @@ class GitHubNativeService:
                 repository,
                 repository.default_branch,
             )
-            branch_result = await self.github.client.create_branch(
-                repository,
-                branch,
-                base.sha,
-            )
+            try:
+                branch_result = await self.github.client.create_branch(
+                    repository,
+                    branch,
+                    base.sha,
+                )
+            except RuntimeError as exc:
+                # Retries reuse the mission branch. GitHub returns 422 when
+                # the branch already exists, which is safe and expected here.
+                if "GitHub API 422" not in str(exc) or "Reference already exists" not in str(exc):
+                    raise
+                branch_result = GitOperationResult(
+                    True,
+                    f"Reusing existing factory branch {branch}",
+                )
             if not branch_result.success:
                 return GitOperationResult(False, branch_result.message)
 
