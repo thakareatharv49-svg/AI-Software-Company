@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     github_api_base_url: str = "https://api.github.com"
     github_timeout: float = 30.0
     github_allow_writes: bool = False
+    github_repository_owner: str = ""
+    github_repository_name: str = ""
+    github_default_branch: str = "main"
+    github_branch_prefix: str = "factory"
 
     model_config = SettingsConfigDict(
         env_file=".env",
