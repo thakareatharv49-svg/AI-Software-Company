@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from contextlib import suppress
 from datetime import UTC, datetime
 from threading import Lock
@@ -416,16 +417,20 @@ class CompanyControlCenter:
             settings.github_allow_writes
             and settings.github_token
             and settings.github_repository_owner
-            and settings.github_repository_name
         ):
+            slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", mission.name.strip())
+            slug = re.sub(r"-{2,}", "-", slug).strip("-._") or "generated-project"
+            # Keep names stable and unique enough for repeated missions with
+            # the same human-readable project name.
+            repository_name_only = f"{slug}-{mission.id[:8]}"
             github_repository = GitHubRepository(
                 owner=settings.github_repository_owner,
-                name=settings.github_repository_name,
+                name=repository_name_only,
                 default_branch=settings.github_default_branch,
             )
             pull_request_head = f"{settings.github_branch_prefix}/{mission.id}"
             repository_name = (
-                f"{settings.github_repository_owner}/{settings.github_repository_name}"
+                f"{settings.github_repository_owner}/{repository_name_only}"
             )
 
         return AutonomousProjectRequest(
