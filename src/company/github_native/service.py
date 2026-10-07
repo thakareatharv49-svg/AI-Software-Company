@@ -104,12 +104,29 @@ class GitHubNativeService:
 
             commit_ids: list[str] = []
             for path, content in files.items():
+                # The Contents API requires the current blob SHA when a file
+                # already exists on the mission branch. This matters on
+                # retries because earlier attempts may have partially
+                # published the generated files.
+                existing_sha = None
+                try:
+                    existing = await self.github.client.get_file(
+                        repository,
+                        path,
+                        branch,
+                    )
+                    existing_sha = existing.sha
+                except RuntimeError as exc:
+                    if "GitHub API 404" not in str(exc):
+                        raise
+
                 result = await self.github.client.write_file(
                     repository,
                     path,
                     content,
                     message,
                     branch,
+                    sha=existing_sha,
                 )
                 if not result.success:
                     return GitOperationResult(False, result.message)
