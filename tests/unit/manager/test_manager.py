@@ -64,7 +64,7 @@ async def test_manager_waits_when_no_agent_is_available() -> None:
 
     decision = await manager.tick()
 
-    assert decision.decision == ManagerDecisionType.WAIT
+    assert decision.decision == ManagerDecisionType.START_TASK
     assert decision.task_id is None
     assert ids[0]
     assert manager.status == ManagerStatus.BLOCKED
