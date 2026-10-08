@@ -29,6 +29,31 @@ def test_queued_company_accepts_multiple_missions() -> None:
     assert second.status == "queued"
 
 
+def test_explicit_factory_launch_prioritizes_selected_mission() -> None:
+    import asyncio
+
+    center = CompanyControlCenter(CompanyOrchestrator())
+    older = center.submit_mission(
+        MissionSubmission(name="Restored mission", objective="Run older work")
+    )
+    center.enqueue_factory_mission(older.mission.id)
+    requested = center.submit_mission(
+        MissionSubmission(name="Requested mission", objective="Run this now")
+    )
+    center.enqueue_factory_mission(requested.mission.id)
+    selected: list[str] = []
+
+    async def fake_run(**kwargs):
+        selected.append(center._factory.queue[0].mission.id)
+
+    center._factory.run = fake_run
+    asyncio.run(center.run_factory(max_projects=1, mission_id=requested.mission.id))
+    assert center._factory_task is not None
+    asyncio.run(center._factory_task)
+    assert selected == [requested.mission.id]
+    assert center._factory.queue[0].mission.id == older.mission.id
+
+
 def test_control_api_serves_mission_and_app() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
