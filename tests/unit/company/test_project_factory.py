@@ -507,3 +507,45 @@ async def test_factory_trusts_successful_pipeline_over_stale_stage_telemetry() -
     assert results == [project]
     assert project.status == "completed"
     assert project.last_error is None
+
+
+@pytest.mark.asyncio
+async def test_factory_preserves_pipeline_result_when_stage_telemetry_is_malformed() -> None:
+    class BrokenStage:
+        @property
+        def status(self):
+            raise RuntimeError("telemetry unavailable")
+
+    class Pipeline:
+        project = type("Project", (), {"id": "pipeline-ok", "repository": None})()
+
+    class Result:
+        stages = (BrokenStage(),)
+        pipeline = Pipeline()
+
+    class Runner:
+        async def run(self, mission, plan):
+            return Result()
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        autonomous_runner=Runner(),
+    )
+    project = factory.enqueue(
+        CompanyMission(name="Calculator", objective="Build a calculator")
+    )
+
+    results = await factory.run(max_projects=1, max_retries=0)
+
+    assert results == [project]
+    assert project.status == "completed"
+    assert project.last_error is None
