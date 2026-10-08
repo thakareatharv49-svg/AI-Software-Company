@@ -18,7 +18,7 @@ async def company_app() -> FileResponse:
     )
 
 @router.get("/product/{mission_id}", include_in_schema=False)
-async def completed_product(mission_id: str) -> FileResponse:
+async def completed_product(mission_id: str) -> HTMLResponse:
     """Open the generated product browser entry point."""
     if not mission_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in mission_id):
         raise HTTPException(status_code=404, detail="Product not found")
