@@ -175,7 +175,7 @@ async def run_factory(
 ) -> dict[str, object]:
     try:
         center.enqueue_factory_mission(mission_id)
-        center.run_factory(
+        await center.run_factory(
             max_projects=1,
             max_stages=max_stages,
             max_retries=max_retries,
