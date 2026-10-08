@@ -1,7 +1,7 @@
 from pathlib import Path
 from tempfile import gettempdir
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 router = APIRouter(tags=["web"])
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -45,3 +45,18 @@ async def completed_product_asset(mission_id: str, file_path: str) -> FileRespon
     if not target.is_file():
         raise HTTPException(status_code=404, detail="Product file not found")
     return FileResponse(target, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/api/products")
+async def completed_products() -> JSONResponse:
+    """List generated browser products that actually have an index.html."""
+    PRODUCTS_DIR.mkdir(parents=True, exist_ok=True)
+    products = []
+    for root in sorted(PRODUCTS_DIR.iterdir(), key=lambda item: item.name):
+        if not root.is_dir() or not (root / "index.html").is_file():
+            continue
+        products.append({
+            "mission_id": root.name,
+            "url": f"/product/{root.name}",
+        })
+    return JSONResponse(products, headers={"Cache-Control": "no-store"})
