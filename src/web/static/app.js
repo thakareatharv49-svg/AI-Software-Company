@@ -41,8 +41,10 @@ function ensureUiElements() {
 }
 
 function message(text, error=false) {
-  $("message").textContent = text || "";
-  $("message").className = "message " + (error ? "error" : "");
+  const node = $("message");
+  if (!node) return;
+  node.textContent = text || "";
+  node.className = "message " + (error ? "error" : "");
 }
 
 function renderPipeline(audit, status) {
@@ -336,33 +338,62 @@ $("stop").addEventListener("click",async()=>{try{await api("/api/company/stop",{
 async function refresh() {
   ensureUiElements();
   if(busy && selectedMissionId) return;
+
+  // Keep the core dashboard alive even if one secondary endpoint is briefly
+  // unavailable. Previously Promise.all() turned one failed request into a
+  // completely "offline" UI and cleared the user's useful state.
   try {
-    const [state,missions,events,summary,factory]=await Promise.all([
-      api("/api/company/state"),api("/api/missions"),api("/api/company/events"),api("/dashboard/summary"),api("/api/factory/status")
+    const state = await api("/api/company/state");
+    $("live").textContent = "company " + (state.status || "unknown");
+  } catch (e) {
+    $("live").textContent = "offline";
+    message("Company state unavailable: " + e.message, true);
+    return;
+  }
+
+  const [missionsResult, eventsResult, summaryResult, factoryResult, productsResult] =
+    await Promise.allSettled([
+      api("/api/missions"),
+      api("/api/company/events"),
+      api("/dashboard/summary"),
+      api("/api/factory/status"),
+      api("/api/products"),
     ]);
-    let products = [];
-    try {
-      products = await api("/api/products");
-    } catch (productError) {
-      const box = $("products");
-      box.replaceChildren();
-      const error = document.createElement("div");
-      error.className = "empty";
-      error.textContent = "Product service unavailable: " + productError.message;
-      box.append(error);
-    }
-    $("live").textContent="company "+state.status;
-    $("projects").textContent=summary.projects ?? 0;
-    $("tasks").textContent=summary.tasks ?? 0;
-    $("agents").textContent=summary.agents ?? 0;
-    $("factory").textContent=factory.running ? "running":"idle";
-    renderMissions(missions); renderProducts(products.map(product => ({
-      mission: missions.find(item => item.mission.id === product.mission_id)?.mission || {name: product.mission_id, objective: "Generated browser product"},
-      product_url: product.url,
-      url: product.url,
-    }))); renderEvents(events);
-    if(selectedMissionId && missions.some(x=>x.mission.id===selectedMissionId)) await showMission(selectedMissionId);
-  } catch(e) { $("live").textContent="offline"; message(e.message,true); }
+
+  if (missionsResult.status === "rejected") {
+    message("Mission service unavailable: " + missionsResult.reason.message, true);
+    return;
+  }
+
+  const missions = Array.isArray(missionsResult.value) ? missionsResult.value : [];
+  const events = eventsResult.status === "fulfilled" && Array.isArray(eventsResult.value)
+    ? eventsResult.value
+    : [];
+  const summary = summaryResult.status === "fulfilled" ? summaryResult.value : {};
+  const factory = factoryResult.status === "fulfilled" ? factoryResult.value : {running: false};
+  const products = productsResult.status === "fulfilled" && Array.isArray(productsResult.value)
+    ? productsResult.value
+    : [];
+
+  $("projects").textContent = summary.projects ?? missions.length;
+  $("tasks").textContent = summary.tasks ?? missions.reduce(
+    (total, item) => total + (Array.isArray(item.plan?.steps) ? item.plan.steps.length : 0), 0
+  );
+  $("agents").textContent = summary.agents ?? "—";
+  $("factory").textContent = factory.running ? "running" : "idle";
+
+  renderMissions(missions);
+  renderProducts(products.map(product => ({
+    mission: missions.find(item => item.mission.id === product.mission_id)?.mission
+      || {name: product.mission_id, objective: "Generated browser product"},
+    product_url: product.url,
+    url: product.url,
+  })));
+  renderEvents(events);
+
+  // Do not rebuild the selected detail panel on every 5-second refresh.
+  // startPolling()/showMission() already owns live detail updates and this
+  // prevents completed mission details from flickering or disappearing.
 }
 window.addEventListener("error",e=>message("UI error: "+e.message,true));
 window.addEventListener("unhandledrejection",e=>message("UI error: "+(e.reason?.message || e.reason),true));
