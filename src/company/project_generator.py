@@ -251,7 +251,7 @@ Rules:
         if not command:
             return default
 
-        executable = command[0].toLowerCase().split(/[\\/]/).pop()
+        executable = command[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
 
         # Keep QA local and deterministic. The model must not turn the test
         # phase into an arbitrary shell, installer, or network command.
@@ -259,9 +259,12 @@ Rules:
             return command
 
         if executable in {"python", "python3", "python.exe", "py", "py.exe"}:
-            args = command.slice(1)
-            if args.length >= 2 && args[0] === "-m" &&
-                {"pytest", "unittest"}.has(args[1].toLowerCase()):
+            args = command[1:]
+            if (
+                len(args) >= 2
+                and args[0] == "-m"
+                and args[1].lower() in {"pytest", "unittest"}
+            ):
                 return command
             return default
 
