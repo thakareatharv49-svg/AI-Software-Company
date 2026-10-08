@@ -233,3 +233,15 @@ def test_browser_calculator_fallback_emits_valid_python() -> None:
     )
     compile(generated.files["calculator.py"], "calculator.py", "exec")
     compile(generated.files["tests/test_calculator.py"], "test_calculator.py", "exec")
+
+
+def test_dashboard_completed_product_preview_uses_defined_identifier() -> None:
+    from pathlib import Path
+
+    dashboard = (
+        Path(__file__).resolve().parents[3] / "src" / "web" / "static" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert "const hasBrowserPreviewAfterRefresh = productIds.has(id);" in dashboard
+    assert "hasBrowserPreviewAfterRefreshAfterRefresh" not in dashboard
+    assert "job.status === \"completed\" && hasBrowserPreviewAfterRefresh" in dashboard
