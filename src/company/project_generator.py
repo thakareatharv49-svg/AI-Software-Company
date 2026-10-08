@@ -123,55 +123,127 @@ Rules:
             return self._fallback_repair(files, failure)
 
     def _fallback_tic_tac_toe(self) -> GeneratedProject:
-        """Return a small deterministic Tic-Tac-Toe CLI without an Ollama round."""
+        """Return a deterministic playable browser Tic-Tac-Toe project."""
         return GeneratedProject(
             files={
-                "tic_tac_toe.py": (
-                    "def winner(board):\n"
-                    "    lines = ((0, 1, 2), (3, 4, 5), (6, 7, 8),\n"
-                    "             (0, 3, 6), (1, 4, 7), (2, 5, 8),\n"
-                    "             (0, 4, 8), (2, 4, 6))\n"
-                    "    for a, b, c in lines:\n"
-                    "        if board[a] and board[a] == board[b] == board[c]:\n"
-                    "            return board[a]\n"
-                    "    return 'draw' if all(board) else None\n\n"
-                    "def play_move(board, position, player):\n"
-                    "    if position < 0 or position >= 9 or board[position]:\n"
-                    "        raise ValueError('Invalid move')\n"
-                    "    board[position] = player\n"
-                    "    return board\n\n"
-                    "def main():\n"
-                    "    board = [''] * 9\n"
-                    "    player = 'X'\n"
-                    "    while winner(board) is None:\n"
-                    "        print(' '.join(cell or str(i + 1) for i, cell in enumerate(board)))\n"
-                    "        move = int(input(f'{player} move (1-9): ')) - 1\n"
-                    "        play_move(board, move, player)\n"
-                    "        player = 'O' if player == 'X' else 'X'\n"
-                    "    result = winner(board)\n"
-                    "    print('Draw!' if result == 'draw' else f'{result} wins!')\n\n"
-                    "if __name__ == '__main__':\n"
-                    "    main()\n"
-                ),
-                "tests/test_tic_tac_toe.py": (
-                    "import pytest\n"
-                    "from tic_tac_toe import play_move, winner\n\n"
-                    "def test_row_winner():\n"
-                    "    board = ['X', 'X', ''] + [''] * 6\n"
-                    "    play_move(board, 2, 'X')\n"
-                    "    assert winner(board) == 'X'\n\n"
-                    "def test_column_winner():\n"
-                    "    board = ['O', '', ''] + ['O', '', ''] + [''] * 3\n"
-                    "    play_move(board, 6, 'O')\n"
-                    "    assert winner(board) == 'O'\n\n"
-                    "def test_draw():\n"
-                    "    board = ['X', 'O', 'X', 'X', 'O', 'O', 'O', 'X', 'X']\n"
-                    "    assert winner(board) == 'draw'\n\n"
-                    "def test_invalid_move():\n"
-                    "    board = ['X'] + [''] * 8\n"
-                    "    with pytest.raises(ValueError):\n"
-                    "        play_move(board, 0, 'O')\n"
-                ),
+                "index.html": """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tic-Tac-Toe</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game">
+    <h1>Tic-Tac-Toe</h1>
+    <p id="status">Player X's turn</p>
+    <div id="board" class="board" aria-label="Tic-Tac-Toe board"></div>
+    <button id="restart">Restart Game</button>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
+""",
+                "style.css": """* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh; display: grid; place-items: center;
+  font-family: system-ui, sans-serif; background: #0b1020; color: #fff;
+}
+.game { text-align: center; padding: 24px; }
+h1 { margin-bottom: 8px; }
+#status { color: #aab5d6; margin-bottom: 20px; }
+.board {
+  display: grid; grid-template-columns: repeat(3, 90px); gap: 8px;
+  margin: 0 auto 20px;
+}
+.cell {
+  width: 90px; height: 90px; border: 1px solid #33405f; border-radius: 12px;
+  background: #141c31; color: #fff; font-size: 32px; cursor: pointer;
+}
+.cell:hover { background: #1d2945; }
+button#restart {
+  border: 0; border-radius: 10px; padding: 10px 18px;
+  background: #6c63ff; color: white; cursor: pointer;
+}
+@media (max-width: 420px) {
+  .board { grid-template-columns: repeat(3, 25vw); }
+  .cell { width: 25vw; height: 25vw; }
+}
+""",
+                "game.js": """const boardElement = document.getElementById("board");
+const statusElement = document.getElementById("status");
+const restartButton = document.getElementById("restart");
+
+let board = Array(9).fill("");
+let currentPlayer = "X";
+let gameOver = false;
+
+const wins = [
+  [0,1,2], [3,4,5], [6,7,8],
+  [0,3,6], [1,4,7], [2,5,8],
+  [0,4,8], [2,4,6]
+];
+
+function winner() {
+  for (const [a,b,c] of wins) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+  }
+  return board.every(Boolean) ? "draw" : null;
+}
+
+function render() {
+  boardElement.innerHTML = "";
+  board.forEach((value, index) => {
+    const cell = document.createElement("button");
+    cell.className = "cell";
+    cell.textContent = value;
+    cell.setAttribute("aria-label", "Cell " + (index + 1));
+    cell.addEventListener("click", () => move(index));
+    boardElement.appendChild(cell);
+  });
+}
+
+function move(index) {
+  if (gameOver || board[index]) return;
+  board[index] = currentPlayer;
+  const result = winner();
+  if (result) {
+    gameOver = true;
+    statusElement.textContent = result === "draw" ? "It's a draw!" : "Player " + result + " wins!";
+  } else {
+    currentPlayer = currentPlayer === "X" ? "O" : "X";
+    statusElement.textContent = "Player " + currentPlayer + "'s turn";
+  }
+  render();
+}
+
+function restart() {
+  board = Array(9).fill("");
+  currentPlayer = "X";
+  gameOver = false;
+  statusElement.textContent = "Player X's turn";
+  render();
+}
+
+restartButton.addEventListener("click", restart);
+render();
+""",
+                "tests/test_project.py": """from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+def test_browser_game_files_exist():
+    assert (ROOT / "index.html").is_file()
+    assert (ROOT / "style.css").is_file()
+    assert (ROOT / "game.js").is_file()
+
+def test_game_contains_core_features():
+    js = (ROOT / "game.js").read_text(encoding="utf-8")
+    assert "function move" in js
+    assert "function restart" in js
+    assert "wins" in js
+""",
             },
             test_command=["python", "-m", "pytest", "-q"],
         )
