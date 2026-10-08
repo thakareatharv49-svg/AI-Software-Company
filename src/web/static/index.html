@@ -11,14 +11,17 @@
 <aside class="side">
   <div class="logo">AI <span>Software</span><br>Company</div>
   <div class="sub">Autonomous software factory</div>
-  <nav class="nav">
-    <div class="active">◆ Control Center</div>
-    <div>◇ Missions</div><div>◇ Factory</div><div>◇ GitHub Delivery</div>
+  <nav class="nav" aria-label="Main navigation">
+    <a class="active" href="#overview">◆ Control Center</a>
+    <a href="#completed-products">◇ Completed Products</a>
+    <a href="#missions-section">◇ Missions</a>
+    <a href="#factory-section">◇ Factory</a>
+    <a href="#events-section">◇ Live Events</a>
   </nav>
   <div class="sidefoot">Human-directed · AI-executed</div>
 </aside>
 <main class="main">
-<header class="head">
+<header class="head" id="overview">
   <div><div class="eyebrow">Control Center</div><h1>Build software with your company.</h1>
   <p>Give an objective. The factory plans, generates, tests, repairs and publishes.</p></div>
   <div class="live"><i></i><span id="live">Connecting…</span></div>
@@ -29,7 +32,7 @@
   <div class="card stat"><small>Agents</small><b id="agents">—</b></div>
   <div class="card stat"><small>Factory</small><b id="factory">idle</b></div>
 </section>
-<section class="card products-card">
+<section class="card products-card" id="completed-products">
 <div class="section-heading"><div><h2>Completed Products</h2><p class="muted">Open finished browser products directly from the factory.</p></div><small id="product-count" class="section-count"></small></div>
 <div id="products" class="products"><div class="empty">Checking generated products…</div></div>
 </section>
@@ -49,8 +52,8 @@
 </section>
 </div>
 <div class="grid">
-<section class="card"><h2>Missions <small id="mission-count" class="section-count"></small></h2><div id="missions" class="missions"><div class="empty">Loading…</div></div></section>
-<section class="card"><h2>Live events</h2><div id="events"><div class="empty">Loading…</div></div></section>
+<section class="card" id="missions-section"><h2>Missions <small id="mission-count" class="section-count"></small></h2><div id="missions" class="missions"><div class="empty">Loading…</div></div></section>
+<section class="card" id="events-section"><h2>Live events</h2><div id="events"><div class="empty">Loading…</div></div></section>
 </div>
 <section class="card details"><h2 id="detail-title">Mission details</h2><div id="details" class="empty">Select a mission to inspect outputs and audit trail.</div></section>
 </main>
