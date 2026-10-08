@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from api.routes.health import router as health_router
 from config.settings import settings
@@ -16,7 +19,6 @@ app = FastAPI(
     description="Autonomous AI software company and continuous software factory",
 )
 
-
 @app.middleware("http")
 async def security_headers_middleware(request, call_next):
     response = await call_next(request)
@@ -26,13 +28,17 @@ async def security_headers_middleware(request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     return response
 
-
 app.include_router(health_router)
 app.include_router(dashboard_router)
 app.include_router(security_router)
 app.include_router(control_router)
 app.include_router(web_router)
 
+app.mount(
+    "/app/static",
+    StaticFiles(directory=Path(__file__).resolve().parent / "web" / "static"),
+    name="app-static",
+)
 
 @app.get("/")
 async def root() -> dict[str, str]:
