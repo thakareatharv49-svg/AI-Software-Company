@@ -64,6 +64,40 @@ function renderMissions(items) {
   }
 }
 
+
+function renderProducts(items) {
+  const completed = items.filter(item => item.status === "completed");
+  $("product-count").textContent = completed.length ? completed.length + " ready" : "";
+  const box = $("products");
+  box.replaceChildren();
+  if (!completed.length) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = "No completed browser products yet.";
+    box.append(e);
+    return;
+  }
+  for (const item of completed.slice(0, 12)) {
+    const card = document.createElement("div");
+    card.className = "product";
+    const info = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = item.mission.name;
+    const desc = document.createElement("p");
+    desc.className = "muted";
+    desc.textContent = item.mission.objective;
+    info.append(title, desc);
+    const open = document.createElement("a");
+    open.className = "primary product-open";
+    open.href = "/product/" + encodeURIComponent(item.mission.id);
+    open.target = "_blank";
+    open.rel = "noopener";
+    open.textContent = "Open Product ↗";
+    card.append(info, open);
+    box.append(card);
+  }
+}
+
 function renderEvents(events) {
   const box=$("events"); box.replaceChildren();
   if (!events.length) { const e=document.createElement("div"); e.className="empty"; e.textContent="Waiting for events."; box.append(e); return; }
@@ -262,7 +296,7 @@ async function refresh() {
     $("tasks").textContent=summary.tasks ?? 0;
     $("agents").textContent=summary.agents ?? 0;
     $("factory").textContent=factory.running ? "running":"idle";
-    renderMissions(missions); renderEvents(events);
+    renderMissions(missions); renderProducts(missions); renderEvents(events);
     if(selectedMissionId && missions.some(x=>x.mission.id===selectedMissionId)) await showMission(selectedMissionId);
   } catch(e) { $("live").textContent="offline"; message(e.message,true); }
 }
