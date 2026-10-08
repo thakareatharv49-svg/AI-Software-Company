@@ -59,3 +59,59 @@ def test_calculator_fallback_is_only_selected_for_calculator_missions() -> None:
 
     assert not called
     assert "index.html" in project.files
+
+
+
+def test_browser_product_missing_entry_point_is_rejected() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    try:
+        OllamaProjectGenerator._validate_mission_output(
+            "Expense Tracker",
+            "Build a web app for tracking monthly expenses.",
+            GeneratedProject(
+                files={"app.js": "console.log('expenses')"},
+                test_command=["python", "-m", "pytest", "-q"],
+            ),
+        )
+    except RuntimeError as exc:
+        assert "index.html" in str(exc)
+    else:
+        raise AssertionError("A browser product without index.html must be rejected")
+
+
+def test_browser_product_missing_local_asset_is_rejected() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    try:
+        OllamaProjectGenerator._validate_mission_output(
+            "Study Planner",
+            "Build a browser app for planning study sessions.",
+            GeneratedProject(
+                files={
+                    "index.html": '<html><head><script src="app.js"></script></head></html>',
+                },
+                test_command=["python", "-m", "pytest", "-q"],
+            ),
+        )
+    except RuntimeError as exc:
+        assert "app.js" in str(exc)
+    else:
+        raise AssertionError("A browser product with a missing local asset must be rejected")
+
+
+def test_browser_product_with_local_assets_passes_validation() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    OllamaProjectGenerator._validate_mission_output(
+        "Study Planner",
+        "Build a browser app for planning study sessions.",
+        GeneratedProject(
+            files={
+                "index.html": '<html><head><link rel="stylesheet" href="style.css"><script src="app.js"></script></head></html>',
+                "style.css": "body { font-family: sans-serif; }",
+                "app.js": "document.title = 'Study Planner';",
+            },
+            test_command=["python", "-m", "pytest", "-q"],
+        ),
+    )
