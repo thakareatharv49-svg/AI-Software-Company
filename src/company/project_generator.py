@@ -532,7 +532,7 @@ def test_game_contains_core_features():
                     "    assert any(path.read_text(encoding='utf-8').strip() for path in source_files), 'Generated source files are empty'",
                     "",
                 ]
-            files["tests/test_generated_project.py"] = "\\n".join(smoke_lines)
+            files["tests/test_generated_project.py"] = "\n".join(smoke_lines)
 
         command = self._normalize_test_command(result.get("test_command"))
 
