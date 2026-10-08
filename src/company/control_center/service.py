@@ -128,10 +128,21 @@ class CompanyControlCenter:
         return self._mission_controller.get_plan(mission_id)
 
     def missions(self) -> list[MissionRecord]:
+        # Refresh the UI projection from durable jobs before serving the list.
+        # The factory updates MissionJob as it runs; without this sync the list
+        # could remain "queued" after the job has already completed.
+        try:
+            jobs = self._job_store.list_all()
+            for job in jobs:
+                self._jobs[job.id] = job
+                self._sync_mission_from_job(job)
+        except SQLAlchemyError:
+            pass
+
         with self._lock:
             return sorted(
                 self._missions.values(),
-                key=lambda item: item.created_at,
+                key=lambda item: item.updated_at,
                 reverse=True,
             )
 
