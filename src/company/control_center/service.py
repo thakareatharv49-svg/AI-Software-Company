@@ -429,7 +429,8 @@ class CompanyControlCenter:
                 name=repository_name_only,
                 default_branch=settings.github_default_branch,
             )
-            pull_request_head = f"{settings.github_branch_prefix}/{mission.id}"
+            # Compatibility field: the factory now publishes directly to the default branch.
+            pull_request_head = settings.github_default_branch
             repository_name = (
                 f"{settings.github_repository_owner}/{repository_name_only}"
             )
