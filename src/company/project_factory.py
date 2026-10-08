@@ -320,7 +320,28 @@ class ProjectFactory:
                 project.status = "blocked"
                 event_type = "FACTORY_PROJECT_BLOCKED"
         elif project.last_error:
-            if project.attempts <= max_retries:
+            # GitHub secondary rate limits are external/transient. Retrying the
+            # entire factory immediately only creates more content-creation calls
+            # and can extend the block. Leave the mission blocked so the user can
+            # retry after GitHub's cooldown without regenerating the project.
+            github_rate_limited = (
+                "secondary rate limit" in project.last_error.lower()
+                or "temporarily blocked from content creation" in project.last_error.lower()
+                or "github api 403" in project.last_error.lower()
+            )
+            if github_rate_limited:
+                project.status = "blocked"
+                self.orchestrator.stop()
+                self._transition_job(
+                    project,
+                    MissionJobStatus.BLOCKED,
+                    (
+                        f"Project blocked by GitHub rate limiting: {project.mission.name}. "
+                        "Wait for the GitHub cooldown, then retry the mission."
+                    ),
+                )
+                event_type = "FACTORY_PROJECT_BLOCKED_RATE_LIMIT"
+            elif project.attempts <= max_retries:
                 project.status = "queued"
                 self._reset_for_retry(project)
                 self.queue.insert(0, project)
