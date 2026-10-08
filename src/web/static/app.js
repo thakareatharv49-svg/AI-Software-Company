@@ -19,6 +19,27 @@ async function api(path, options = {}) {
   return data;
 }
 
+function ensureUiElements() {
+  const main = document.querySelector(".main");
+  if (main && !$("products")) {
+    const section = document.createElement("section");
+    section.className = "card products-card";
+    section.innerHTML = '<div class="section-heading"><div><h2>Completed Products</h2><p class="muted">Open finished browser products directly from the factory.</p></div><small id="product-count" class="section-count"></small></div><div id="products" class="products"><div class="empty">Checking generated products…</div></div>';
+    const stats = main.querySelector(".stats");
+    if (stats) stats.insertAdjacentElement("afterend", section);
+    else main.prepend(section);
+  }
+  if (!$("message")) {
+    const form = $("mission-form");
+    if (form) {
+      const node = document.createElement("div");
+      node.id = "message";
+      node.className = "message";
+      form.insertAdjacentElement("afterend", node);
+    }
+  }
+}
+
 function message(text, error=false) {
   $("message").textContent = text || "";
   $("message").className = "message " + (error ? "error" : "");
@@ -74,6 +95,7 @@ function renderMissions(items) {
 
 
 function renderProducts(items) {
+  if (!$("products") || !$("product-count")) return;
   const completed = Array.isArray(items) ? items : [];
   $("product-count").textContent = completed.length ? completed.length + " ready" : "";
   const box = $("products");
@@ -312,6 +334,7 @@ $("details").addEventListener("click",e => {
 $("stop").addEventListener("click",async()=>{try{await api("/api/company/stop",{method:"POST"});message("Company stopped.");await refresh();}catch(e){message("Stop failed: "+e.message,true);}});
 
 async function refresh() {
+  ensureUiElements();
   if(busy && selectedMissionId) return;
   try {
     const [state,missions,events,summary,factory]=await Promise.all([
@@ -343,6 +366,7 @@ async function refresh() {
 }
 window.addEventListener("error",e=>message("UI error: "+e.message,true));
 window.addEventListener("unhandledrejection",e=>message("UI error: "+(e.reason?.message || e.reason),true));
+ensureUiElements();
 refresh();
 setInterval(refresh,5000);
 })();
