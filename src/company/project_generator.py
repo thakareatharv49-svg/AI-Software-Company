@@ -34,7 +34,8 @@ Rules:
 - Generate a complete runnable implementation, not a plan. Prioritize the exact mission requirements over generic starter templates.
 - The product title, labels, sample data, main workflow, and tests must clearly correspond to the requested mission.
 - Never silently substitute a different product when the requested implementation is difficult; return the requested product or fail with a useful error.
-- Include automated tests under tests/.
+- Include automated tests under tests/ that verify real mission-specific behavior and edge cases, not just file existence, copied strings, or tautological assertions.
+- For interactive browser products, include tests for important business rules or pure JavaScript logic where practical; the tests must fail if a core feature is removed or behaves incorrectly.
 - The implementation MUST define every function, class, module, or API used by its tests.
 - Make the implementation and tests internally consistent and runnable together.
 - Keep the project small enough to run locally.
