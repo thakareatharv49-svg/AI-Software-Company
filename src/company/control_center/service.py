@@ -264,7 +264,8 @@ class CompanyControlCenter:
 
     def enqueue_factory_mission(self, mission_id: str) -> None:
         record = self._get_mission(mission_id)
-        self._factory.enqueue(record.mission)
+        if not self._factory.has_queued_mission(mission_id):
+            self._factory.enqueue(record.mission)
         job = self._job_store.get(mission_id)
         if job is not None:
             self._jobs[mission_id] = job
