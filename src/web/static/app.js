@@ -74,7 +74,7 @@ function renderMissions(items) {
 
 
 function renderProducts(items) {
-  const completed = items.filter(item => String(item.status || item.mission?.status || "").toLowerCase() === "completed");
+  const completed = Array.isArray(items) ? items : [];
   $("product-count").textContent = completed.length ? completed.length + " ready" : "";
   const box = $("products");
   box.replaceChildren();
@@ -97,7 +97,7 @@ function renderProducts(items) {
     info.append(title, desc);
     const open = document.createElement("a");
     open.className = "primary product-open";
-    open.href = "/product/" + encodeURIComponent(item.mission.id);
+    open.href = item.product_url || item.url || ("/product/" + encodeURIComponent(item.mission.id));
     open.target = "_blank";
     open.rel = "noopener";
     open.textContent = "Open Product ↗";
@@ -314,18 +314,29 @@ $("stop").addEventListener("click",async()=>{try{await api("/api/company/stop",{
 async function refresh() {
   if(busy && selectedMissionId) return;
   try {
-    const [state,missions,events,summary,factory,products]=await Promise.all([
-      api("/api/company/state"),api("/api/missions"),api("/api/company/events"),api("/dashboard/summary"),api("/api/factory/status"),api("/api/products")
+    const [state,missions,events,summary,factory]=await Promise.all([
+      api("/api/company/state"),api("/api/missions"),api("/api/company/events"),api("/dashboard/summary"),api("/api/factory/status")
     ]);
+    let products = [];
+    try {
+      products = await api("/api/products");
+    } catch (productError) {
+      const box = $("products");
+      box.replaceChildren();
+      const error = document.createElement("div");
+      error.className = "empty";
+      error.textContent = "Product service unavailable: " + productError.message;
+      box.append(error);
+    }
     $("live").textContent="company "+state.status;
     $("projects").textContent=summary.projects ?? 0;
     $("tasks").textContent=summary.tasks ?? 0;
     $("agents").textContent=summary.agents ?? 0;
     $("factory").textContent=factory.running ? "running":"idle";
     renderMissions(missions); renderProducts(products.map(product => ({
-      mission: missions.find(item => item.mission.id === product.mission_id)?.mission || {name: "Completed Product", objective: "Generated browser product"},
-      status: "completed",
+      mission: missions.find(item => item.mission.id === product.mission_id)?.mission || {name: product.mission_id, objective: "Generated browser product"},
       product_url: product.url,
+      url: product.url,
     }))); renderEvents(events);
     if(selectedMissionId && missions.some(x=>x.mission.id===selectedMissionId)) await showMission(selectedMissionId);
   } catch(e) { $("live").textContent="offline"; message(e.message,true); }
