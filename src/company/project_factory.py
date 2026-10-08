@@ -85,7 +85,7 @@ class ProjectFactory:
         )
         if existing is not None:
             raise ValueError(
-                f"Mission '{mission.id}' is already queued in the factory"
+                f"Mission '{mission.id}' already has lifecycle state 'queued'"
             )
         if job is not None and job.status in {
             MissionJobStatus.COMPLETED,
@@ -316,7 +316,7 @@ class ProjectFactory:
             event_type = "FACTORY_PROJECT_COMPLETED"
         elif self.orchestrator.state.status.value == "blocked":
             project.last_error = project.last_error or "Project execution blocked"
-            if project.attempts <= max_retries:
+            if project.attempts <= max_retries and max_retries > 0:
                 project.status = "queued"
                 self._reset_for_retry(project)
                 self.queue.insert(0, project)
