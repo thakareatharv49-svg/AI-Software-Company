@@ -388,6 +388,37 @@ class CompanyExecutionPipeline:
             )
         )
 
+    async def _flush_one_pending_github_publish(self) -> None:
+        """Retry at most one due publish without blocking local project execution."""
+        if self.github_native is None:
+            return
+        for entry in self.github_publish_queue.due()[:1]:
+            repository = GitHubRepository(
+                owner=str(entry.get("owner", "")),
+                name=str(entry.get("name", "")),
+            )
+            branch = str(entry.get("branch", "main"))
+            files = entry.get("files", {})
+            if not repository.owner or not repository.name or not isinstance(files, dict):
+                self.github_publish_queue.remove(entry)
+                continue
+            result = await self.github_native.publish_files(
+                repository,
+                branch,
+                {str(path): str(content) for path, content in files.items()},
+                str(entry.get("message", "feat: publish generated project")),
+            )
+            if result.success:
+                self.github_publish_queue.remove(entry)
+            elif self._is_github_rate_limited(result.message):
+                self.github_publish_queue.enqueue(
+                    owner=repository.owner,
+                    name=repository.name,
+                    branch=branch,
+                    files={str(path): str(content) for path, content in files.items()},
+                    message=str(entry.get("message", "feat: publish generated project")),
+                )
+
     async def run_end_to_end(
         self,
         *,
@@ -409,6 +440,14 @@ class CompanyExecutionPipeline:
         """
 
         self._active_run_id = self.observability.create_run_id()
+
+        # Publishing is deliberately decoupled from project generation. A due
+        # GitHub publish is retried once per factory run; a rate limit never
+        # blocks the new project's local completion.
+        try:
+            await self._flush_one_pending_github_publish()
+        except Exception:
+            pass
 
         while True:
             try:
