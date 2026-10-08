@@ -214,7 +214,7 @@ Rules:
                     files[normalized] = files[path]
                 del files[path]
 
-        if not any(path.startswith("tests/") for path in files):
+        if not any(path.lower().startswith("tests/") for path in files):
             smoke_lines = [
                 "from pathlib import Path",
                 "",
