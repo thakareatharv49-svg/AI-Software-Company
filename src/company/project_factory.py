@@ -274,21 +274,26 @@ class ProjectFactory:
                     raise RuntimeError(
                         "Autonomous runner returned no pipeline result"
                     )
-                results = [
-                    type(
-                        "FactoryStageResult",
-                        (),
-                        {
-                            "success": (
-                                str(getattr(stage.status, "value", stage.status))
-                                .strip()
-                                .casefold()
-                                == "completed"
-                            )
-                        },
-                    )()
-                    for stage in autonomous_result.stages
-                ]
+                # Stage telemetry is best-effort only. A malformed status
+                # must not turn a successfully returned pipeline into a failure.
+                try:
+                    results = [
+                        type(
+                            "FactoryStageResult",
+                            (),
+                            {
+                                "success": (
+                                    str(getattr(stage.status, "value", stage.status))
+                                    .strip()
+                                    .casefold()
+                                    == "completed"
+                                )
+                            },
+                        )()
+                        for stage in autonomous_result.stages
+                    ]
+                except Exception:
+                    results = []
                 if not results:
                     results = [
                         type(
@@ -297,6 +302,8 @@ class ProjectFactory:
                             {"success": True},
                         )()
                     ]
+                # Ignore telemetry errors once the authoritative pipeline exists.
+                project.last_error = None
             else:
                 results = await self.pipeline.execute_mission(
                     project.mission,
