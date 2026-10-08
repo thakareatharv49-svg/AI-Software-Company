@@ -30,24 +30,398 @@ APP_HTML = """<!doctype html>
 <section class="card details"><h2 id="detailTitle">Mission details</h2><div id="details" class="empty">Select a mission to inspect its outputs and audit trail.</div></section>
 </main></div>
 <script>
-const $=id=>document.getElementById(id);
-const terminal=new Set(["completed","blocked","failed","cancelled"]);
-const esc=v=>String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
-async function api(path,opts){const r=await fetch(path,opts);let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.detail||("Request failed: "+r.status));return d}
-async function refresh(){try{
- const [state,missions,events,summary,factory]=await Promise.all([api("/api/company/state"),api("/api/missions"),api("/api/company/events"),api("/dashboard/summary"),api("/api/factory/status")]);
- $("live").textContent="company "+state.status;$("projects").textContent=summary.projects;$("tasks").textContent=summary.tasks;$("agents").textContent=summary.agents;$("factory").textContent=factory.running?"running":"idle";
- $("missions").innerHTML=missions.length?missions.map(m=>'<button type="button" class="mission" onclick="selectMission(\''+m.mission.id+'\')"><div><strong>'+esc(m.mission.name)+'</strong><p>'+esc(m.mission.objective)+'</p></div><span class="pill">'+esc(m.status)+'</span></button>').join(""):'<div class="empty">No missions yet.</div>';
- $("events").innerHTML=events.length?events.slice().reverse().slice(0,25).map(e=>'<div class="event"><b>'+esc(e.event_type)+'</b><div class="muted">'+esc(e.payload?.message||e.project_id||"company event")+'</div></div>').join(""):'<div class="empty">Waiting for factory events.</div>';
- }catch(e){$("live").textContent="offline";$("message").textContent=e.message}}
-async function selectMission(id){try{const [jobs,outs,audit]=await Promise.all([api("/api/missions/"+id+"/job"),api("/api/missions/"+id+"/outputs"),api("/api/missions/"+id+"/audit")]);$("detailTitle").textContent=jobs.mission.name;$("details").innerHTML='<div class="row" style="justify-content:space-between"><div><span class="pill">'+esc(jobs.status)+'</span><div style="margin-top:10px" class="muted">'+esc(jobs.message)+'</div></div><div class="actions">'+(jobs.status==="queued"?'<button type="button" class="primary" onclick="runFactory(\''+id+'\')">Run Factory</button>':"")+(jobs.status==="failed"||jobs.status==="blocked"?'<button type="button" class="secondary" onclick="retryMission(\''+id+'\')">Retry</button>':"")+(jobs.status!=="completed"&&jobs.status!=="cancelled"?'<button type="button" class="danger" onclick="cancelMission(\''+id+'\')">Cancel</button>':"")+'</div></div><h3 style="margin-top:22px">Outputs</h3>'+(outs.length?outs.map(o=>'<div class="event"><b>'+esc(o.name)+'</b> · '+esc(o.status)+'<div class="muted">'+esc(o.output_type)+'</div>'+(o.repository?'<a class="repo" target="_blank" rel="noopener" href="https://github.com/'+esc(o.repository)+'">Open GitHub repository ↗</a>':"")+'</div>').join(""):'<div class="empty">No outputs recorded yet.</div>')+'<h3 style="margin-top:22px">Audit trail</h3>'+(audit.length?audit.slice().reverse().map(a=>'<div class="event"><b>'+esc(a.event_type)+'</b> <span class="pill">'+esc(a.status||"event")+'</span><div class="muted">'+esc(a.message)+'</div><time>'+esc(new Date(a.timestamp).toLocaleString())+'</time></div>').join(""):'<div class="empty">No audit entries.</div>');}catch(e){$("details").innerHTML='<div class="empty">'+esc(e.message)+'</div>'}}
-async function runFactory(id){try{$("progress").style.display="block";$("message").textContent="Starting factory…";await api("/api/missions/"+id+"/factory-run",{method:"POST"});$("message").textContent="Factory is running.";await selectMission(id);watch(id)}catch(e){$("message").textContent="Factory start failed: "+e.message;await refresh()}} async function launch(e){if(e)e.preventDefault();$("start").disabled=true;$("progress").style.display="block";$("message").textContent="Creating mission…";try{const m=await api("/api/missions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:$("name").value.trim(),objective:$("objective").value.trim()})});const id=m.mission.id;$("message").textContent="Mission created. Starting factory…";$("form").reset();await runFactory(id)}catch(e){$("message").textContent="Launch failed: "+e.message}finally{$("start").disabled=false}}
-async function watch(id){for(let i=0;i<180;i++){try{const j=await api("/api/missions/"+id+"/job");await selectMission(id);await refresh();if(terminal.has(j.status)){$("progress").style.display="none";$("message").textContent="Mission "+j.status+".";return}}catch{}await new Promise(r=>setTimeout(r,2000))}}
-async function retryMission(id){try{await api("/api/missions/"+id+"/retry",{method:"POST"});await runFactory(id)}catch(e){$("message").textContent="Retry failed: "+e.message}}
-async function cancelMission(id){try{await api("/api/missions/"+id+"/cancel",{method:"POST"});await selectMission(id);await refresh()}catch(e){$("message").textContent=e.message}}
-$("stop").addEventListener("click",async()=>{try{await api("/api/company/stop",{method:"POST"});$("message").textContent="Company stopped.";await refresh()}catch(e){$("message").textContent=e.message}});
-refresh();setInterval(refresh,3000);
-window.addEventListener("error",e=>{$("message").textContent="UI error: "+e.message});
+const $ = (id) => document.getElementById(id);
+const terminal = new Set(["completed", "blocked", "failed", "cancelled"]);
+let selectedMissionId = null;
+let refreshBusy = false;
+let watchingMissionId = null;
+
+function esc(value) {
+  const div = document.createElement("div");
+  div.textContent = String(value ?? "");
+  return div.innerHTML;
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      ...(options.body ? {"Content-Type": "application/json"} : {}),
+      ...(options.headers || {})
+    }
+  });
+  let data = {};
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok) {
+    throw new Error(data.detail || ("Request failed: " + response.status));
+  }
+  return data;
+}
+
+function setMessage(message, error = false) {
+  const node = $("message");
+  node.textContent = message || "";
+  node.style.color = error ? "#ff9aae" : "";
+}
+
+function setProgress(visible) {
+  $("progress").style.display = visible ? "block" : "none";
+}
+
+function renderMissions(missions) {
+  const container = $("missions");
+  container.replaceChildren();
+
+  if (!missions.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "No missions yet.";
+    container.appendChild(empty);
+    return;
+  }
+
+  for (const item of missions) {
+    const mission = item.mission;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mission";
+    button.dataset.action = "select-mission";
+    button.dataset.missionId = mission.id;
+
+    const left = document.createElement("div");
+    const strong = document.createElement("strong");
+    strong.textContent = mission.name;
+    const p = document.createElement("p");
+    p.textContent = mission.objective;
+    left.append(strong, p);
+
+    const pill = document.createElement("span");
+    pill.className = "pill";
+    pill.textContent = item.status;
+
+    button.append(left, pill);
+    container.appendChild(button);
+  }
+}
+
+function renderEvents(events) {
+  const container = $("events");
+  container.replaceChildren();
+
+  if (!events.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "Waiting for factory events.";
+    container.appendChild(empty);
+    return;
+  }
+
+  for (const event of events.slice().reverse().slice(0, 25)) {
+    const node = document.createElement("div");
+    node.className = "event";
+    const title = document.createElement("b");
+    title.textContent = event.event_type || "event";
+    const message = document.createElement("div");
+    message.className = "muted";
+    message.textContent = event.payload?.message || event.project_id || "company event";
+    node.append(title, message);
+    container.appendChild(node);
+  }
+}
+
+async function refresh() {
+  if (refreshBusy) return;
+  refreshBusy = true;
+  try {
+    const [state, missions, events, summary, factory] = await Promise.all([
+      api("/api/company/state"),
+      api("/api/missions"),
+      api("/api/company/events"),
+      api("/dashboard/summary"),
+      api("/api/factory/status")
+    ]);
+
+    $("live").textContent = "company " + state.status;
+    $("projects").textContent = summary.projects ?? 0;
+    $("tasks").textContent = summary.tasks ?? 0;
+    $("agents").textContent = summary.agents ?? 0;
+    $("factory").textContent = factory.running ? "running" : "idle";
+    renderMissions(missions);
+    renderEvents(events);
+
+    if (selectedMissionId && missions.some((item) => item.mission.id === selectedMissionId)) {
+      await selectMission(selectedMissionId, false);
+    }
+  } catch (error) {
+    $("live").textContent = "offline";
+    setMessage(error.message, true);
+  } finally {
+    refreshBusy = false;
+  }
+}
+
+function actionButton(label, action, id, className) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  button.textContent = label;
+  button.dataset.action = action;
+  button.dataset.missionId = id;
+  return button;
+}
+
+async function selectMission(id, showLoading = true) {
+  selectedMissionId = id;
+  if (showLoading) {
+    $("details").textContent = "Loading mission…";
+  }
+
+  try {
+    const [job, outputs, audit] = await Promise.all([
+      api("/api/missions/" + encodeURIComponent(id) + "/job"),
+      api("/api/missions/" + encodeURIComponent(id) + "/outputs"),
+      api("/api/missions/" + encodeURIComponent(id) + "/audit")
+    ]);
+
+    $("detailTitle").textContent = job.mission.name;
+
+    const root = document.createElement("div");
+    const top = document.createElement("div");
+    top.style.display = "flex";
+    top.style.justifyContent = "space-between";
+    top.style.gap = "16px";
+
+    const info = document.createElement("div");
+    const status = document.createElement("span");
+    status.className = "pill";
+    status.textContent = job.status;
+    const message = document.createElement("div");
+    message.className = "muted";
+    message.style.marginTop = "10px";
+    message.textContent = job.message || "";
+    info.append(status, message);
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    if (job.status === "queued") {
+      actions.appendChild(actionButton("Run Factory", "run-factory", id, "primary"));
+    }
+    if (job.status === "failed" || job.status === "blocked") {
+      actions.appendChild(actionButton("Retry", "retry", id, "secondary"));
+    }
+    if (job.status !== "completed" && job.status !== "cancelled") {
+      actions.appendChild(actionButton("Cancel", "cancel", id, "danger"));
+    }
+    top.append(info, actions);
+    root.appendChild(top);
+
+    const outputsTitle = document.createElement("h3");
+    outputsTitle.style.marginTop = "22px";
+    outputsTitle.textContent = "Outputs";
+    root.appendChild(outputsTitle);
+
+    if (outputs.length) {
+      for (const output of outputs) {
+        const node = document.createElement("div");
+        node.className = "event";
+        const title = document.createElement("b");
+        title.textContent = output.name + " · " + output.status;
+        const type = document.createElement("div");
+        type.className = "muted";
+        type.textContent = output.output_type || "";
+        node.append(title, type);
+
+        if (output.repository) {
+          const link = document.createElement("a");
+          link.className = "repo";
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.href = "https://github.com/" + output.repository;
+          link.textContent = "Open GitHub repository ↗";
+          node.appendChild(link);
+        }
+        root.appendChild(node);
+      }
+    } else {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No outputs recorded yet.";
+      root.appendChild(empty);
+    }
+
+    const auditTitle = document.createElement("h3");
+    auditTitle.style.marginTop = "22px";
+    auditTitle.textContent = "Audit trail";
+    root.appendChild(auditTitle);
+
+    if (audit.length) {
+      for (const entry of audit.slice().reverse()) {
+        const node = document.createElement("div");
+        node.className = "event";
+        const title = document.createElement("b");
+        title.textContent = entry.event_type || "event";
+        const status = document.createElement("span");
+        status.className = "pill";
+        status.style.marginLeft = "6px";
+        status.textContent = entry.status || "event";
+        const message = document.createElement("div");
+        message.className = "muted";
+        message.textContent = entry.message || "";
+        const time = document.createElement("time");
+        time.textContent = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "";
+        node.append(title, status, message, time);
+        root.appendChild(node);
+      }
+    } else {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No audit entries.";
+      root.appendChild(empty);
+    }
+
+    $("details").replaceChildren(root);
+  } catch (error) {
+    $("details").textContent = "Unable to load mission: " + error.message;
+  }
+}
+
+async function runFactory(id) {
+  selectedMissionId = id;
+  setProgress(true);
+  setMessage("Starting factory…");
+  try {
+    await api("/api/missions/" + encodeURIComponent(id) + "/factory-run", {method: "POST"});
+    setMessage("Factory is running.");
+    await selectMission(id);
+    watch(id);
+  } catch (error) {
+    setMessage("Factory start failed: " + error.message, true);
+    await refresh();
+  }
+}
+
+async function launch(event) {
+  event?.preventDefault();
+  const name = $("name").value.trim();
+  const objective = $("objective").value.trim();
+
+  if (!name || !objective) {
+    setMessage("Mission name and objective are required.", true);
+    return false;
+  }
+
+  $("start").disabled = true;
+  setProgress(true);
+  setMessage("Creating mission…");
+
+  try {
+    const result = await api("/api/missions", {
+      method: "POST",
+      body: JSON.stringify({name, objective})
+    });
+    const id = result.mission.id;
+    $("form").reset();
+    setMessage("Mission created. Starting factory…");
+    await runFactory(id);
+  } catch (error) {
+    setMessage("Launch failed: " + error.message, true);
+  } finally {
+    $("start").disabled = false;
+  }
+  return false;
+}
+
+async function retryMission(id) {
+  setProgress(true);
+  setMessage("Retrying mission…");
+  try {
+    await api("/api/missions/" + encodeURIComponent(id) + "/retry", {method: "POST"});
+    await runFactory(id);
+  } catch (error) {
+    setMessage("Retry failed: " + error.message, true);
+  }
+}
+
+async function cancelMission(id) {
+  setMessage("Cancelling mission…");
+  try {
+    await api("/api/missions/" + encodeURIComponent(id) + "/cancel", {method: "POST"});
+    await selectMission(id);
+    await refresh();
+  } catch (error) {
+    setMessage("Cancel failed: " + error.message, true);
+  }
+}
+
+async function watch(id) {
+  if (watchingMissionId === id) return;
+  watchingMissionId = id;
+
+  try {
+    for (let i = 0; i < 180; i++) {
+      const job = await api("/api/missions/" + encodeURIComponent(id) + "/job");
+      await selectMission(id, false);
+      if (terminal.has(job.status)) {
+        setProgress(false);
+        setMessage("Mission " + job.status + ".");
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    setMessage("Factory is still running. You can continue using the control center.");
+  } catch (error) {
+    setMessage("Factory monitor stopped: " + error.message, true);
+  } finally {
+    watchingMissionId = null;
+    await refresh();
+  }
+}
+
+$("form").addEventListener("submit", launch);
+
+$("missions").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action='select-mission']");
+  if (button) {
+    event.preventDefault();
+    selectMission(button.dataset.missionId);
+  }
+});
+
+$("details").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-action]");
+  if (!button) return;
+  event.preventDefault();
+
+  const id = button.dataset.missionId;
+  const action = button.dataset.action;
+
+  if (action === "run-factory") runFactory(id);
+  if (action === "retry") retryMission(id);
+  if (action === "cancel") cancelMission(id);
+});
+
+$("stop").addEventListener("click", async (event) => {
+  event.preventDefault();
+  try {
+    await api("/api/company/stop", {method: "POST"});
+    setMessage("Company stopped.");
+    await refresh();
+  } catch (error) {
+    setMessage("Stop failed: " + error.message, true);
+  }
+});
+
+window.addEventListener("error", (event) => {
+  setMessage("UI error: " + event.message, true);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  setMessage("UI error: " + (event.reason?.message || event.reason), true);
+});
+
+refresh();
+setInterval(refresh, 3000);
 </script></body></html>"""
 
 @router.get("/app", response_class=HTMLResponse)
