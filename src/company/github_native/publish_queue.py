@@ -20,7 +20,7 @@ class GitHubPublishQueue:
 
     @staticmethod
     def _key(owner: str, name: str, branch: str) -> str:
-        raw = f"{owner}/{name}:{branch}".encode("utf-8")
+        raw = f"{owner}/{name}:{branch}".encode()
         return hashlib.sha256(raw).hexdigest()[:24]
 
     def enqueue(
