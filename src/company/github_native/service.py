@@ -86,12 +86,19 @@ class GitHubNativeService:
                     ),
                 )
 
-            base = await self.github.client.get_branch(
-                repository,
-                repository.default_branch,
-            )
-
             branch_head = await self.github.client.get_branch(repository, branch)
+
+            tree_entries: list[dict[str, str]] = []
+            for path, content in files.items():
+                blob_sha = await self.github.client.create_blob(repository, content)
+                tree_entries.append(
+                    {
+                        "path": path,
+                        "mode": "100644",
+                        "type": "blob",
+                        "sha": blob_sha,
+                    }
+                )
 
             if not tree_entries:
                 return GitOperationResult(
