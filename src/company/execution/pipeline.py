@@ -8,6 +8,7 @@ from src.company.gates.quality import ProductionQualityGate
 from src.company.project_generator import OllamaProjectGenerator
 from src.config.settings import settings
 from src.company.github_native.service import GitHubNativeService
+from src.company.github_native.publish_queue import GitHubPublishQueue
 from src.company.intelligence import (
     CrossProjectMemory,
     LearningEngine,
@@ -44,6 +45,7 @@ class PipelineResult:
     qa_result: QATestResult
     review_result: CodeReviewResult
     github_message: str | None = None
+    github_pending: bool = False
     memory_id: str | None = None
 
 
@@ -89,6 +91,7 @@ class CompanyExecutionPipeline:
 
         self.github = github or configured_github
         self.github_native = github_native or configured_github_native
+        self.github_publish_queue = GitHubPublishQueue()
         self.memory = memory or MemoryService()
         self.cross_project_memory = cross_project_memory or CrossProjectMemory()
         self.learning = learning or LearningEngine()
@@ -261,23 +264,61 @@ class CompanyExecutionPipeline:
             raise RuntimeError(gate.reason)
 
         github_message = None
+        github_pending = False
 
         if (
             self.github is not None
             and github_repository is not None
             and pull_request_head is not None
+            and self.github_native is not None
         ):
-            if self.github_native is not None:
-                publish_result = await self.github_native.publish_files(
-                    github_repository,
-                    pull_request_head,
-                    files,
-                    f"feat: complete {project.name}",
+            publish_result = await self.github_native.publish_files(
+                github_repository,
+                pull_request_head,
+                files,
+                f"feat: complete {project.name}",
+            )
+            if publish_result.success:
+                github_message = (
+                    "Published generated project directly to "
+                    f"{github_repository.owner}/{github_repository.name}:"
+                    f"{pull_request_head}"
                 )
-                if not publish_result.success:
-                    raise RuntimeError(publish_result.message)
-
-            github_message = f"Published generated project directly to {github_repository.owner}/{github_repository.name}:{pull_request_head}"
+                for entry in self.github_publish_queue.due():
+                    if (
+                        entry.get("owner") == github_repository.owner
+                        and entry.get("name") == github_repository.name
+                        and entry.get("branch") == pull_request_head
+                    ):
+                        self.github_publish_queue.remove(entry)
+            elif self._is_github_rate_limited(publish_result.message):
+                self.github_publish_queue.enqueue(
+                    owner=github_repository.owner,
+                    name=github_repository.name,
+                    branch=pull_request_head,
+                    files=dict(files),
+                    message=f"feat: complete {project.name}",
+                )
+                github_pending = True
+                github_message = (
+                    "GitHub publish deferred because GitHub is temporarily "
+                    "rate-limited. The local product is completed and the "
+                    "publish is queued for a later retry."
+                )
+                self._publish_event(
+                    "github.publish.deferred",
+                    project_id=project.id,
+                    payload={
+                        "repository": (
+                            f"{github_repository.owner}/"
+                            f"{github_repository.name}"
+                        ),
+                        "branch": pull_request_head,
+                        "reason": publish_result.message,
+                    },
+                )
+            else:
+                raise RuntimeError(publish_result.message)
 
         self.project_engine.transition(project.id, ProjectStatus.RELEASE)
         project = self.project_engine.complete(project.id)
@@ -329,7 +370,22 @@ class CompanyExecutionPipeline:
             qa_result=qa_result,
             review_result=review_result,
             github_message=github_message,
+            github_pending=github_pending,
             memory_id=memory_entry.id,
+        )
+
+    @staticmethod
+    def _is_github_rate_limited(message: str) -> bool:
+        lowered = message.lower()
+        return any(
+            marker in lowered
+            for marker in (
+                "secondary rate limit",
+                "temporarily blocked from content creation",
+                "rate limit exceeded",
+                "api rate limit",
+                "github api 403",
+            )
         )
 
     async def run_end_to_end(
