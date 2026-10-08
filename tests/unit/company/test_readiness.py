@@ -27,6 +27,7 @@ def test_readiness_report_passes_for_authenticated_production(monkeypatch) -> No
 
 def test_readiness_api_is_exposed() -> None:
     from fastapi.testclient import TestClient
+
     from src.main import app
 
     response = TestClient(app).get("/api/company/readiness")
