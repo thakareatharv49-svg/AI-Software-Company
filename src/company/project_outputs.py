@@ -15,6 +15,7 @@ class ProjectOutputManifest(BaseModel):
     repository: str | None = None
     product_url: str | None = None
     github_message: str | None = None
+    github_pending: bool = False
     memory_id: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
