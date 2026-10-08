@@ -66,4 +66,6 @@ class FactoryAutonomousRunner:
                 )
             return await self.runner.run(request)
         finally:
-            workspace.destroy()
+            # Completed workspaces are intentionally retained for the product
+            # viewer. Failed attempts are also retained for diagnostics/retry.
+            pass
