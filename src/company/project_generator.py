@@ -475,22 +475,64 @@ def test_game_contains_core_features():
                 del files[path]
 
         if not any(path.lower().startswith("tests/") for path in files):
-            smoke_lines = [
-                "from pathlib import Path",
-                "",
-                "",
-                "def test_generated_python_compiles():",
-                "    root = Path(__file__).resolve().parents[1]",
-                "    python_files = [",
-                "        path for path in root.rglob('*.py')",
-                "        if 'tests' not in path.parts",
-                "    ]",
-                "    assert python_files, 'Generated project contains no Python source files'",
-                "    for path in python_files:",
-                "        compile(path.read_text(encoding='utf-8'), str(path), 'exec')",
-                "",
+            python_sources = [
+                path for path in files
+                if path.lower().endswith(".py")
+                and not path.lower().startswith("tests/")
             ]
-            files["tests/test_generated_project.py"] = "\n".join(smoke_lines)
+            if python_sources:
+                smoke_lines = [
+                    "from pathlib import Path",
+                    "",
+                    "",
+                    "def test_generated_python_compiles():",
+                    "    root = Path(__file__).resolve().parents[1]",
+                    "    python_files = [",
+                    "        path for path in root.rglob('*.py')",
+                    "        if 'tests' not in path.parts",
+                    "    ]",
+                    "    assert python_files, 'Generated Python source files are missing'",
+                    "    for path in python_files:",
+                    "        compile(path.read_text(encoding='utf-8'), str(path), 'exec')",
+                    "",
+                ]
+            elif "index.html" in files:
+                smoke_lines = [
+                    "from pathlib import Path",
+                    "import re",
+                    "",
+                    "",
+                    "def test_browser_entrypoint_and_local_assets_exist():",
+                    "    root = Path(__file__).resolve().parents[1]",
+                    "    entry = root / 'index.html'",
+                    "    assert entry.is_file(), 'Browser product is missing index.html'",
+                    "    html = entry.read_text(encoding='utf-8')",
+                    "    references = re.findall(r\"\"\"(?:src|href)\\s*=\\s*['\\\"]([^'\\\"#]+)['\\\"]\"\"\", html, flags=re.IGNORECASE)",
+                    "    for reference in references:",
+                    "        reference = reference.strip()",
+                    "        if reference.startswith(('//', 'data:', 'http:', 'https:', 'mailto:', 'tel:', 'javascript:')):",
+                    "            continue",
+                    "        local = reference.split('?', 1)[0].split('#', 1)[0].lstrip('/')",
+                    "        if local:",
+                    "            assert (root / local).is_file(), f'Missing browser asset: {reference}'",
+                    "",
+                ]
+            else:
+                smoke_lines = [
+                    "from pathlib import Path",
+                    "",
+                    "",
+                    "def test_generated_source_files_exist():",
+                    "    root = Path(__file__).resolve().parents[1]",
+                    "    source_files = [",
+                    "        path for path in root.rglob('*')",
+                    "        if path.is_file() and 'tests' not in path.parts",
+                    "    ]",
+                    "    assert source_files, 'Generated project contains no source files'",
+                    "    assert any(path.read_text(encoding='utf-8').strip() for path in source_files), 'Generated source files are empty'",
+                    "",
+                ]
+            files["tests/test_generated_project.py"] = "\\n".join(smoke_lines)
 
         command = self._normalize_test_command(result.get("test_command"))
 
