@@ -19,17 +19,21 @@ class OllamaProjectGenerator:
     """Generate and repair small runnable projects."""
 
     async def generate(self, name: str, objective: str) -> GeneratedProject:
-        prompt = f"""Build a small, runnable software project for this mission.
+        prompt = f"""Build a distinct, complete, runnable software product for this mission. Treat the mission objective as the source of truth; do not default to a calculator, Tic-Tac-Toe, todo list, or generic landing page unless that exact product is requested.
 
-Project: {name}
-Objective: {objective}
+Project name: {name}
+Mission objective: {objective}
+
+Before writing code, infer the appropriate product category, target user, core workflow, and acceptance criteria from the mission. Implement the requested product—not a generic example—and make its interface, data model, and interactions specific to that objective. For web apps, create a coherent multi-section or multi-page experience when the scope calls for it, with real working interactions and useful sample data. Do not replace requested features with placeholders or merely describe what could be built.
 
 Return ONLY valid JSON with this shape:
 {{"files": {{"relative/path": "complete file contents"}},
  "test_command": ["python", "-m", "pytest", "-q"]}}
 
 Rules:
-- Generate a complete runnable implementation, not a plan.
+- Generate a complete runnable implementation, not a plan. Prioritize the exact mission requirements over generic starter templates.
+- The product title, labels, sample data, main workflow, and tests must clearly correspond to the requested mission.
+- Never silently substitute a different product when the requested implementation is difficult; return the requested product or fail with a useful error.
 - Include automated tests under tests/.
 - The implementation MUST define every function, class, module, or API used by its tests.
 - Make the implementation and tests internally consistent and runnable together.
@@ -61,7 +65,7 @@ Rules:
                 "required": ["files", "test_command"],
             },
             "keep_alive": "10m",
-            "options": {"temperature": 0.1, "num_predict": 1536},
+            "options": {"temperature": 0.2, "num_predict": 4096},
         }
         # Calculator missions have a deterministic, fully tested implementation.
         # Prefer it before contacting Ollama so the factory never spends the model
@@ -124,7 +128,7 @@ Rules:
                 "required": ["files", "test_command"],
             },
             "keep_alive": "10m",
-            "options": {"temperature": 0.0, "num_predict": 1536},
+            "options": {"temperature": 0.0, "num_predict": 4096},
         }
         try:
             return self._parse(await self._call(payload))
