@@ -146,6 +146,9 @@ Rules:
                 continue
             if local_path.startswith("/"):
                 local_path = local_path.lstrip("/")
+            # HTML commonly uses ./app.js; normalize safe relative URL paths
+            # before comparing them with the generated file map.
+            local_path = PurePosixPath(local_path).as_posix()
             if local_path not in project.files:
                 raise RuntimeError(
                     f"Generated browser product references missing local asset '{reference}'. "
