@@ -46,6 +46,7 @@ class PipelineResult:
     review_result: CodeReviewResult
     github_message: str | None = None
     github_pending: bool = False
+    browser_preview: bool = False
     memory_id: str | None = None
 
 
@@ -371,6 +372,7 @@ class CompanyExecutionPipeline:
             review_result=review_result,
             github_message=github_message,
             github_pending=github_pending,
+            browser_preview=("index.html" in files),
             memory_id=memory_entry.id,
         )
 
