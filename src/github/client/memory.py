@@ -25,6 +25,16 @@ class InMemoryGitHubClient(GitHubClient):
     ) -> GitHubRepository:
         return GitHubRepository(owner=owner, name=name)
 
+    async def create_repository(
+        self,
+        owner: str,
+        name: str,
+        description: str = "",
+        private: bool = False,
+    ) -> GitHubRepository:
+        repository = GitHubRepository(owner=owner, name=name)
+        return repository
+
     async def create_issue(
         self,
         repository: GitHubRepository,
