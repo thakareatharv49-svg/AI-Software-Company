@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from src.company.control_center.routes import get_control_center
 from src.company.control_center.service import CompanyControlCenter, MissionSubmission
@@ -29,9 +30,8 @@ def test_queued_company_accepts_multiple_missions() -> None:
     assert second.status == "queued"
 
 
-def test_explicit_factory_launch_prioritizes_selected_mission() -> None:
-    import asyncio
-
+@pytest.mark.asyncio
+async def test_explicit_factory_launch_prioritizes_selected_mission() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     older = center.submit_mission(
         MissionSubmission(name="Restored mission", objective="Run older work")
@@ -47,9 +47,9 @@ def test_explicit_factory_launch_prioritizes_selected_mission() -> None:
         selected.append(center._factory.queue[0].mission.id)
 
     center._factory.run = fake_run
-    asyncio.run(center.run_factory(max_projects=1, mission_id=requested.mission.id))
+    await center.run_factory(max_projects=1, mission_id=requested.mission.id)
     assert center._factory_task is not None
-    asyncio.run(center._factory_task)
+    await center._factory_task
     assert selected == [requested.mission.id]
     assert center._factory.queue[0].mission.id == older.mission.id
 
