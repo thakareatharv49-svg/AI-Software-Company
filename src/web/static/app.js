@@ -216,7 +216,7 @@ async function showMission(id) {
     const productIds = productsResult.status === "fulfilled" && Array.isArray(productsResult.value)
       ? new Set(productsResult.value.map(product => product.mission_id))
       : browserProductIds;
-    const hasBrowserPreview = productIds.has(id);
+    const hasBrowserPreviewAfterRefresh = productIds.has(id);
 
     renderPipeline(audit, job.status);
     root.removeChild(loading);
