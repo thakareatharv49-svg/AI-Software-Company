@@ -42,8 +42,10 @@ async def test_explicit_factory_launch_prioritizes_selected_mission() -> None:
     )
     center.enqueue_factory_mission(requested.mission.id)
     selected: list[str] = []
+    queue_at_start: list[str] = []
 
     async def fake_run(**kwargs):
+        queue_at_start.extend(item.mission.id for item in center._factory.queue)
         selected.append(center._factory.queue[0].mission.id)
 
     center._factory.run = fake_run
@@ -51,7 +53,7 @@ async def test_explicit_factory_launch_prioritizes_selected_mission() -> None:
     assert center._factory_task is not None
     await center._factory_task
     assert selected == [requested.mission.id]
-    assert center._factory.queue[0].mission.id == older.mission.id
+    assert queue_at_start == [requested.mission.id, older.mission.id]
 
 
 def test_control_api_serves_mission_and_app() -> None:
