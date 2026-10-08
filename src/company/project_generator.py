@@ -131,53 +131,101 @@ Rules:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tic-Tac-Toe</title>
+  <title>Neon Tic-Tac-Toe</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="glow glow-one"></div>
+  <div class="glow glow-two"></div>
   <main class="game">
-    <h1>Tic-Tac-Toe</h1>
-    <p id="status">Player X's turn</p>
-    <div id="board" class="board" aria-label="Tic-Tac-Toe board"></div>
-    <button id="restart">Restart Game</button>
+    <header class="hero">
+      <span class="eyebrow">ARCADE · 01</span>
+      <h1>Tic<span>·</span>Tac<span>·</span>Toe</h1>
+      <p>Classic strategy. Clean neon board. First to three wins.</p>
+    </header>
+    <section class="scoreboard" aria-label="Scoreboard">
+      <div class="score"><small>PLAYER X</small><strong id="score-x">0</strong></div>
+      <div class="turn" id="status">Player X's turn</div>
+      <div class="score"><small>PLAYER O</small><strong id="score-o">0</strong></div>
+    </section>
+    <section class="board-wrap">
+      <div id="board" class="board" aria-label="Tic-Tac-Toe board"></div>
+    </section>
+    <div class="actions">
+      <button id="restart" class="primary">New Round</button>
+      <button id="reset-score" class="secondary">Reset Score</button>
+    </div>
+    <p class="hint">Tip: control the center and create two threats at once.</p>
   </main>
   <script src="game.js"></script>
 </body>
 </html>
 """,
                 "style.css": """* { box-sizing: border-box; }
+:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #f7f8ff; background: #070a14; }
 body {
-  margin: 0; min-height: 100vh; display: grid; place-items: center;
-  font-family: system-ui, sans-serif; background: #0b1020; color: #fff;
+  margin: 0; min-height: 100vh; display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(circle at 50% 20%, #18235a 0, #0b1023 34%, #070a14 72%);
 }
-.game { text-align: center; padding: 24px; }
-h1 { margin-bottom: 8px; }
-#status { color: #aab5d6; margin-bottom: 20px; }
-.board {
-  display: grid; grid-template-columns: repeat(3, 90px); gap: 8px;
-  margin: 0 auto 20px;
+.glow { position: fixed; width: 280px; height: 280px; border-radius: 50%; filter: blur(90px); opacity: .28; pointer-events: none; }
+.glow-one { background: #6c63ff; top: -100px; left: -70px; }
+.glow-two { background: #22d3ee; right: -100px; bottom: -110px; }
+.game {
+  width: min(94vw, 500px); padding: 30px; position: relative; z-index: 1;
+  text-align: center; border: 1px solid #252d49; border-radius: 28px;
+  background: rgba(11, 16, 32, .78); box-shadow: 0 30px 90px rgba(0,0,0,.45);
+  backdrop-filter: blur(18px);
 }
+.hero .eyebrow { font-size: 10px; letter-spacing: .22em; color: #8d96b8; }
+h1 { margin: 8px 0 6px; font-size: clamp(38px, 10vw, 58px); letter-spacing: -.05em; }
+h1 span { color: #756bff; }
+.hero p { margin: 0 0 24px; color: #9da7c5; font-size: 13px; }
+.scoreboard {
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center;
+  margin-bottom: 18px;
+}
+.score { padding: 12px; border: 1px solid #252d49; border-radius: 15px; background: #0d1325; }
+.score small { display: block; color: #7f89a8; font-size: 9px; letter-spacing: .12em; }
+.score strong { display: block; margin-top: 2px; font-size: 25px; }
+.turn { min-width: 130px; color: #cbd2ea; font-size: 12px; font-weight: 600; }
+.board-wrap { padding: 10px; border: 1px solid #252d49; border-radius: 22px; background: #090e1d; }
+.board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .cell {
-  width: 90px; height: 90px; border: 1px solid #33405f; border-radius: 12px;
-  background: #141c31; color: #fff; font-size: 32px; cursor: pointer;
+  aspect-ratio: 1; border: 1px solid #293351; border-radius: 16px;
+  background: linear-gradient(145deg, #131b32, #0d1428); color: #fff;
+  font-size: clamp(38px, 12vw, 60px); font-weight: 800; cursor: pointer;
+  transition: transform .15s, border-color .15s, background .15s;
 }
-.cell:hover { background: #1d2945; }
-button#restart {
-  border: 0; border-radius: 10px; padding: 10px 18px;
-  background: #6c63ff; color: white; cursor: pointer;
+.cell:hover:not(:disabled) { transform: translateY(-2px); border-color: #756bff; background: #17203a; }
+.cell:disabled { cursor: default; }
+.cell.x { color: #8f87ff; text-shadow: 0 0 22px rgba(117,107,255,.35); }
+.cell.o { color: #42d9e9; text-shadow: 0 0 22px rgba(34,211,238,.3); }
+.cell.win { border-color: #7df3c2; background: #122a29; transform: scale(.97); }
+.actions { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+.actions button {
+  border: 1px solid #2b3553; border-radius: 12px; padding: 11px 16px;
+  color: #fff; cursor: pointer; font-weight: 700;
 }
-@media (max-width: 420px) {
-  .board { grid-template-columns: repeat(3, 25vw); }
-  .cell { width: 25vw; height: 25vw; }
+.primary { background: #665bd1; }
+.secondary { background: #10172a; }
+.hint { margin: 16px 0 0; color: #697492; font-size: 11px; }
+@media (max-width: 460px) {
+  .game { padding: 22px; border-radius: 22px; }
+  .scoreboard { grid-template-columns: 1fr 1fr; }
+  .turn { grid-column: 1 / -1; grid-row: 1; }
 }
 """,
                 "game.js": """const boardElement = document.getElementById("board");
 const statusElement = document.getElementById("status");
 const restartButton = document.getElementById("restart");
+const resetScoreButton = document.getElementById("reset-score");
+const scoreXElement = document.getElementById("score-x");
+const scoreOElement = document.getElementById("score-o");
 
 let board = Array(9).fill("");
 let currentPlayer = "X";
 let gameOver = false;
+let scores = { X: 0, O: 0 };
 
 const wins = [
   [0,1,2], [3,4,5], [6,7,8],
@@ -192,16 +240,19 @@ function winner() {
   return board.every(Boolean) ? "draw" : null;
 }
 
-function render() {
+function render(winningCells = []) {
   boardElement.innerHTML = "";
   board.forEach((value, index) => {
     const cell = document.createElement("button");
-    cell.className = "cell";
+    cell.className = "cell" + (value ? " " + value.toLowerCase() : "") + (winningCells.includes(index) ? " win" : "");
     cell.textContent = value;
-    cell.setAttribute("aria-label", "Cell " + (index + 1));
+    cell.disabled = gameOver || Boolean(value);
+    cell.setAttribute("aria-label", "Cell " + (index + 1) + (value ? ": " + value : ""));
     cell.addEventListener("click", () => move(index));
     boardElement.appendChild(cell);
   });
+  scoreXElement.textContent = scores.X;
+  scoreOElement.textContent = scores.O;
 }
 
 function move(index) {
@@ -210,12 +261,20 @@ function move(index) {
   const result = winner();
   if (result) {
     gameOver = true;
-    statusElement.textContent = result === "draw" ? "It's a draw!" : "Player " + result + " wins!";
+    if (result === "draw") {
+      statusElement.textContent = "Draw game — play again!";
+      render();
+    } else {
+      scores[result] += 1;
+      statusElement.textContent = "Player " + result + " wins!";
+      const winningCells = wins.find(([a,b,c]) => board[a] && board[a] === board[b] && board[a] === board[c]) || [];
+      render(winningCells);
+    }
   } else {
     currentPlayer = currentPlayer === "X" ? "O" : "X";
     statusElement.textContent = "Player " + currentPlayer + "'s turn";
+    render();
   }
-  render();
 }
 
 function restart() {
@@ -226,7 +285,13 @@ function restart() {
   render();
 }
 
+function resetScore() {
+  scores = { X: 0, O: 0 };
+  restart();
+}
+
 restartButton.addEventListener("click", restart);
+resetScoreButton.addEventListener("click", resetScore);
 render();
 """,
                 "tests/test_project.py": """from pathlib import Path
@@ -242,6 +307,7 @@ def test_game_contains_core_features():
     js = (ROOT / "game.js").read_text(encoding="utf-8")
     assert "function move" in js
     assert "function restart" in js
+    assert "function resetScore" in js
     assert "wins" in js
 """,
             },
