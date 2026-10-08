@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 import pytest
 
 from src.company.control_center.routes import get_control_center
@@ -178,5 +179,38 @@ def test_project_outputs_api() -> None:
         assert outputs.status_code == 200
         assert outputs.json() == []
         assert client.get("/api/missions/missing/outputs").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_factory_run_api_starts_the_requested_mission() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    app.dependency_overrides[get_control_center] = lambda: center
+    started: list[tuple[str, str]] = []
+
+    async def fake_run(**kwargs):
+        started.append((kwargs.get("mission_id", ""), center._factory.queue[0].mission.id))
+
+    center._factory.run = fake_run
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            created = await client.post(
+                "/api/missions",
+                json={"name": "Route launch", "objective": "Verify factory route execution"},
+            )
+            assert created.status_code == 201
+            mission_id = created.json()["mission"]["id"]
+
+            launched = await client.post(f"/api/missions/{mission_id}/factory-run")
+            assert launched.status_code == 200
+            assert launched.json() == {"status": "started", "mission_id": mission_id}
+            assert center._factory_task is not None
+            await center._factory_task
+
+        assert started == [(mission_id, mission_id)]
     finally:
         app.dependency_overrides.clear()
