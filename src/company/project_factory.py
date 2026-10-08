@@ -120,9 +120,9 @@ class ProjectFactory:
                     )
                 )
         project = FactoryProject(mission=mission, plan=plan)
-        # A newly submitted mission is an explicit run request. Prioritize it over
-        # restored/stale queued work so the factory-run API executes the requested mission.
-        self.queue.insert(0, project)
+        # Preserve FIFO ordering: the first submitted mission must execute first.
+        # This also ensures a blocked project stops the run before later queued work.
+        self.queue.append(project)
         self._save(project)
         self._audit(
             mission.id,
