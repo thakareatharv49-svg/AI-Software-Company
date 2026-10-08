@@ -103,6 +103,29 @@ class GitHubAPIClient(GitHubClient):
             default_branch=data.get("default_branch", "main"),
         )
 
+    async def create_repository(
+        self,
+        owner: str,
+        name: str,
+        description: str = "",
+        private: bool = False,
+    ) -> GitHubRepository:
+        self._require_writes()
+        data = await self._request(
+            "POST",
+            f"/user/repos",
+            json={
+                "name": name,
+                "description": description,
+                "private": private,
+            },
+        )
+        return GitHubRepository(
+            owner=data.get("owner", {}).get("login", owner),
+            name=data.get("name", name),
+            default_branch=data.get("default_branch", "main"),
+        )
+
     async def create_issue(
         self,
         repository: GitHubRepository,
