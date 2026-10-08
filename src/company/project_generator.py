@@ -34,6 +34,14 @@ Rules:
 - The implementation MUST define every function, class, module, or API used by its tests.
 - Make the implementation and tests internally consistent and runnable together.
 - Keep the project small enough to run locally.
+- If the objective is a browser/web app, build a complete polished frontend, not a bare demo:
+  - include index.html, style.css, and game.js/app.js when appropriate
+  - use semantic HTML, responsive mobile-first layout, clear hierarchy, accessible controls, hover/focus states, and useful empty/error/success states
+  - make the primary interaction obvious and fully functional without a backend
+  - use a cohesive modern visual system with spacing, typography, cards/panels, buttons, and subtle transitions
+  - do not use placeholder text such as "coming soon" for required functionality
+  - keep all browser assets local; do not depend on CDNs or external services
+- For interactive browser apps, implement complete state handling, reset/restart behavior, validation, and feedback for user actions.
 - Use Python standard library where practical.
 - Never use absolute paths.
 - Do not include secrets, credentials, shell commands, or network calls in generated source.
@@ -53,7 +61,7 @@ Rules:
                 "required": ["files", "test_command"],
             },
             "keep_alive": "10m",
-            "options": {"temperature": 0.1, "num_predict": 768},
+            "options": {"temperature": 0.1, "num_predict": 1536},
         }
         # Calculator missions have a deterministic, fully tested implementation.
         # Prefer it before contacting Ollama so the factory never spends the model
@@ -94,6 +102,7 @@ Rules:
 - Fix the implementation to satisfy the existing tests.
 - Do not weaken, remove, or skip tests just to make them pass.
 - Return the COMPLETE contents of every file that should exist after repair.
+- If this is a browser/web app, preserve and improve the visual polish and responsive behavior; do not reduce it to a bare functional demo.
 - Keep tests under tests/.
 - Use only safe relative file paths.
 """
