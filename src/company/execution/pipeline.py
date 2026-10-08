@@ -276,21 +276,7 @@ class CompanyExecutionPipeline:
                 if not publish_result.success:
                     raise RuntimeError(publish_result.message)
 
-            github_result = await self.github.open_pull_request(
-                github_repository,
-                title=f"feat: complete {project.name}",
-                head=pull_request_head,
-                body=project.description,
-            )
-
-            if not github_result.success:
-                self.project_engine.transition(
-                    project.id,
-                    ProjectStatus.BLOCKED,
-                )
-                raise RuntimeError(github_result.message)
-
-            github_message = github_result.message
+            github_message = f"Published generated project directly to {github_repository.owner}/{github_repository.name}:{pull_request_head}"
 
         self.project_engine.transition(project.id, ProjectStatus.RELEASE)
         project = self.project_engine.complete(project.id)
