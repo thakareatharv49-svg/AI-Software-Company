@@ -183,7 +183,7 @@ class CompanyControlCenter:
                 self._audit(
                     mission.id,
                     "MISSION_CREATED",
-                    result.message,
+                    message,
                     status=job.status.value,
                 )
             except SQLAlchemyError:
