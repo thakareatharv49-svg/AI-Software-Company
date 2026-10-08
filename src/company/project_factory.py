@@ -167,6 +167,17 @@ class ProjectFactory:
     def has_queued_mission(self, mission_id: str) -> bool:
         return any(item.mission.id == mission_id for item in self.queue)
 
+    def prioritize_mission(self, mission_id: str) -> None:
+        """Run an explicitly requested mission before older restored queue entries."""
+        index = next(
+            (i for i, item in enumerate(self.queue) if item.mission.id == mission_id),
+            None,
+        )
+        if index is None:
+            raise KeyError(f"Queued mission '{mission_id}' not found")
+        if index:
+            self.queue.insert(0, self.queue.pop(index))
+
     def retry(self, mission_id: str) -> MissionJob:
         job = self._load_job(mission_id)
         if job is None:
