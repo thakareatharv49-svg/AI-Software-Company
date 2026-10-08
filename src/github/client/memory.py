@@ -139,6 +139,41 @@ class InMemoryGitHubClient(GitHubClient):
             identifier=file_sha,
         )
 
+    async def create_tree(
+        self,
+        repository: GitHubRepository,
+        base_tree_sha: str,
+        entries: list[dict[str, str]],
+    ) -> str:
+        for entry in entries:
+            if "content" in entry:
+                await self.write_file(
+                    repository,
+                    entry["path"],
+                    entry["content"],
+                    "memory tree",
+                    repository.default_branch,
+                )
+        return f"memory-tree-{len(self.files)}"
+
+    async def create_commit(
+        self,
+        repository: GitHubRepository,
+        message: str,
+        tree_sha: str,
+        parent_sha: str,
+    ) -> str:
+        return f"memory-commit-{len(self.files)}"
+
+    async def update_branch_ref(
+        self,
+        repository: GitHubRepository,
+        branch: str,
+        commit_sha: str,
+        expected_sha: str,
+    ) -> None:
+        return None
+
     async def get_check_runs(
         self,
         repository: GitHubRepository,
