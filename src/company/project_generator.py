@@ -38,6 +38,9 @@ Rules:
 - The implementation MUST define every function, class, module, or API used by its tests.
 - Make the implementation and tests internally consistent and runnable together.
 - Keep the project small enough to run locally.
+- Default to a browser-based application that can be opened in the factory's product preview unless the mission explicitly requests a different deliverable such as a CLI, library, API-only service, or native app.
+- For browser-based products, always include a root index.html plus every local stylesheet and JavaScript module it references. The preview must work by opening index.html directly; do not require a development server, build step, CDN, or external API.
+- A mission for a tracker, planner, dashboard, store, learning tool, or other app must produce that requested category with its own domain-specific workflows and realistic sample data. Do not reinterpret unrelated missions as calculator or Tic-Tac-Toe.
 - If the objective is a browser/web app, build a complete polished frontend, not a bare demo:
   - include index.html, style.css, and game.js/app.js when appropriate
   - use semantic HTML, responsive mobile-first layout, clear hierarchy, accessible controls, hover/focus states, and useful empty/error/success states
@@ -65,7 +68,7 @@ Rules:
                 "required": ["files", "test_command"],
             },
             "keep_alive": "10m",
-            "options": {"temperature": 0.2, "num_predict": 4096},
+            "options": {"temperature": 0.2, "num_predict": 8192},
         }
         # Calculator missions have a deterministic, fully tested implementation.
         # Prefer it before contacting Ollama so the factory never spends the model
@@ -128,7 +131,7 @@ Rules:
                 "required": ["files", "test_command"],
             },
             "keep_alive": "10m",
-            "options": {"temperature": 0.0, "num_predict": 4096},
+            "options": {"temperature": 0.0, "num_predict": 8192},
         }
         try:
             return self._parse(await self._call(payload))
