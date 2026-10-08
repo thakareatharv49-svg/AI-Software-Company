@@ -64,7 +64,7 @@ async def test_factory_stops_after_blocked_project() -> None:
     project = factory.enqueue(CompanyMission(name="Blocked", objective="Fail safely"))
     queued = factory.enqueue(CompanyMission(name="Later", objective="Should remain queued"))
 
-    results = await factory.run(max_projects=2)
+    results = await factory.run(max_projects=2, max_retries=0)
 
     assert project.status == "blocked"
     assert queued.status == "queued"
@@ -461,4 +461,5 @@ async def test_factory_autonomous_runner_materializes_project_workspace(tmp_path
     result = await adapter.run(mission, plan)
 
     assert result.pipeline.project.id == "workspace-project"
-    assert tuple(tmp_path.iterdir()) == ()
+    workspace = next(tmp_path.iterdir())
+    assert (workspace / "src" / "main.py").read_text(encoding="utf-8") == "print('hello')"
