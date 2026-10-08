@@ -449,7 +449,12 @@ class ProjectFactory:
                 name=project.mission.name,
                 status=status,
                 repository=getattr(pipeline_project, "repository", None),
-                product_url=f"/product/{project.mission.id}" if status == "completed" else None,
+                product_url=(
+                    f"/product/{project.mission.id}"
+                    if status == "completed"
+                    and getattr(pipeline_result, "browser_preview", False)
+                    else None
+                ),
                 github_message=getattr(pipeline_result, "github_message", None),
                 github_pending=getattr(pipeline_result, "github_pending", False),
                 memory_id=getattr(pipeline_result, "memory_id", None),
