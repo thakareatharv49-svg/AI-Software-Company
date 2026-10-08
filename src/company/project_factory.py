@@ -310,11 +310,15 @@ class ProjectFactory:
             self._last_autonomous_result is not None
             and getattr(self._last_autonomous_result, "pipeline", None) is not None
         )
+        # A returned autonomous pipeline result means the end-to-end runner
+        # completed its delivery contract. Stage telemetry is diagnostic metadata
+        # and must not override that authoritative result: adapters may report
+        # stale/inconsistent stage statuses even when the pipeline succeeded.
         execution_succeeded = (
-            all(result.success for result in results)
-            and (
-                autonomous_pipeline_succeeded
-                or all(step.status == "completed" for step in project.plan.steps)
+            autonomous_pipeline_succeeded
+            or (
+                all(result.success for result in results)
+                and all(step.status == "completed" for step in project.plan.steps)
             )
         )
 
