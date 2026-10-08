@@ -314,15 +314,19 @@ $("stop").addEventListener("click",async()=>{try{await api("/api/company/stop",{
 async function refresh() {
   if(busy && selectedMissionId) return;
   try {
-    const [state,missions,events,summary,factory]=await Promise.all([
-      api("/api/company/state"),api("/api/missions"),api("/api/company/events"),api("/dashboard/summary"),api("/api/factory/status")
+    const [state,missions,events,summary,factory,products]=await Promise.all([
+      api("/api/company/state"),api("/api/missions"),api("/api/company/events"),api("/dashboard/summary"),api("/api/factory/status"),api("/api/products")
     ]);
     $("live").textContent="company "+state.status;
     $("projects").textContent=summary.projects ?? 0;
     $("tasks").textContent=summary.tasks ?? 0;
     $("agents").textContent=summary.agents ?? 0;
     $("factory").textContent=factory.running ? "running":"idle";
-    renderMissions(missions); renderProducts(missions); renderEvents(events);
+    renderMissions(missions); renderProducts(products.map(product => ({
+      mission: missions.find(item => item.mission.id === product.mission_id)?.mission || {name: "Completed Product", objective: "Generated browser product"},
+      status: "completed",
+      product_url: product.url,
+    }))); renderEvents(events);
     if(selectedMissionId && missions.some(x=>x.mission.id===selectedMissionId)) await showMission(selectedMissionId);
   } catch(e) { $("live").textContent="offline"; message(e.message,true); }
 }
