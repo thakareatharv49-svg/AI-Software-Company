@@ -189,3 +189,21 @@ def test_browser_product_still_fails_if_repair_output_is_invalid() -> None:
         assert "missing.js" in str(exc)
     else:
         raise AssertionError("Invalid output after repair must still fail validation")
+
+
+
+def test_browser_product_accepts_dot_relative_local_assets() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    OllamaProjectGenerator._validate_mission_output(
+        "Study Planner",
+        "Build a browser app for planning study sessions.",
+        GeneratedProject(
+            files={
+                "index.html": '<html><head><link rel="stylesheet" href="./style.css"><script src="./app.js"></script></head></html>',
+                "style.css": "body { font-family: sans-serif; }",
+                "app.js": "document.title = 'Study Planner';",
+            },
+            test_command=["python", "-m", "pytest", "-q"],
+        ),
+    )
