@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Software Company — Control Center</title>
+<link rel="stylesheet" href="/app/static/styles.css">
+</head>
+<body>
+<div class="shell">
+<aside class="side">
+  <div class="logo">AI <span>Software</span><br>Company</div>
+  <div class="sub">Autonomous software factory</div>
+  <nav class="nav">
+    <div class="active">◆ Control Center</div>
+    <div>◇ Missions</div><div>◇ Factory</div><div>◇ GitHub Delivery</div>
+  </nav>
+  <div class="sidefoot">Human-directed · AI-executed</div>
+</aside>
+<main class="main">
+<header class="head">
+  <div><div class="eyebrow">Control Center</div><h1>Build software with your company.</h1>
+  <p>Give an objective. The factory plans, generates, tests, repairs and publishes.</p></div>
+  <div class="live"><i></i><span id="live">Connecting…</span></div>
+</header>
+<section class="stats">
+  <div class="card stat"><small>Projects</small><b id="projects">—</b></div>
+  <div class="card stat"><small>Tasks</small><b id="tasks">—</b></div>
+  <div class="card stat"><small>Agents</small><b id="agents">—</b></div>
+  <div class="card stat"><small>Factory</small><b id="factory">idle</b></div>
+</section>
+<div class="grid">
+<section class="card">
+<h2>New mission</h2><p class="muted">Describe the product, not the implementation.</p>
+<form id="mission-form" class="stack">
+<label>MISSION NAME<input id="name" maxlength="200" required placeholder="Python Calculator"></label>
+<label>OBJECTIVE<textarea id="objective" maxlength="5000" required placeholder="Create a Python calculator with automated tests."></textarea></label>
+<button id="launch" class="primary" type="submit">Launch factory</button>
+</form><div id="message" class="message"></div>
+</section>
+<section class="card">
+<h2>Factory pipeline</h2><p class="muted">Autonomous delivery path.</p>
+<div class="pipeline"><div>01 · Plan <span>mission controller</span></div><div>02 · Generate <span>local Ollama</span></div><div>03 · Validate <span>tests + QA + security</span></div><div>04 · Repair <span>autonomous retry loop</span></div><div>05 · Publish <span>GitHub main</span></div></div>
+<button id="stop" class="secondary" type="button">Stop company</button>
+</section>
+</div>
+<div class="grid">
+<section class="card"><h2>Missions</h2><div id="missions" class="missions"><div class="empty">Loading…</div></div></section>
+<section class="card"><h2>Live events</h2><div id="events"><div class="empty">Loading…</div></div></section>
+</div>
+<section class="card details"><h2 id="detail-title">Mission details</h2><div id="details" class="empty">Select a mission to inspect outputs and audit trail.</div></section>
+</main>
+</div>
+<script src="/app/static/app.js" defer></script>
+</body>
+</html>
