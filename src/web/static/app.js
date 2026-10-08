@@ -45,7 +45,9 @@ function renderPipeline(audit, status) {
 }
 
 function renderMissions(items) {
-  const visible = items.slice(0, 20);\n  $("mission-count").textContent = items.length > 20 ? `Latest 20 of ${items.length}` : `${items.length} total`;\n  const box = $("missions");
+  const visible = items.slice(0, 20);
+  $("mission-count").textContent = items.length > 20 ? `Latest 20 of ${items.length}` : `${items.length} total`;
+  const box = $("missions");
   box.replaceChildren();
   if (!visible.length) {
     const e=document.createElement("div"); e.className="empty"; e.textContent="No missions yet."; box.append(e); return;
@@ -87,7 +89,8 @@ async function showMission(id) {
       api("/api/missions/"+encodeURIComponent(id)+"/outputs"),
       api("/api/missions/"+encodeURIComponent(id)+"/audit")
     ]);
-    $("detail-title").textContent=job.mission.name;\n    renderPipeline(audit, job.status);
+    $("detail-title").textContent=job.mission.name;
+    renderPipeline(audit, job.status);
     const root=document.createElement("div");
     const head=document.createElement("div"); head.className="detail-head";
     const info=document.createElement("div");
