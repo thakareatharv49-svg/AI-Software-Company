@@ -1,5 +1,5 @@
-from src.company.models.contracts import CompanyMission
 from src.company.mission_controller.models import MissionPlan, MissionStage, PlannedStep
+from src.company.models.contracts import CompanyMission
 
 
 _STAGE_OBJECTIVES = {
