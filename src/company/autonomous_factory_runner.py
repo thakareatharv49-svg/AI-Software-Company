@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from pathlib import Path
-from tempfile import gettempdir
 from typing import Protocol
 
 from src.company.autonomous_project import (
@@ -38,7 +37,7 @@ class FactoryAutonomousRunner:
         self.runner = runner
         self.request_builder = request_builder
         self.workspace_service = workspace_service or ProjectExecutionService(
-            Path(gettempdir()) / "ai-software-company-workspaces"
+            Path(__file__).resolve().parents[2] / "generated-products"
         )
 
     async def run(
