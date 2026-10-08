@@ -1,11 +1,11 @@
 from pathlib import Path
-from tempfile import gettempdir
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 router = APIRouter(tags=["web"])
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-PRODUCTS_DIR = Path(gettempdir()) / "ai-software-company-workspaces"
+PRODUCTS_DIR = Path(__file__).resolve().parents[2] / "generated-products"
+LEGACY_PRODUCTS_DIR = Path(__import__("tempfile").gettempdir()) / "ai-software-company-workspaces"
 
 @router.get("/app")
 async def company_app() -> FileResponse:
@@ -21,6 +21,8 @@ async def completed_product(mission_id: str) -> FileResponse:
     if not mission_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in mission_id):
         raise HTTPException(status_code=404, detail="Product not found")
     root = (PRODUCTS_DIR / mission_id).resolve()
+    if not root.is_dir():
+        root = (LEGACY_PRODUCTS_DIR / mission_id).resolve()
     try:
         root.relative_to(PRODUCTS_DIR.resolve())
     except ValueError as exc:
@@ -52,7 +54,14 @@ async def completed_products() -> JSONResponse:
     """List generated browser products that actually have an index.html."""
     PRODUCTS_DIR.mkdir(parents=True, exist_ok=True)
     products = []
-    for root in sorted(PRODUCTS_DIR.iterdir(), key=lambda item: item.name):
+    roots = list(PRODUCTS_DIR.iterdir())
+    if LEGACY_PRODUCTS_DIR.is_dir():
+        roots.extend(LEGACY_PRODUCTS_DIR.iterdir())
+    seen = set()
+    for root in sorted(roots, key=lambda item: item.name):
+        if root.name in seen:
+            continue
+        seen.add(root.name)
         if not root.is_dir() or not (root / "index.html").is_file():
             continue
         products.append({
