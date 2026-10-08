@@ -91,7 +91,12 @@ class CompanyExecutionPipeline:
             )
 
         self.github = github or configured_github
-        self.github_native = github_native or configured_github_native
+        if github_native is not None:
+            self.github_native = github_native
+        elif self.github is not None:
+            self.github_native = GitHubNativeService(github=self.github)
+        else:
+            self.github_native = configured_github_native
         self.github_publish_queue = GitHubPublishQueue()
         self.memory = memory or MemoryService()
         self.cross_project_memory = cross_project_memory or CrossProjectMemory()
