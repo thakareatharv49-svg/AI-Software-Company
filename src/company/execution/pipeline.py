@@ -279,39 +279,55 @@ class CompanyExecutionPipeline:
             and pull_request_head is not None
             and self.github_native is not None
         ):
-            publish_result = await self.github_native.publish_files(
-                github_repository,
-                pull_request_head,
-                files,
-                f"feat: complete {project.name}",
-            )
-            if publish_result.success:
-                github_message = (
-                    "Published generated project directly to "
-                    f"{github_repository.owner}/{github_repository.name}:"
-                    f"{pull_request_head}"
+            publish_commit_message = f"feat: complete {project.name}"
+            publish_error = None
+            try:
+                publish_result = await self.github_native.publish_files(
+                    github_repository,
+                    pull_request_head,
+                    files,
+                    publish_commit_message,
                 )
-                for entry in self.github_publish_queue.due():
-                    if (
-                        entry.get("owner") == github_repository.owner
-                        and entry.get("name") == github_repository.name
-                        and entry.get("branch") == pull_request_head
-                    ):
-                        self.github_publish_queue.remove(entry)
-            elif self._is_github_rate_limited(publish_result.message):
+                if publish_result.success:
+                    github_message = (
+                        "Published generated project directly to "
+                        f"{github_repository.owner}/{github_repository.name}:"
+                        f"{pull_request_head}"
+                    )
+                    for entry in self.github_publish_queue.due():
+                        if (
+                            entry.get("owner") == github_repository.owner
+                            and entry.get("name") == github_repository.name
+                            and entry.get("branch") == pull_request_head
+                        ):
+                            self.github_publish_queue.remove(entry)
+                else:
+                    publish_error = publish_result.message
+            except Exception as exc:
+                # Publishing is a delivery side-effect, not a build/QA gate.
+                # Network errors and API failures must not discard a valid local product.
+                publish_error = str(exc)
+
+            if publish_error is not None:
                 self.github_publish_queue.enqueue(
                     owner=github_repository.owner,
                     name=github_repository.name,
                     branch=pull_request_head,
                     files=dict(files),
-                    message=f"feat: complete {project.name}",
+                    message=publish_commit_message,
                 )
                 github_pending = True
-                github_message = (
-                    "GitHub publish deferred because GitHub is temporarily "
-                    "rate-limited. The local product is completed and the "
-                    "publish is queued for a later retry."
-                )
+                if self._is_github_rate_limited(publish_error):
+                    github_message = (
+                        "GitHub publishing is rate-limited. The local product "
+                        "passed QA/security and is completed; publishing is queued."
+                    )
+                else:
+                    github_message = (
+                        "The local product passed QA/security and is completed, "
+                        "but GitHub publishing failed and is queued for retry: "
+                        f"{publish_error}"
+                    )
                 self._publish_event(
                     "github.publish.deferred",
                     project_id=project.id,
@@ -321,11 +337,9 @@ class CompanyExecutionPipeline:
                             f"{github_repository.name}"
                         ),
                         "branch": pull_request_head,
-                        "reason": publish_result.message,
+                        "reason": publish_error,
                     },
                 )
-            else:
-                raise RuntimeError(publish_result.message)
 
         self.project_engine.transition(project.id, ProjectStatus.RELEASE)
         project = self.project_engine.complete(project.id)
