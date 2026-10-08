@@ -21,10 +21,12 @@ async def completed_product(mission_id: str) -> FileResponse:
     if not mission_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in mission_id):
         raise HTTPException(status_code=404, detail="Product not found")
     root = (PRODUCTS_DIR / mission_id).resolve()
+    base = PRODUCTS_DIR.resolve()
     if not root.is_dir():
         root = (LEGACY_PRODUCTS_DIR / mission_id).resolve()
+        base = LEGACY_PRODUCTS_DIR.resolve()
     try:
-        root.relative_to(PRODUCTS_DIR.resolve())
+        root.relative_to(base)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Product not found") from exc
     index = root / "index.html"
@@ -38,9 +40,13 @@ async def completed_product_asset(mission_id: str, file_path: str) -> FileRespon
     if not mission_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in mission_id):
         raise HTTPException(status_code=404, detail="Product not found")
     root = (PRODUCTS_DIR / mission_id).resolve()
+    base = PRODUCTS_DIR.resolve()
+    if not root.is_dir():
+        root = (LEGACY_PRODUCTS_DIR / mission_id).resolve()
+        base = LEGACY_PRODUCTS_DIR.resolve()
     target = (root / file_path).resolve()
     try:
-        root.relative_to(PRODUCTS_DIR.resolve())
+        root.relative_to(base)
         target.relative_to(root)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Product not found") from exc
