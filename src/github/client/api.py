@@ -113,7 +113,7 @@ class GitHubAPIClient(GitHubClient):
         self._require_writes()
         data = await self._request(
             "POST",
-            f"/user/repos",
+            "/user/repos",
             json={
                 "name": name,
                 "description": description,
