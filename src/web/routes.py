@@ -1,7 +1,8 @@
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 router = APIRouter(tags=["web"])
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -33,7 +34,24 @@ async def completed_product(mission_id: str) -> FileResponse:
     index = root / "index.html"
     if not index.is_file():
         raise HTTPException(status_code=404, detail="This product has no browser preview")
-    return FileResponse(index, media_type="text/html", headers={"Cache-Control": "no-store"})
+
+    # Product URLs have no trailing slash. Without a base URL, relative assets
+    # such as style.css and app.js resolve under /product/ instead of this
+    # mission asset route, leaving generated apps unstyled and nonfunctional.
+    html = index.read_text(encoding="utf-8")
+    base_tag = f'<base href="/product/{mission_id}/">'
+    head_pattern = r"(<head(?:\s[^>]*)?>)"
+    if re.search(head_pattern, html, flags=re.IGNORECASE):
+        html = re.sub(
+            head_pattern,
+            lambda match: match.group(1) + base_tag,
+            html,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+    else:
+        html = base_tag + html
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 @router.get("/product/{mission_id}/{file_path:path}", include_in_schema=False)
 async def completed_product_asset(mission_id: str, file_path: str) -> FileResponse:
