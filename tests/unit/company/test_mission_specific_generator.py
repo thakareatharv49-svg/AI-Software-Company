@@ -207,3 +207,51 @@ def test_browser_product_accepts_dot_relative_local_assets() -> None:
             test_command=["python", "-m", "pytest", "-q"],
         ),
     )
+
+def test_browser_only_project_gets_browser_smoke_test_instead_of_python_requirement(tmp_path) -> None:
+    generator = OllamaProjectGenerator()
+    project = generator._parse(json.dumps({
+        "files": {
+            "index.html": "<!doctype html><html><head><link rel='stylesheet' href='./style.css'></head><body><h1>Expense Tracker</h1><script src='./app.js'></script></body></html>",
+            "style.css": "body { font-family: sans-serif; }",
+            "app.js": "document.querySelector('h1').textContent = 'Expense Tracker';",
+        },
+        "test_command": ["python", "-m", "pytest", "-q"],
+    }))
+
+    generated_test = project.files["tests/test_generated_project.py"]
+    assert "test_browser_entrypoint_and_local_assets_exist" in generated_test
+    assert "Generated Python source files are missing" not in generated_test
+
+    for relative_path, content in project.files.items():
+        target = tmp_path / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+
+    test_path = tmp_path / "tests/test_generated_project.py"
+    namespace = {"__file__": str(test_path)}
+    exec(compile(generated_test, str(test_path), "exec"), namespace)
+    namespace["test_browser_entrypoint_and_local_assets_exist"]()
+
+
+def test_browser_smoke_test_fails_when_a_referenced_local_asset_is_missing(tmp_path) -> None:
+    generator = OllamaProjectGenerator()
+    project = generator._parse(json.dumps({
+        "files": {
+            "index.html": "<!doctype html><html><body><script src='app.js'></script></body></html>",
+        },
+        "test_command": ["python", "-m", "pytest", "-q"],
+    }))
+    generated_test = project.files["tests/test_generated_project.py"]
+    test_path = tmp_path / "tests/test_generated_project.py"
+    test_path.parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "index.html").write_text(project.files["index.html"], encoding="utf-8")
+    namespace = {"__file__": str(test_path)}
+    exec(compile(generated_test, str(test_path), "exec"), namespace)
+
+    try:
+        namespace["test_browser_entrypoint_and_local_assets_exist"]()
+    except AssertionError as exc:
+        assert "app.js" in str(exc)
+    else:
+        raise AssertionError("Browser smoke test must reject missing local assets")
