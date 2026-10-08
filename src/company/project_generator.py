@@ -80,9 +80,61 @@ Rules:
             return self._fallback_tic_tac_toe()
 
         try:
-            return self._parse(await self._call(payload))
+            generated = self._parse(await self._call(payload))
+            self._validate_mission_output(name, objective, generated)
+            return generated
         except RuntimeError:
             raise
+
+    @staticmethod
+    def _validate_mission_output(
+        name: str,
+        objective: str,
+        project: GeneratedProject,
+    ) -> None:
+        """Reject browser-app output that cannot be opened in the product preview."""
+        mission = f"{name} {objective}".casefold()
+        browser_terms = (
+            "web app", "web application", "website", "web site", "browser",
+            "dashboard", "tracker", "planner", "storefront", "e-commerce",
+            " ecommerce", "portfolio", "landing page", "management system",
+            "booking system", "learning app", "educational app", "budget app",
+            "expense app", "productivity app", "build an app", "build a app",
+            "build app", "create an app", "create app",
+        )
+        if not any(term in mission for term in browser_terms):
+            return
+
+        index_html = project.files.get("index.html")
+        if not index_html:
+            raise RuntimeError(
+                "Generated browser product is missing root index.html; "
+                "the product preview cannot open it. Regenerate with a root HTML entry point."
+            )
+
+        import re
+        references = re.findall(
+            r"""(?:src|href)\s*=\s*["']([^"'#]+)["']""",
+            index_html,
+            flags=re.IGNORECASE,
+        )
+        for reference in references:
+            reference = reference.strip()
+            if (
+                not reference
+                or reference.startswith(("#", "//", "data:", "http:", "https:", "mailto:", "tel:", "javascript:"))
+            ):
+                continue
+            local_path = reference.split("?", 1)[0].split("#", 1)[0]
+            if not local_path:
+                continue
+            if local_path.startswith("/"):
+                local_path = local_path.lstrip("/")
+            if local_path not in project.files:
+                raise RuntimeError(
+                    f"Generated browser product references missing local asset '{reference}'. "
+                    "Include every referenced local script, stylesheet, and asset in the output."
+                )
 
     async def repair(
         self,
