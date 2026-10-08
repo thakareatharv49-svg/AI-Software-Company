@@ -166,6 +166,9 @@ class ProjectFactory:
         self._audit(mission_id, "MISSION_CANCELLED", cancelled.message, cancelled.status.value)
         return cancelled
 
+    def has_queued_mission(self, mission_id: str) -> bool:
+        return any(item.mission.id == mission_id for item in self.queue)
+
     def retry(self, mission_id: str) -> MissionJob:
         job = self._load_job(mission_id)
         if job is None:
