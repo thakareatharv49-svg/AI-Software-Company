@@ -109,9 +109,18 @@ class ProjectFactory:
                 )
             )
         else:
-            self._save_job(
-                transition_job(job, MissionJobStatus.QUEUED, f"Project re-queued: {mission.name}")
-            )
+            # A newly created mission is already QUEUED. Keep factory-run
+            # idempotent without requiring a QUEUED -> QUEUED lifecycle transition.
+            if job.status == MissionJobStatus.QUEUED:
+                self._save_job(job)
+            else:
+                self._save_job(
+                    transition_job(
+                        job,
+                        MissionJobStatus.QUEUED,
+                        f"Project re-queued: {mission.name}",
+                    )
+                )
         project = FactoryProject(mission=mission, plan=plan)
         # A newly submitted mission is an explicit run request. Prioritize it over
         # restored/stale queued work so the factory-run API executes the requested mission.
