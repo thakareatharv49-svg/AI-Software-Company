@@ -80,12 +80,27 @@ Rules:
         if "tic tac toe" in request_text or "tictactoe" in request_text or "tic-tac-toe" in request_text:
             return self._fallback_tic_tac_toe()
 
+        generated = self._parse(await self._call(payload))
         try:
-            generated = self._parse(await self._call(payload))
             self._validate_mission_output(name, objective, generated)
             return generated
-        except RuntimeError:
-            raise
+        except RuntimeError as validation_error:
+            # A structural validation failure is actionable: give the model one
+            # bounded repair attempt instead of immediately blocking the mission.
+            failure = (
+                f"Project name: {name}\n"
+                f"Mission objective: {objective}\n"
+                f"Preview validation failure: {validation_error}"
+            )
+            repaired = await self.repair(generated.files, failure)
+            try:
+                self._validate_mission_output(name, objective, repaired)
+            except RuntimeError as repair_error:
+                raise RuntimeError(
+                    f"Generated product failed preview validation after one repair: "
+                    f"{repair_error}"
+                ) from repair_error
+            return repaired
 
     @staticmethod
     def _validate_mission_output(
@@ -160,6 +175,8 @@ Return ONLY valid JSON with this shape:
 Rules:
 - Preserve the intended behavior and public APIs of the project.
 - Fix the implementation to satisfy the existing tests.
+- Keep the original mission objective and product category; never replace it with a generic demo.
+- If the failure mentions preview validation, add the missing root index.html or referenced local assets and preserve all existing working features.
 - Do not weaken, remove, or skip tests just to make them pass.
 - Return the COMPLETE contents of every file that should exist after repair.
 - If this is a browser/web app, preserve and improve the visual polish and responsive behavior; do not reduce it to a bare functional demo.
