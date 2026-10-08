@@ -216,7 +216,7 @@ async function showMission(id) {
     const productIds = productsResult.status === "fulfilled" && Array.isArray(productsResult.value)
       ? new Set(productsResult.value.map(product => product.mission_id))
       : browserProductIds;
-    const hasBrowserPreviewAfterRefresh = productIds.has(id);
+    const hasBrowserPreviewAfterRefreshAfterRefresh = productIds.has(id);
 
     renderPipeline(audit, job.status);
     root.removeChild(loading);
@@ -232,7 +232,7 @@ async function showMission(id) {
         const t = document.createElement("b");
         t.textContent = (out.name || "output") + " · " + (out.status || "");
         n.append(t);
-        if (job.status === "completed" && hasBrowserPreview) {
+        if (job.status === "completed" && hasBrowserPreviewAfterRefresh) {
           const a = document.createElement("a");
           a.href = out.product_url || "/product/" + encodeURIComponent(id);
           a.target = "_blank";
