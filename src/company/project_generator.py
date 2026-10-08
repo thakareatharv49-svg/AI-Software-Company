@@ -19,21 +19,29 @@ class OllamaProjectGenerator:
     """Generate and repair small runnable projects."""
 
     async def generate(self, name: str, objective: str) -> GeneratedProject:
-        prompt = f"""Build a small, runnable software project for this mission.
+        prompt = f"""Build a distinct, complete, runnable software product for this mission. Treat the mission objective as the source of truth; do not default to a calculator, Tic-Tac-Toe, todo list, or generic landing page unless that exact product is requested.
 
-Project: {name}
-Objective: {objective}
+Project name: {name}
+Mission objective: {objective}
+
+Before writing code, infer the appropriate product category, target user, core workflow, and acceptance criteria from the mission. Implement the requested product—not a generic example—and make its interface, data model, and interactions specific to that objective. For web apps, create a coherent multi-section or multi-page experience when the scope calls for it, with real working interactions and useful sample data. Do not replace requested features with placeholders or merely describe what could be built.
 
 Return ONLY valid JSON with this shape:
 {{"files": {{"relative/path": "complete file contents"}},
  "test_command": ["python", "-m", "pytest", "-q"]}}
 
 Rules:
-- Generate a complete runnable implementation, not a plan.
-- Include automated tests under tests/.
+- Generate a complete runnable implementation, not a plan. Prioritize the exact mission requirements over generic starter templates.
+- The product title, labels, sample data, main workflow, and tests must clearly correspond to the requested mission.
+- Never silently substitute a different product when the requested implementation is difficult; return the requested product or fail with a useful error.
+- Include automated tests under tests/ that verify real mission-specific behavior and edge cases, not just file existence, copied strings, or tautological assertions.
+- For interactive browser products, include tests for important business rules or pure JavaScript logic where practical; the tests must fail if a core feature is removed or behaves incorrectly.
 - The implementation MUST define every function, class, module, or API used by its tests.
 - Make the implementation and tests internally consistent and runnable together.
 - Keep the project small enough to run locally.
+- Default to a browser-based application that can be opened in the factory's product preview unless the mission explicitly requests a different deliverable such as a CLI, library, API-only service, or native app.
+- For browser-based products, always include a root index.html plus every local stylesheet and JavaScript module it references. The preview must work by opening index.html directly; do not require a development server, build step, CDN, or external API.
+- A mission for a tracker, planner, dashboard, store, learning tool, or other app must produce that requested category with its own domain-specific workflows and realistic sample data. Do not reinterpret unrelated missions as calculator or Tic-Tac-Toe.
 - If the objective is a browser/web app, build a complete polished frontend, not a bare demo:
   - include index.html, style.css, and game.js/app.js when appropriate
   - use semantic HTML, responsive mobile-first layout, clear hierarchy, accessible controls, hover/focus states, and useful empty/error/success states
@@ -61,7 +69,7 @@ Rules:
                 "required": ["files", "test_command"],
             },
             "keep_alive": "10m",
-            "options": {"temperature": 0.1, "num_predict": 1536},
+            "options": {"temperature": 0.2, "num_predict": 8192},
         }
         # Calculator missions have a deterministic, fully tested implementation.
         # Prefer it before contacting Ollama so the factory never spends the model
@@ -72,10 +80,80 @@ Rules:
         if "tic tac toe" in request_text or "tictactoe" in request_text or "tic-tac-toe" in request_text:
             return self._fallback_tic_tac_toe()
 
+        generated = self._parse(await self._call(payload))
         try:
-            return self._parse(await self._call(payload))
-        except RuntimeError:
-            raise
+            self._validate_mission_output(name, objective, generated)
+            return generated
+        except RuntimeError as validation_error:
+            # A structural validation failure is actionable: give the model one
+            # bounded repair attempt instead of immediately blocking the mission.
+            failure = (
+                f"Project name: {name}\n"
+                f"Mission objective: {objective}\n"
+                f"Preview validation failure: {validation_error}"
+            )
+            repaired = await self.repair(generated.files, failure)
+            try:
+                self._validate_mission_output(name, objective, repaired)
+            except RuntimeError as repair_error:
+                raise RuntimeError(
+                    f"Generated product failed preview validation after one repair: "
+                    f"{repair_error}"
+                ) from repair_error
+            return repaired
+
+    @staticmethod
+    def _validate_mission_output(
+        name: str,
+        objective: str,
+        project: GeneratedProject,
+    ) -> None:
+        """Reject browser-app output that cannot be opened in the product preview."""
+        mission = f"{name} {objective}".casefold()
+        browser_terms = (
+            "web app", "web application", "website", "web site", "browser",
+            "dashboard", "tracker", "planner", "storefront", "e-commerce",
+            " ecommerce", "portfolio", "landing page", "management system",
+            "booking system", "learning app", "educational app", "budget app",
+            "expense app", "productivity app", "build an app", "build a app",
+            "build app", "create an app", "create app",
+        )
+        if not any(term in mission for term in browser_terms):
+            return
+
+        index_html = project.files.get("index.html")
+        if not index_html:
+            raise RuntimeError(
+                "Generated browser product is missing root index.html; "
+                "the product preview cannot open it. Regenerate with a root HTML entry point."
+            )
+
+        import re
+        references = re.findall(
+            r"""(?:src|href)\s*=\s*["']([^"'#]+)["']""",
+            index_html,
+            flags=re.IGNORECASE,
+        )
+        for reference in references:
+            reference = reference.strip()
+            if (
+                not reference
+                or reference.startswith(("#", "//", "data:", "http:", "https:", "mailto:", "tel:", "javascript:"))
+            ):
+                continue
+            local_path = reference.split("?", 1)[0].split("#", 1)[0]
+            if not local_path:
+                continue
+            if local_path.startswith("/"):
+                local_path = local_path.lstrip("/")
+            # HTML commonly uses ./app.js; normalize safe relative URL paths
+            # before comparing them with the generated file map.
+            local_path = PurePosixPath(local_path).as_posix()
+            if local_path not in project.files:
+                raise RuntimeError(
+                    f"Generated browser product references missing local asset '{reference}'. "
+                    "Include every referenced local script, stylesheet, and asset in the output."
+                )
 
     async def repair(
         self,
@@ -100,6 +178,8 @@ Return ONLY valid JSON with this shape:
 Rules:
 - Preserve the intended behavior and public APIs of the project.
 - Fix the implementation to satisfy the existing tests.
+- Keep the original mission objective and product category; never replace it with a generic demo.
+- If the failure mentions preview validation, add the missing root index.html or referenced local assets and preserve all existing working features.
 - Do not weaken, remove, or skip tests just to make them pass.
 - Return the COMPLETE contents of every file that should exist after repair.
 - If this is a browser/web app, preserve and improve the visual polish and responsive behavior; do not reduce it to a bare functional demo.
@@ -124,7 +204,7 @@ Rules:
                 "required": ["files", "test_command"],
             },
             "keep_alive": "10m",
-            "options": {"temperature": 0.0, "num_predict": 1536},
+            "options": {"temperature": 0.0, "num_predict": 8192},
         }
         try:
             return self._parse(await self._call(payload))
@@ -353,7 +433,7 @@ def test_game_contains_core_features():
         except json.JSONDecodeError:
             start, end = response.find("{"), response.rfind("}")
             if start < 0 or end <= start:
-                raise RuntimeError("Ollama returned invalid project JSON")
+                raise RuntimeError("Ollama returned invalid project JSON") from None
             try:
                 result = json.loads(response[start : end + 1])
             except json.JSONDecodeError as exc:
