@@ -1,14 +1,34 @@
 # AI Software Company
 
-A runnable autonomous software factory.
+A runnable autonomous software factory with a browser control center.
+
+## Web app
+
+The control center is served by the same FastAPI application:
+
+**http://127.0.0.1:8000/app**
+
+From the web app you can:
+- Create and launch missions.
+- Watch live company/factory status.
+- Inspect mission status and messages.
+- View generated project outputs.
+- Open the generated GitHub repository.
+- Review the mission audit trail.
+- Retry failed/blocked missions.
+- Cancel missions or stop the company.
+
+The browser UI is intentionally part of the main application, so there is no separate frontend server to configure.
 
 ## What it does
+
 1. You give the company a software mission from the web control center.
 2. The local Ollama model turns the mission into a small runnable project.
 3. The company materializes the project in an isolated workspace.
 4. Automated tests run inside the workspace.
 5. QA and security gates run before completion.
-6. The result is recorded in the company dashboard.
+6. Generated project files are published directly to the target repository's default branch.
+7. The result is recorded in the company dashboard.
 
 ## Run locally
 
@@ -32,15 +52,14 @@ The default model is `llama3.2`. Start Ollama and make sure the model is availab
     ollama serve
     ollama pull llama3.2
 
-GitHub delivery can be enabled with a GitHub token and target repository:
+GitHub delivery can be enabled with a GitHub token:
 
     GITHUB_TOKEN=your_token
     GITHUB_ALLOW_WRITES=true
     GITHUB_REPOSITORY_OWNER=thakareatharv49-svg
-# GITHUB_REPOSITORY_NAME is not required; each mission gets its own repository.
-        GITHUB_DEFAULT_BRANCH=main
+    GITHUB_DEFAULT_BRANCH=main
     GITHUB_BRANCH_PREFIX=factory
 
-With these settings, a successful factory run creates a branch, publishes the generated project files, opens a pull request, and records the repository/PR result in the mission output.
+Each successful mission gets its own GitHub repository and the generated project is committed directly to its default branch. No pull request is required.
 
 GitHub and deployment integrations remain optional and are protected by the existing gates.
