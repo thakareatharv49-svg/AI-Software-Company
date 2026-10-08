@@ -18,7 +18,7 @@ class GitOperationResult:
 
 
 class GitHubNativeService:
-    """Repository lifecycle: clone, branch, edit, commit, push and PR."""
+    """Repository lifecycle: clone, edit, commit and publish."""
 
     def __init__(
         self,
@@ -62,11 +62,11 @@ class GitHubNativeService:
         files: dict[str, str],
         message: str,
     ) -> GitOperationResult:
-        """Publish all generated files as one Git commit.
+        """Publish all generated files directly to the target branch.
 
-        Using the Git database API avoids the Contents API's per-file SHA
-        requirement and makes retries atomic: one branch update represents
-        the complete generated project state.
+        The factory already runs QA and security review before publishing, so
+        a successful run is delivered straight to the repository default
+        branch instead of creating a pull request.
         """
         try:
             try:
@@ -91,39 +91,7 @@ class GitHubNativeService:
                 repository.default_branch,
             )
 
-            try:
-                branch_result = await self.github.client.create_branch(
-                    repository,
-                    branch,
-                    base.sha,
-                )
-            except RuntimeError as exc:
-                if (
-                    "GitHub API 422" not in str(exc)
-                    or "Reference already exists" not in str(exc)
-                ):
-                    raise
-                branch_result = GitOperationResult(
-                    True,
-                    f"Reusing existing factory branch {branch}",
-                )
-
-            if not branch_result.success:
-                return GitOperationResult(False, branch_result.message)
-
             branch_head = await self.github.client.get_branch(repository, branch)
-
-            tree_entries: list[dict[str, str]] = []
-            for path, content in files.items():
-                blob_sha = await self.github.client.create_blob(repository, content)
-                tree_entries.append(
-                    {
-                        "path": path,
-                        "mode": "100644",
-                        "type": "blob",
-                        "sha": blob_sha,
-                    }
-                )
 
             if not tree_entries:
                 return GitOperationResult(
