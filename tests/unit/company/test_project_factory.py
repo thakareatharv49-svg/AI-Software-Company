@@ -348,7 +348,8 @@ async def test_factory_can_use_real_m36_runner_adapter() -> None:
         memory_id = "memory-1"
 
     class Result:
-        stages = tuple(Stage("completed") for _ in range(12))
+        # Stage status may be an enum or a differently-cased string from adapters.
+        stages = tuple(Stage("COMPLETED") for _ in range(12))
         pipeline = Pipeline()
 
     class Runner:
