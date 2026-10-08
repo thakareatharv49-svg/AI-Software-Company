@@ -81,49 +81,125 @@ function action(label, name, id, cls) {
 }
 
 async function showMission(id) {
-  selectedMissionId=id;
-  $("details").textContent="Loading…";
-  try {
-    const [job, outputs, audit] = await Promise.all([
-      api("/api/missions/"+encodeURIComponent(id)+"/job"),
-      api("/api/missions/"+encodeURIComponent(id)+"/outputs"),
-      api("/api/missions/"+encodeURIComponent(id)+"/audit")
-    ]);
-    $("detail-title").textContent=job.mission.name;
-    renderPipeline(audit, job.status);
-    const root=document.createElement("div");
-    const head=document.createElement("div"); head.className="detail-head";
-    const info=document.createElement("div");
-    const pill=document.createElement("span"); pill.className="pill"; pill.textContent=job.status;
-    const msg=document.createElement("p"); msg.className="muted"; msg.textContent=job.message || "";
-    info.append(pill,msg);
-    const actions=document.createElement("div"); actions.className="actions";
-    if(job.status==="queued") actions.append(action("Run Factory","run",id,"primary"));
-    if(job.status==="failed" || job.status==="blocked") actions.append(action("Retry","retry",id,"secondary"));
-    if(job.status!=="completed" && job.status!=="cancelled") actions.append(action("Cancel","cancel",id,"danger"));
-    head.append(info,actions); root.append(head);
-    const oh=document.createElement("h3"); oh.textContent="Outputs"; root.append(oh);
-    if(outputs.length) for(const out of outputs) {
-      const n=document.createElement("div"); n.className="event";
-      const t=document.createElement("b"); t.textContent=(out.name || "output")+" · "+(out.status || "");
-      n.append(t);
-      if(out.repository) {
-        const a=document.createElement("a"); a.href="https://github.com/"+out.repository; a.target="_blank"; a.rel="noopener"; a.className="repo"; a.textContent="Open GitHub repository ↗"; n.append(a);
-      }
-      root.append(n);
-    } else { const e=document.createElement("div"); e.className="empty"; e.textContent="No outputs recorded yet."; root.append(e); }
-    const ah=document.createElement("h3"); ah.textContent="Audit trail"; root.append(ah);
-    for(const entry of audit.slice().reverse()) {
-      const n=document.createElement("div"); n.className="event";
-      const t=document.createElement("b"); t.textContent=entry.event_type || "event";
-      const m=document.createElement("div"); m.className="muted"; m.textContent=entry.message || "";
-      const time=document.createElement("time"); time.textContent=entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "";
-      n.append(t,m,time); root.append(n);
-    }
-    $("details").replaceChildren(root);
-  } catch(e) { $("details").textContent="Unable to load mission: "+e.message; }
-}
+  selectedMissionId = id;
+  const details = $("details");
+  const title = $("detail-title");
+  details.textContent = "Loading mission…";
 
+  try {
+    // Load the job first so selection works immediately even while the
+    // factory is still generating, testing, repairing, or publishing.
+    const job = await api("/api/missions/" + encodeURIComponent(id) + "/job");
+    title.textContent = job.mission.name;
+    renderPipeline([], job.status);
+
+    const root = document.createElement("div");
+    const head = document.createElement("div");
+    head.className = "detail-head";
+
+    const info = document.createElement("div");
+    const pill = document.createElement("span");
+    pill.className = "pill";
+    pill.textContent = job.status;
+    const msg = document.createElement("p");
+    msg.className = "muted";
+    msg.textContent = job.message || "Mission is running.";
+    info.append(pill, msg);
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    if (job.status === "queued") actions.append(action("Run Factory", "run", id, "primary"));
+    if (job.status === "failed" || job.status === "blocked") actions.append(action("Retry", "retry", id, "secondary"));
+    if (job.status !== "completed" && job.status !== "cancelled") {
+      actions.append(action("Cancel", "cancel", id, "danger"));
+    }
+
+    head.append(info, actions);
+    root.append(head);
+
+    const loading = document.createElement("div");
+    loading.className = "empty";
+    loading.textContent = "Loading outputs and audit trail…";
+    root.append(loading);
+    details.replaceChildren(root);
+
+    // Outputs and audit are secondary. If either is temporarily unavailable,
+    // keep the mission details visible instead of replacing the whole panel.
+    const [outputsResult, auditResult] = await Promise.allSettled([
+      api("/api/missions/" + encodeURIComponent(id) + "/outputs"),
+      api("/api/missions/" + encodeURIComponent(id) + "/audit")
+    ]);
+
+    if (selectedMissionId !== id) return;
+
+    const outputs = outputsResult.status === "fulfilled" ? outputsResult.value : [];
+    const audit = auditResult.status === "fulfilled" ? auditResult.value : [];
+
+    renderPipeline(audit, job.status);
+    root.removeChild(loading);
+
+    const oh = document.createElement("h3");
+    oh.textContent = "Outputs";
+    root.append(oh);
+
+    if (outputs.length) {
+      for (const out of outputs) {
+        const n = document.createElement("div");
+        n.className = "event";
+        const t = document.createElement("b");
+        t.textContent = (out.name || "output") + " · " + (out.status || "");
+        n.append(t);
+        if (out.repository) {
+          const a = document.createElement("a");
+          a.href = "https://github.com/" + out.repository;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.className = "repo";
+          a.textContent = "Open GitHub repository ↗";
+          n.append(a);
+        }
+        root.append(n);
+      }
+    } else {
+      const e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = "No outputs recorded yet.";
+      root.append(e);
+    }
+
+    const ah = document.createElement("h3");
+    ah.textContent = "Audit trail";
+    root.append(ah);
+
+    if (audit.length) {
+      for (const entry of audit.slice().reverse()) {
+        const n = document.createElement("div");
+        n.className = "event";
+        const t = document.createElement("b");
+        t.textContent = entry.event_type || "event";
+        const m = document.createElement("div");
+        m.className = "muted";
+        m.textContent = entry.message || "";
+        const time = document.createElement("time");
+        time.textContent = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "";
+        n.append(t, m, time);
+        root.append(n);
+      }
+    } else {
+      const e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = auditResult.status === "rejected"
+        ? "Audit trail is temporarily unavailable."
+        : "No audit events yet.";
+      root.append(e);
+    }
+  } catch (e) {
+    if (selectedMissionId === id) {
+      title.textContent = "Mission details";
+      details.textContent = "Unable to load mission: " + e.message;
+    }
+  }
+}
 async function runFactory(id) {
   selectedMissionId=id; message("Starting factory…");
   try {
