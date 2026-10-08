@@ -245,3 +245,13 @@ def test_dashboard_completed_product_preview_uses_defined_identifier() -> None:
     assert "const hasBrowserPreviewAfterRefresh = productIds.has(id);" in dashboard
     assert "hasBrowserPreviewAfterRefreshAfterRefresh" not in dashboard
     assert "job.status === \"completed\" && hasBrowserPreviewAfterRefresh" in dashboard
+
+    static_dir = Path(__file__).resolve().parents[3] / "src" / "web" / "static"
+    html = (static_dir / "index.html").read_text(encoding="utf-8")
+    css = (static_dir / "styles.css").read_text(encoding="utf-8")
+
+    assert '/app/static/app.js?v=12' in html
+    assert '/app/static/styles.css?v=7' in html
+    assert 'href="#missions-section"' in html and 'id="missions-section"' in html
+    assert 'href="#factory-section"' in html and 'id="factory-section"' in html
+    assert ".nav a{" in css
