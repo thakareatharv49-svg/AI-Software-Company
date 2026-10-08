@@ -212,6 +212,11 @@ class CompanyControlCenter:
                 )
             raise RuntimeError("Factory is already running; try again when it is idle")
 
+        # The dashboard's launch/retry action names one specific mission. Put that
+        # mission first without changing FIFO order for ordinary batch factory runs.
+        if mission_id is not None:
+            self._factory.prioritize_mission(mission_id)
+
         async def runner() -> None:
             try:
                 # Keep the factory on the application's event loop. The control
