@@ -3,7 +3,6 @@
 import re
 import shutil
 import sys
-import tempfile
 from pathlib import Path
 
 from src.sandbox.execution.executor import SandboxExecutor
@@ -53,12 +52,13 @@ class ProjectWorkspace:
 
         safe_id = safe_id or "project"
 
-        root = Path(
-            tempfile.mkdtemp(
-                prefix=f"{safe_id}-",
-                dir=parent,
-            )
-        )
+        # Keep one stable workspace per mission so a completed product can be
+        # be opened directly from the company UI. A new factory attempt starts
+        # from a clean copy of the generated project.
+        root = parent / safe_id
+        if root.exists():
+            shutil.rmtree(root, ignore_errors=True)
+        root.mkdir(parents=True, exist_ok=True)
 
         return cls(root, **limits)
 
