@@ -194,38 +194,19 @@ class CompanyControlCenter:
         mission_id: str | None = None,
     ) -> None:
         if self._factory_task is not None and not self._factory_task.done():
-            if mission_id is None:
-                raise RuntimeError("Factory is already running")
-
-            job = self.mission_job(mission_id)
-            if job is None:
+            # Do not cancel an asyncio task that owns asyncio.to_thread(). Cancelling
+            # the task does not stop the underlying worker thread, so doing that here
+            # can create two factory runs against the same database and workspace.
+            # Keep the current run authoritative and let the caller retry once it is
+            # idle.
+            job = self.mission_job(mission_id) if mission_id is not None else None
+            if mission_id is not None and job is None:
                 raise KeyError(mission_id)
-            if job.status == MissionJobStatus.RUNNING:
-                raise RuntimeError(f"Mission '{mission_id}' is already running in the factory")
-            if job.status != MissionJobStatus.QUEUED:
-                raise ValueError(
-                    f"Mission '{mission_id}' cannot start from '{job.status.value}'"
+            if job is not None and job.status == MissionJobStatus.RUNNING:
+                raise RuntimeError(
+                    f"Mission '{mission_id}' is already running in the factory"
                 )
-
-            # An old factory task can remain alive while the requested mission is
-            # still queued, commonly because autonomous execution is hung. An
-            # explicit factory-run request must be able to recover that scheduler.
-            stale_task = self._factory_task
-            stale_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await stale_task
-            self._factory_task = None
-
-            # Cancellation can leave the interrupted project persisted as RUNNING.
-            # Recover it and restore durable factory work before starting again.
-            try:
-                self._job_store.recover_running()
-                for recovered in self._job_store.list_all():
-                    self._jobs[recovered.id] = recovered
-                    self._sync_mission_from_job(recovered)
-                self._factory.restore()
-            except SQLAlchemyError:
-                pass
+            raise RuntimeError("Factory is already running; try again when it is idle")
 
         async def runner() -> None:
             try:
