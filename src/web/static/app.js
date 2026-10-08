@@ -60,13 +60,21 @@ function renderMissions(items) {
     const desc=document.createElement("p"); desc.textContent=item.mission.objective;
     left.append(title,desc);
     const pill=document.createElement("span"); pill.className="pill"; pill.textContent=item.status;
-    b.append(left,pill); box.append(b);
+    b.append(left,pill);
+    if (String(item.status || "").toLowerCase() === "completed") {
+      const open=document.createElement("a");
+      open.href="/product/" + encodeURIComponent(item.mission.id);
+      open.target="_blank"; open.rel="noopener";
+      open.className="product-open"; open.textContent="Open Product ↗";
+      open.addEventListener("click", event => event.stopPropagation());
+      b.append(open);
+    } box.append(b);
   }
 }
 
 
 function renderProducts(items) {
-  const completed = items.filter(item => item.status === "completed");
+  const completed = items.filter(item => String(item.status || item.mission?.status || "").toLowerCase() === "completed");
   $("product-count").textContent = completed.length ? completed.length + " ready" : "";
   const box = $("products");
   box.replaceChildren();
@@ -143,7 +151,7 @@ async function showMission(id) {
     const actions = document.createElement("div");
     actions.className = "actions";
     if (job.status === "queued") actions.append(action("Run Factory", "run", id, "primary"));
-    if (job.status === "completed") {
+    if (String(job.status || "").toLowerCase() === "completed") {
       const product = document.createElement("a");
       product.href = "/product/" + encodeURIComponent(id);
       product.target = "_blank";
