@@ -277,7 +277,10 @@ class ProjectFactory:
                         (),
                         {
                             "success": (
-                                getattr(stage.status, "value", stage.status) == "completed"
+                                str(getattr(stage.status, "value", stage.status))
+                                .strip()
+                                .casefold()
+                                == "completed"
                             )
                         },
                     )()
@@ -395,7 +398,21 @@ class ProjectFactory:
             )
             if execution_failed and project.attempts > max_retries:
                 project.status = "blocked"
-                project.last_error = project.last_error or "Project execution did not complete all stages"
+                if not project.last_error:
+                    failed_stages = [
+                        f"{stage.name}: {stage.detail}"
+                        for stage in getattr(self._last_autonomous_result, "stages", ())
+                        if str(getattr(stage.status, "value", stage.status))
+                        .strip()
+                        .casefold()
+                        != "completed"
+                    ]
+                    project.last_error = (
+                        "Project execution did not complete all stages. "
+                        + "; ".join(failed_stages)
+                        if failed_stages
+                        else "Project execution did not complete all stages"
+                    )
                 self.orchestrator.block(project.last_error)
                 self._transition_job(
                     project,
