@@ -5,8 +5,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from src.company.models.contracts import CompanyMission
 from src.company.mission_controller.models import MissionPlan
+from src.company.models.contracts import CompanyMission
 
 
 class MissionJobStatus(StrEnum):
