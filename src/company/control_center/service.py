@@ -155,12 +155,20 @@ class CompanyControlCenter:
                 objective=submission.objective.strip(),
                 constraints=[item.strip() for item in submission.constraints if item.strip()],
             )
-            plan, result = self._mission_controller.start(mission)
+            # Mission creation must only register the work. The factory-run
+            # endpoint owns execution and ProjectFactory.run_next() will start
+            # the orchestrator at the moment the queued mission actually runs.
+            plan = self._mission_controller.get_plan(mission.id)
+            if plan is None:
+                from src.company.mission_controller.planner import build_mission_plan
+
+                plan = build_mission_plan(mission)
             now = datetime.now(UTC)
+            message = f"Mission queued: {mission.name}"
             record = MissionRecord(
                 mission=mission,
-                status=result.state.status.value,
-                message=result.message,
+                status=MissionJobStatus.QUEUED.value,
+                message=message,
                 created_at=now,
                 updated_at=now,
                 plan=plan,
@@ -170,8 +178,8 @@ class CompanyControlCenter:
                 id=mission.id,
                 mission=mission,
                 plan=plan,
-                status=MissionJobStatus.RUNNING,
-                message=result.message,
+                status=MissionJobStatus.QUEUED,
+                message=message,
             )
             self._jobs[mission.id] = job
             try:
