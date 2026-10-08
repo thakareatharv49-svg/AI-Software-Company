@@ -377,8 +377,10 @@ class ProjectFactory:
             # An execution that returns unsuccessful stage results or leaves plan
             # steps incomplete is a failure, not a harmless pause. Retry only when
             # budget remains; otherwise persist a terminal blocked state.
-            execution_failed = any(not result.success for result in results) or any(
-                step.status != "completed" for step in project.plan.steps
+            execution_failed = (
+                not results
+                or any(not result.success for result in results)
+                or any(step.status != "completed" for step in project.plan.steps)
             )
             if execution_failed and project.attempts > max_retries:
                 project.status = "blocked"
