@@ -24,13 +24,33 @@ function message(text, error=false) {
   $("message").className = "message " + (error ? "error" : "");
 }
 
+function renderPipeline(audit, status) {
+  const steps = [["plan","Plan","Mission controller"],["generate","Generate","Local Ollama"],["validate","Validate","Tests + QA + security"],["repair","Repair","Autonomous retry loop"],["publish","Publish","GitHub main"]];
+  const types = audit.map(e => String(e.event_type || "").toUpperCase());
+  let current = "plan";
+  if (types.some(t => /GENERAT|PROJECT_STARTED|FACTORY_PROJECT_STARTED/.test(t))) current = "generate";
+  if (types.some(t => /VALIDAT|TEST|QA|PROJECT_COMPLETED/.test(t))) current = "validate";
+  if (types.some(t => /REPAIR/.test(t))) current = "repair";
+  if (types.some(t => /PUBLISH|GITHUB/.test(t)) || status === "completed") current = "publish";
+  const box = $("pipeline"); box.replaceChildren();
+  const order = steps.map(s => s[0]), currentIndex = order.indexOf(current);
+  for (const [key,title,desc] of steps) {
+    const row=document.createElement("div"), index=order.indexOf(key);
+    row.className="pipeline-step " + (status==="completed" || index<currentIndex ? "done " : "") + (index===currentIndex && status!=="completed" ? "active" : "");
+    const marker=document.createElement("b"); marker.textContent=status==="completed" || index<currentIndex ? "✓" : String(index+1).padStart(2,"0");
+    const label=document.createElement("span"); label.textContent=title;
+    const detail=document.createElement("small"); detail.textContent=desc;
+    row.append(marker,label,detail); box.append(row);
+  }
+}
+
 function renderMissions(items) {
-  const box = $("missions");
+  const visible = items.slice(0, 20);\n  $("mission-count").textContent = items.length > 20 ? `Latest 20 of ${items.length}` : `${items.length} total`;\n  const box = $("missions");
   box.replaceChildren();
-  if (!items.length) {
+  if (!visible.length) {
     const e=document.createElement("div"); e.className="empty"; e.textContent="No missions yet."; box.append(e); return;
   }
-  for (const item of items) {
+  for (const item of visible) {
     const b=document.createElement("button"); b.type="button"; b.className="mission";
     b.dataset.id=item.mission.id;
     const left=document.createElement("div");
@@ -67,7 +87,7 @@ async function showMission(id) {
       api("/api/missions/"+encodeURIComponent(id)+"/outputs"),
       api("/api/missions/"+encodeURIComponent(id)+"/audit")
     ]);
-    $("detail-title").textContent=job.mission.name;
+    $("detail-title").textContent=job.mission.name;\n    renderPipeline(audit, job.status);
     const root=document.createElement("div");
     const head=document.createElement("div"); head.className="detail-head";
     const info=document.createElement("div");
