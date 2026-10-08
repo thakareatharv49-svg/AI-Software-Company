@@ -59,5 +59,34 @@ class GitHubClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def create_tree(
+        self,
+        repository: GitHubRepository,
+        base_tree_sha: str,
+        entries: list[dict[str, str]],
+    ) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def create_commit(
+        self,
+        repository: GitHubRepository,
+        message: str,
+        tree_sha: str,
+        parent_sha: str,
+    ) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def update_branch_ref(
+        self,
+        repository: GitHubRepository,
+        branch: str,
+        commit_sha: str,
+        expected_sha: str,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
     async def get_check_runs(self, repository: GitHubRepository, ref: str) -> list[GitHubCheckRun]:
         raise NotImplementedError
