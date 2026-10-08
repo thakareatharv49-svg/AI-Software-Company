@@ -115,3 +115,77 @@ def test_browser_product_with_local_assets_passes_validation() -> None:
             test_command=["python", "-m", "pytest", "-q"],
         ),
     )
+
+
+
+def test_browser_validation_failure_triggers_one_mission_aware_repair() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    generator = OllamaProjectGenerator()
+    repair_calls: list[tuple[dict[str, str], str]] = []
+
+    async def fake_call(payload: dict) -> str:
+        return json.dumps({
+            "files": {"app.js": "console.log('expenses')"},
+            "test_command": ["python", "-m", "pytest", "-q"],
+        })
+
+    async def fake_repair(files: dict[str, str], failure: str) -> GeneratedProject:
+        repair_calls.append((files, failure))
+        return GeneratedProject(
+            files={
+                "index.html": '<html><head><script src="app.js"></script></head><body><h1>Expense Tracker</h1></body></html>',
+                "app.js": "document.title = 'Expense Tracker';",
+            },
+            test_command=["python", "-m", "pytest", "-q"],
+        )
+
+    generator._call = fake_call  # type: ignore[method-assign]
+    generator.repair = fake_repair  # type: ignore[method-assign]
+
+    project = asyncio.run(
+        generator.generate(
+            "Personal Expense Tracker",
+            "Build a browser app with monthly budgets and category summaries.",
+        )
+    )
+
+    assert len(repair_calls) == 1
+    assert "Personal Expense Tracker" in repair_calls[0][1]
+    assert "monthly budgets and category summaries" in repair_calls[0][1]
+    assert "index.html" in project.files
+    assert "app.js" in project.files
+
+
+def test_browser_product_still_fails_if_repair_output_is_invalid() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    generator = OllamaProjectGenerator()
+
+    async def fake_call(payload: dict) -> str:
+        return json.dumps({
+            "files": {"app.js": "console.log('study')"},
+            "test_command": ["python", "-m", "pytest", "-q"],
+        })
+
+    async def fake_repair(files: dict[str, str], failure: str) -> GeneratedProject:
+        return GeneratedProject(
+            files={"index.html": '<html><script src="missing.js"></script></html>'},
+            test_command=["python", "-m", "pytest", "-q"],
+        )
+
+    generator._call = fake_call  # type: ignore[method-assign]
+    generator.repair = fake_repair  # type: ignore[method-assign]
+
+    try:
+        asyncio.run(
+            generator.generate(
+                "Study Planner",
+                "Build a browser app for planning study sessions.",
+            )
+        )
+    except RuntimeError as exc:
+        assert "after one repair" in str(exc)
+        assert "missing.js" in str(exc)
+    else:
+        raise AssertionError("Invalid output after repair must still fail validation")
