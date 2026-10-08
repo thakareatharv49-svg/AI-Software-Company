@@ -34,12 +34,6 @@ jobs:
       - name: Database migrations
         run: alembic upgrade head
       - name: Ruff
-        run: |
-          files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.sha }}" -- '*.py')
-          if [ -n "$files" ]; then
-            ruff check $files
-          else
-            echo "No Python files changed."
-          fi
+        run: ruff check src tests
       - name: Tests
         run: pytest -q
