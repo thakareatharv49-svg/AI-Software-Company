@@ -214,20 +214,16 @@ class CompanyControlCenter:
 
         async def runner() -> None:
             try:
-                # The factory performs synchronous database/file operations while
-                # orchestrating async work. Run the whole factory loop outside
-                # FastAPI's event-loop thread so long-running project execution
-                # can never block health/status/job HTTP requests.
-                def run_factory_sync() -> None:
-                    asyncio.run(
-                        self._factory.run(
-                            max_projects=max_projects,
-                            max_stages=max_stages,
-                            max_retries=max_retries,
-                        )
-                    )
-
-                await asyncio.to_thread(run_factory_sync)
+                # Keep the factory on the application's event loop. The control
+                # center, factory, orchestrator, event bus, and autonomous runner
+                # are one shared object graph; moving execution into asyncio.run()
+                # on a worker thread creates a second event loop and can detach
+                # loop-bound async state from the HTTP application.
+                await self._factory.run(
+                    max_projects=max_projects,
+                    max_stages=max_stages,
+                    max_retries=max_retries,
+                )
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -258,10 +254,9 @@ class CompanyControlCenter:
                         )
                 raise
 
-        # Start the factory in the background and return control to the HTTP
-        # request immediately. The task owns all long-running autonomous work;
-        # its failures are persisted by runner() so callers can inspect /job
-        # instead of waiting for the factory to finish.
+        # Start the factory in the background without creating a second event
+        # loop. The HTTP request returns immediately while the factory continues
+        # on the application's loop and shares the same async context.
         self._factory_task = asyncio.create_task(runner())
 
     def factory_running(self) -> bool:
