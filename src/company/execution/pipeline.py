@@ -5,9 +5,9 @@ from pathlib import Path
 from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
+from src.company.gates.quality import ProductionQualityGate
 from src.company.github_native.publish_queue import GitHubPublishQueue
 from src.company.github_native.service import GitHubNativeService
-from src.company.gates.quality import ProductionQualityGate
 from src.company.project_generator import OllamaProjectGenerator
 from src.config.settings import settings
 from src.company.intelligence import (
