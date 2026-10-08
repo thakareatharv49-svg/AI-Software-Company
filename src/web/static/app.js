@@ -176,7 +176,9 @@ async function showMission(id) {
     const actions = document.createElement("div");
     actions.className = "actions";
     if (job.status === "queued") actions.append(action("Run Factory", "run", id, "primary"));
-    const initialProducts = await api("/api/products").catch(() => []);\n    const hasBrowserPreview = Array.isArray(initialProducts) && initialProducts.some(product => product.mission_id === id);\n    if (String(job.status || "").toLowerCase() === "completed" && hasBrowserPreview) {
+    const initialProducts = await api("/api/products").catch(() => []);
+    const hasBrowserPreview = Array.isArray(initialProducts) && initialProducts.some(product => product.mission_id === id);
+    if (String(job.status || "").toLowerCase() === "completed" && hasBrowserPreview) {
       const product = document.createElement("a");
       product.href = "/product/" + encodeURIComponent(id);
       product.target = "_blank";
