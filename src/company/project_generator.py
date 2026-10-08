@@ -353,7 +353,7 @@ def test_game_contains_core_features():
         except json.JSONDecodeError:
             start, end = response.find("{"), response.rfind("}")
             if start < 0 or end <= start:
-                raise RuntimeError("Ollama returned invalid project JSON")
+                raise RuntimeError("Ollama returned invalid project JSON") from None
             try:
                 result = json.loads(response[start : end + 1])
             except json.JSONDecodeError as exc:
