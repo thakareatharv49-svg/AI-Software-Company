@@ -3,8 +3,8 @@ from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentDefinition, AgentRequest, AgentResult
 from src.agents.registry.registry import AgentRegistry
 from src.company.events.events import CompanyEvent
-from src.company.mission_controller.models import MissionPlan, MissionStage
 from src.company.models.contracts import CompanyMission
+from src.company.mission_controller.models import MissionPlan, MissionStage
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 
 
