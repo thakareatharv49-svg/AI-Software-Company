@@ -7,31 +7,26 @@ from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.main import app
 
 
-def test_submit_mission_starts_company() -> None:
+def test_submit_mission_queues_company_work() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     record = center.submit_mission(
         MissionSubmission(name="Build X", objective="Create X for users")
     )
-    assert record.status == "running"
+    assert record.status == "queued"
     assert record.mission.objective == "Create X for users"
-    assert center.state.status.value == "running"
+    assert center.state.status.value == "idle"
     assert [step.stage.value for step in record.plan.steps] == [
         "research", "product", "architecture", "tasks", "agents", "execution",
         "qa", "security", "github", "deployment", "monitoring", "learning",
     ]
-    assert center.state.current_project_id == f"project:{record.mission.id}"
-    assert center.state.current_task_id == f"task:{record.mission.id}:research"
 
 
-def test_running_company_rejects_second_mission() -> None:
+def test_queued_company_accepts_multiple_missions() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
-    center.submit_mission(MissionSubmission(name="First", objective="First objective"))
-    try:
-        center.submit_mission(MissionSubmission(name="Second", objective="Second objective"))
-    except RuntimeError as exc:
-        assert "already running" in str(exc)
-    else:
-        raise AssertionError("expected running-company guard")
+    first = center.submit_mission(MissionSubmission(name="First", objective="First objective"))
+    second = center.submit_mission(MissionSubmission(name="Second", objective="Second objective"))
+    assert first.status == "queued"
+    assert second.status == "queued"
 
 
 def test_control_api_serves_mission_and_app() -> None:
@@ -41,8 +36,8 @@ def test_control_api_serves_mission_and_app() -> None:
         client = TestClient(app)
         response = client.post("/api/missions", json={"name": "Build X", "objective": "Create X"})
         assert response.status_code == 201
-        assert response.json()["status"] == "running"
-        assert client.get("/api/company/state").json()["status"] == "running"
+        assert response.json()["status"] == "queued"
+        assert client.get("/api/company/state").json()["status"] == "idle"
         assert client.get("/app").status_code == 200
         assert "AI Software Company" in client.get("/app").text
     finally:
@@ -90,7 +85,7 @@ def test_mission_job_api_exposes_persistent_lifecycle() -> None:
         job = client.get(f"/api/missions/{mission_id}/job")
         assert job.status_code == 200
         assert job.json()["id"] == mission_id
-        assert job.json()["status"] == "running"
+        assert job.json()["status"] == "queued"
 
         jobs = client.get("/api/mission-jobs")
         assert jobs.status_code == 200
@@ -112,7 +107,8 @@ def test_mission_cancel_and_retry_api() -> None:
         mission_id = response.json()["mission"]["id"]
 
         cancelled = client.post(f"/api/missions/{mission_id}/cancel")
-        assert cancelled.status_code == 409
+        assert cancelled.status_code == 200
+        assert cancelled.json()["status"] == "cancelled"
 
         center._job_store.save(
             center.mission_job(mission_id).model_copy(
@@ -134,7 +130,7 @@ def test_mission_audit_api_supports_filters() -> None:
         response = client.post("/api/missions", json={"name": "Audit API", "objective": "Inspect lifecycle history"})
         assert response.status_code == 201
         mission_id = response.json()["mission"]["id"]
-        audit = client.get(f"/api/missions/{mission_id}/audit", params={"event_type": "MISSION_CREATED", "status": "running"})
+        audit = client.get(f"/api/missions/{mission_id}/audit", params={"event_type": "MISSION_CREATED", "status": "queued"})
         assert audit.status_code == 200
         assert isinstance(audit.json(), list)
         missing = client.get("/api/missions/missing/audit")
