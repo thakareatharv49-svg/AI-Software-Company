@@ -1,8 +1,8 @@
 import pytest
 
+from src.company.mission_controller.planner import build_mission_plan
 from src.company.mission_jobs import MissionJob, MissionJobStatus, transition_job
 from src.company.models.contracts import CompanyMission
-from src.company.mission_controller.planner import build_mission_plan
 
 
 def make_job(status: MissionJobStatus = MissionJobStatus.QUEUED) -> MissionJob:
