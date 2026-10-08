@@ -183,6 +183,15 @@ async function showMission(id) {
         const t = document.createElement("b");
         t.textContent = (out.name || "output") + " · " + (out.status || "");
         n.append(t);
+        if (out.product_url) {
+          const a = document.createElement("a");
+          a.href = out.product_url;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.className = "primary product-open";
+          a.textContent = "Open Completed Product ↗";
+          n.append(a);
+        }
         if (out.repository) {
           const a = document.createElement("a");
           a.href = "https://github.com/" + out.repository;
