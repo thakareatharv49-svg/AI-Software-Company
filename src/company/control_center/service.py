@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import re
-from contextlib import suppress
 from datetime import UTC, datetime
 from threading import Lock
 
