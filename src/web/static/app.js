@@ -143,6 +143,15 @@ async function showMission(id) {
     const actions = document.createElement("div");
     actions.className = "actions";
     if (job.status === "queued") actions.append(action("Run Factory", "run", id, "primary"));
+    if (job.status === "completed") {
+      const product = document.createElement("a");
+      product.href = "/product/" + encodeURIComponent(id);
+      product.target = "_blank";
+      product.rel = "noopener";
+      product.className = "primary product-open";
+      product.textContent = "Open Product ↗";
+      actions.append(product);
+    }
     if (job.status === "failed" || job.status === "blocked") actions.append(action("Retry", "retry", id, "secondary"));
     if (job.status !== "completed" && job.status !== "cancelled") {
       actions.append(action("Cancel", "cancel", id, "danger"));
@@ -183,9 +192,9 @@ async function showMission(id) {
         const t = document.createElement("b");
         t.textContent = (out.name || "output") + " · " + (out.status || "");
         n.append(t);
-        if (out.product_url) {
+        if (job.status === "completed") {
           const a = document.createElement("a");
-          a.href = out.product_url;
+          a.href = out.product_url || "/product/" + encodeURIComponent(id);
           a.target = "_blank";
           a.rel = "noopener";
           a.className = "primary product-open";
