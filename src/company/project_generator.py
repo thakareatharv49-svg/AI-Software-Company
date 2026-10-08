@@ -324,34 +324,8 @@ def test_game_contains_core_features():
         )
 
     def _fallback_calculator(self) -> GeneratedProject:
-        return GeneratedProject(
-            files={
-                "calculator.py": (
-                    "def add(a, b):\n"
-                    "    return a + b\n\n"
-                    "def sub(a, b):\n"
-                    "    return a - b\n\n"
-                    "def mul(a, b):\n"
-                    "    return a * b\n\n"
-                    "def div(a, b):\n"
-                    "    if b == 0:\n"
-                    "        raise ZeroDivisionError(\"division by zero\")\n"
-                    "    return a / b\n"
-                ),
-                "tests/test_calculator.py": (
-                    "import calculator\n\n"
-                    "def test_add():\n"
-                    "    assert calculator.add(1, 2) == 3\n\n"
-                    "def test_sub():\n"
-                    "    assert calculator.sub(2, 1) == 1\n\n"
-                    "def test_mul():\n"
-                    "    assert calculator.mul(2, 3) == 6\n\n"
-                    "def test_div():\n"
-                    "    assert calculator.div(6, 3) == 2\n"
-                ),
-            },
-            test_command=["python", "-m", "pytest", "-q"],
-        )
+        from src.company.browser_calculator import browser_calculator
+        return browser_calculator()
 
     def _fallback_repair(
         self,
