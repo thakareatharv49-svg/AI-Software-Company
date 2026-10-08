@@ -199,7 +199,7 @@ Rules:
                 raise RuntimeError(f"Invalid generated file: {raw_path}")
             files[str(path)] = str(content)
 
-        if not any(path.startswith("tests/") for path in files):
+        if not any(path.lower().startswith("tests/") for path in files):
             root_tests = [
                 path for path in files
                 if path.lower().endswith(".py")
@@ -232,11 +232,37 @@ Rules:
             ]
             files["tests/test_generated_project.py"] = "\n".join(smoke_lines)
 
-        command = result.get("test_command", ["python", "-m", "pytest", "-q"])
-        if not isinstance(command, list) or not command:
-            raise RuntimeError("Generated test command is invalid")
+        command = self._normalize_test_command(result.get("test_command"))
 
         return GeneratedProject(
             files=files,
-            test_command=[str(item) for item in command],
+            test_command=command,
         )
+
+    @staticmethod
+    def _normalize_test_command(raw_command: object) -> list[str]:
+        """Accept only local Python test runners produced by the factory."""
+        default = ["python", "-m", "pytest", "-q"]
+
+        if not isinstance(raw_command, list) or not raw_command:
+            return default
+
+        command = [str(item).strip() for item in raw_command if str(item).strip()]
+        if not command:
+            return default
+
+        executable = command[0].toLowerCase().split(/[\\/]/).pop()
+
+        # Keep QA local and deterministic. The model must not turn the test
+        # phase into an arbitrary shell, installer, or network command.
+        if executable in {"pytest", "pytest.exe"}:
+            return command
+
+        if executable in {"python", "python3", "python.exe", "py", "py.exe"}:
+            args = command.slice(1)
+            if args.length >= 2 && args[0] === "-m" &&
+                {"pytest", "unittest"}.has(args[1].toLowerCase()):
+                return command
+            return default
+
+        return default
