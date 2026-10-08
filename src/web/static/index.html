@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Software Company — Control Center</title>
-<link rel="stylesheet" href="/app/static/styles.css?v=2">
+<link rel="stylesheet" href="/app/static/styles.css?v=3">
 </head>
 <body>
 <div class="shell">
@@ -39,18 +39,18 @@
 </form><div id="message" class="message"></div>
 </section>
 <section class="card">
-<h2>Factory pipeline</h2><p class="muted">Autonomous delivery path.</p>
-<div class="pipeline"><div>01 · Plan <span>mission controller</span></div><div>02 · Generate <span>local Ollama</span></div><div>03 · Validate <span>tests + QA + security</span></div><div>04 · Repair <span>autonomous retry loop</span></div><div>05 · Publish <span>GitHub main</span></div></div>
+<h2>Factory pipeline</h2><p class="muted">Live stage for the selected mission.</p>
+<div id="pipeline" class="pipeline"><div class="pipeline-step active"><b>01</b><span>Waiting</span><small>Select a mission</small></div></div>
 <button id="stop" class="secondary" type="button">Stop company</button>
 </section>
 </div>
 <div class="grid">
-<section class="card"><h2>Missions</h2><div id="missions" class="missions"><div class="empty">Loading…</div></div></section>
+<section class="card"><h2>Missions <small id="mission-count" class="section-count"></small></h2><div id="missions" class="missions"><div class="empty">Loading…</div></div></section>
 <section class="card"><h2>Live events</h2><div id="events"><div class="empty">Loading…</div></div></section>
 </div>
 <section class="card details"><h2 id="detail-title">Mission details</h2><div id="details" class="empty">Select a mission to inspect outputs and audit trail.</div></section>
 </main>
 </div>
-<script src="/app/static/app.js?v=2" defer></script>
+<script src="/app/static/app.js?v=3" defer></script>
 </body>
 </html>
