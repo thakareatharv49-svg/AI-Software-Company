@@ -12,9 +12,14 @@ class MissionController:
         self.orchestrator = orchestrator
         self._plans: dict[str, MissionPlan] = {}
 
-    def start(self, mission: CompanyMission) -> tuple[MissionPlan, CompanyCycleResult]:
+    def prepare(self, mission: CompanyMission) -> MissionPlan:
+        """Build and register a mission plan without starting execution."""
         plan = build_mission_plan(mission)
         self._plans[mission.id] = plan
+        return plan
+
+    def start(self, mission: CompanyMission) -> tuple[MissionPlan, CompanyCycleResult]:
+        plan = self.prepare(mission)
 
         result = self.orchestrator.start(mission)
         if result.state.status.value != "running":
