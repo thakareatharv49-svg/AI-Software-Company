@@ -98,7 +98,7 @@ class CompanyExecutionPipeline:
         self.learning = learning or LearningEngine()
         self.project_generator = project_generator or OllamaProjectGenerator()
         self._active_generated_files: dict[str, str] = {}
-        self.recovery = RecoveryService(max_attempts=1)
+        self.recovery = RecoveryService(max_attempts=3)
         self.quality_gate = ProductionQualityGate()
         self.observability = ObservabilityService()
         self._active_run_id: str | None = None
