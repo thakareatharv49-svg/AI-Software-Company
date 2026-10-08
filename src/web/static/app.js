@@ -5,6 +5,7 @@ const terminal = new Set(["completed","blocked","failed","cancelled"]);
 let selectedMissionId = null;
 let pollTimer = null;
 let busy = false;
+let browserProductIds = new Set();
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -84,7 +85,7 @@ function renderMissions(items) {
     left.append(title,desc);
     const pill=document.createElement("span"); pill.className="pill"; pill.textContent=item.status;
     b.append(left,pill);
-    if (String(item.status || "").toLowerCase() === "completed") {
+    if (String(item.status || "").toLowerCase() === "completed" && browserProductIds.has(item.mission.id)) {
       const open=document.createElement("a");
       open.href="/product/" + encodeURIComponent(item.mission.id);
       open.target="_blank"; open.rel="noopener";
@@ -175,7 +176,7 @@ async function showMission(id) {
     const actions = document.createElement("div");
     actions.className = "actions";
     if (job.status === "queued") actions.append(action("Run Factory", "run", id, "primary"));
-    if (String(job.status || "").toLowerCase() === "completed") {
+    if (String(job.status || "").toLowerCase() === "completed" && hasBrowserPreview) {
       const product = document.createElement("a");
       product.href = "/product/" + encodeURIComponent(id);
       product.target = "_blank";
@@ -200,15 +201,20 @@ async function showMission(id) {
 
     // Outputs and audit are secondary. If either is temporarily unavailable,
     // keep the mission details visible instead of replacing the whole panel.
-    const [outputsResult, auditResult] = await Promise.allSettled([
+    const [outputsResult, auditResult, productsResult] = await Promise.allSettled([
       api("/api/missions/" + encodeURIComponent(id) + "/outputs"),
-      api("/api/missions/" + encodeURIComponent(id) + "/audit")
+      api("/api/missions/" + encodeURIComponent(id) + "/audit"),
+      api("/api/products")
     ]);
 
     if (selectedMissionId !== id) return;
 
     const outputs = outputsResult.status === "fulfilled" ? outputsResult.value : [];
     const audit = auditResult.status === "fulfilled" ? auditResult.value : [];
+    const productIds = productsResult.status === "fulfilled" && Array.isArray(productsResult.value)
+      ? new Set(productsResult.value.map(product => product.mission_id))
+      : browserProductIds;
+    const hasBrowserPreview = productIds.has(id);
 
     renderPipeline(audit, job.status);
     root.removeChild(loading);
@@ -224,7 +230,7 @@ async function showMission(id) {
         const t = document.createElement("b");
         t.textContent = (out.name || "output") + " · " + (out.status || "");
         n.append(t);
-        if (job.status === "completed") {
+        if (job.status === "completed" && hasBrowserPreview) {
           const a = document.createElement("a");
           a.href = out.product_url || "/product/" + encodeURIComponent(id);
           a.target = "_blank";
@@ -374,6 +380,7 @@ async function refresh() {
   const products = productsResult.status === "fulfilled" && Array.isArray(productsResult.value)
     ? productsResult.value
     : [];
+  browserProductIds = new Set(products.map(product => product.mission_id));
 
   $("projects").textContent = summary.projects ?? missions.length;
   $("tasks").textContent = summary.tasks ?? missions.reduce(
