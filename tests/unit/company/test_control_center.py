@@ -1,6 +1,6 @@
+import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
-import pytest
 
 from src.company.control_center.routes import get_control_center
 from src.company.control_center.service import CompanyControlCenter, MissionSubmission
@@ -155,10 +155,16 @@ def test_mission_audit_api_supports_filters() -> None:
     app.dependency_overrides[get_control_center] = lambda: center
     try:
         client = TestClient(app)
-        response = client.post("/api/missions", json={"name": "Audit API", "objective": "Inspect lifecycle history"})
+        response = client.post(
+            "/api/missions",
+            json={"name": "Audit API", "objective": "Inspect lifecycle history"},
+        )
         assert response.status_code == 201
         mission_id = response.json()["mission"]["id"]
-        audit = client.get(f"/api/missions/{mission_id}/audit", params={"event_type": "MISSION_CREATED", "status": "queued"})
+        audit = client.get(
+            f"/api/missions/{mission_id}/audit",
+            params={"event_type": "MISSION_CREATED", "status": "queued"},
+        )
         assert audit.status_code == 200
         assert isinstance(audit.json(), list)
         missing = client.get("/api/missions/missing/audit")
@@ -172,7 +178,10 @@ def test_project_outputs_api() -> None:
     app.dependency_overrides[get_control_center] = lambda: center
     try:
         client = TestClient(app)
-        response = client.post("/api/missions", json={"name": "Outputs API", "objective": "Expose project outputs"})
+        response = client.post(
+            "/api/missions",
+            json={"name": "Outputs API", "objective": "Expose project outputs"},
+        )
         assert response.status_code == 201
         mission_id = response.json()["mission"]["id"]
         outputs = client.get(f"/api/missions/{mission_id}/outputs")
