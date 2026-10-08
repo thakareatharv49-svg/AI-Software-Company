@@ -374,14 +374,42 @@ class ProjectFactory:
                 )
                 event_type = "FACTORY_PROJECT_BLOCKED"
         else:
-            project.status = "queued"
-            self._transition_job(
-                project,
-                MissionJobStatus.QUEUED,
-                f"Project paused and re-queued: {project.mission.name}",
+            # An execution that returns unsuccessful stage results or leaves plan
+            # steps incomplete is a failure, not a harmless pause. Retry only when
+            # budget remains; otherwise persist a terminal blocked state.
+            execution_failed = any(not result.success for result in results) or any(
+                step.status != "completed" for step in project.plan.steps
             )
-            event_type = "FACTORY_PROJECT_PAUSED"
-            self.queue.insert(0, project)
+            if execution_failed and project.attempts > max_retries:
+                project.status = "blocked"
+                project.last_error = project.last_error or "Project execution did not complete all stages"
+                self.orchestrator.block(project.last_error)
+                self._transition_job(
+                    project,
+                    MissionJobStatus.BLOCKED,
+                    f"Project blocked after retries: {project.mission.name}. "
+                    f"Last error: {project.last_error}",
+                )
+                event_type = "FACTORY_PROJECT_BLOCKED"
+            elif execution_failed:
+                project.status = "queued"
+                self._reset_for_retry(project)
+                self.queue.insert(0, project)
+                self._transition_job(
+                    project,
+                    MissionJobStatus.QUEUED,
+                    f"Retry queued after failed attempt: {project.mission.name}",
+                )
+                event_type = "FACTORY_PROJECT_RETRY_QUEUED"
+            else:
+                project.status = "queued"
+                self._transition_job(
+                    project,
+                    MissionJobStatus.QUEUED,
+                    f"Project paused and re-queued: {project.mission.name}",
+                )
+                event_type = "FACTORY_PROJECT_PAUSED"
+                self.queue.insert(0, project)
 
         self._save(project)
         job = self._load_job(project.mission.id)
