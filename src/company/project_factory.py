@@ -261,6 +261,9 @@ class ProjectFactory:
                     project.mission,
                     project.plan,
                 )
+                # Capture the authoritative result immediately. Processing optional
+                # stage telemetry below must never erase a completed pipeline result.
+                self._last_autonomous_result = autonomous_result
                 for step in project.plan.steps:
                     step.status = "completed"
                 # The autonomous runner's returned pipeline is the authoritative
@@ -294,7 +297,6 @@ class ProjectFactory:
                             {"success": True},
                         )()
                     ]
-                self._last_autonomous_result = autonomous_result
             else:
                 results = await self.pipeline.execute_mission(
                     project.mission,
@@ -411,11 +413,20 @@ class ProjectFactory:
                         .casefold()
                         != "completed"
                     ]
+                    incomplete_steps = [
+                        f"{step.stage.value}: {step.status}"
+                        for step in project.plan.steps
+                        if step.status != "completed"
+                    ]
+                    diagnostic_parts = failed_stages + incomplete_steps
+                    if not diagnostic_parts:
+                        diagnostic_parts.append(
+                            "no failed stage details were recorded; "
+                            f"orchestrator_status={self.orchestrator.state.status.value}"
+                        )
                     project.last_error = (
-                        "Project execution did not complete all stages. "
-                        + "; ".join(failed_stages)
-                        if failed_stages
-                        else "Project execution did not complete all stages"
+                        "Project execution did not complete all stages: "
+                        + "; ".join(diagnostic_parts)
                     )
                 self.orchestrator.block(project.last_error)
                 self._transition_job(
