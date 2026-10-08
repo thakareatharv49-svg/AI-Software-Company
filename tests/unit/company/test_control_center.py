@@ -196,10 +196,10 @@ def test_project_outputs_api() -> None:
 async def test_factory_run_api_starts_the_requested_mission() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
-    started: list[tuple[str, str]] = []
+    started: list[str] = []
 
     async def fake_run(**kwargs):
-        started.append((kwargs.get("mission_id", ""), center._factory.queue[0].mission.id))
+        started.append(center._factory.queue[0].mission.id)
 
     center._factory.run = fake_run
     try:
@@ -220,6 +220,6 @@ async def test_factory_run_api_starts_the_requested_mission() -> None:
             assert center._factory_task is not None
             await center._factory_task
 
-        assert started == [(mission_id, mission_id)]
+        assert started == [mission_id]
     finally:
         app.dependency_overrides.clear()
