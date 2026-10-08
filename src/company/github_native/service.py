@@ -88,15 +88,17 @@ class GitHubNativeService:
 
             branch_head = await self.github.client.get_branch(repository, branch)
 
+            # Use inline tree content instead of one POST /git/blobs request
+            # per generated file. This dramatically reduces GitHub secondary
+            # content-creation pressure for projects with many files.
             tree_entries: list[dict[str, str]] = []
             for path, content in files.items():
-                blob_sha = await self.github.client.create_blob(repository, content)
                 tree_entries.append(
                     {
                         "path": path,
                         "mode": "100644",
                         "type": "blob",
-                        "sha": blob_sha,
+                        "content": content,
                     }
                 )
 
