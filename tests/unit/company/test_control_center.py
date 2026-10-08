@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
+from src.company.browser_calculator import browser_calculator
 from src.company.control_center.routes import get_control_center
 from src.company.control_center.service import CompanyControlCenter, MissionSubmission
 from src.company.models.contracts import CompanyState
@@ -223,3 +224,12 @@ async def test_factory_run_api_starts_the_requested_mission() -> None:
         assert started == [mission_id]
     finally:
         app.dependency_overrides.clear()
+
+
+def test_browser_calculator_fallback_emits_valid_python() -> None:
+    generated = browser_calculator()
+    assert {"index.html", "style.css", "app.js", "calculator.py", "tests/test_calculator.py"} <= set(
+        generated.files
+    )
+    compile(generated.files["calculator.py"], "calculator.py", "exec")
+    compile(generated.files["tests/test_calculator.py"], "test_calculator.py", "exec")
