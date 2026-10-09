@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from inspect import isawaitable
+import traceback
 from typing import Any
 
 from company.ceo.ceo import AICEO
@@ -262,6 +263,8 @@ class AutonomousProjectRunner:
             result = action()
         except Exception as exc:
             detail = f"{type(exc).__name__}: {exc}"
+            trace = traceback.format_exc().strip()
+            detail = f"{detail}\nTraceback:\n{trace}"
             stages.append(StageResult(name, StageStatus.FAILED, detail))
             raise RuntimeError(f"Autonomous stage '{name}' failed: {detail}") from exc
         stages.append(StageResult(name, StageStatus.COMPLETED, "Stage completed."))
@@ -277,6 +280,8 @@ class AutonomousProjectRunner:
             result = await action()
         except Exception as exc:
             detail = f"{type(exc).__name__}: {exc}"
+            trace = traceback.format_exc().strip()
+            detail = f"{detail}\nTraceback:\n{trace}"
             stages.append(StageResult(name, StageStatus.FAILED, detail))
             raise RuntimeError(f"Autonomous stage '{name}' failed: {detail}") from exc
         stages.append(StageResult(name, StageStatus.COMPLETED, "Stage completed."))
