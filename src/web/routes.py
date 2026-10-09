@@ -17,6 +17,26 @@ async def company_app() -> FileResponse:
         headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
 
+def _find_product_entrypoint(root: Path) -> tuple[Path, Path] | None:
+    """Find a browser entry point at the root or in common frontend output folders."""
+    resolved_root = root.resolve()
+    for relative in (
+        Path("index.html"),
+        Path("frontend/index.html"),
+        Path("public/index.html"),
+        Path("dist/index.html"),
+        Path("build/index.html"),
+    ):
+        candidate = (resolved_root / relative).resolve()
+        try:
+            candidate.relative_to(resolved_root)
+        except ValueError:
+            continue
+        if candidate.is_file():
+            return candidate, candidate.parent
+    return None
+
+
 @router.get("/product/{mission_id}", include_in_schema=False)
 async def completed_product(mission_id: str) -> HTMLResponse:
     """Open the generated product browser entry point."""
@@ -28,24 +48,36 @@ async def completed_product(mission_id: str) -> HTMLResponse:
     )
     root = None
     index = None
+    asset_root = None
     for candidate, base in candidates:
         try:
             candidate.relative_to(base)
         except ValueError:
             continue
-        if candidate.is_dir() and (candidate / "index.html").is_file():
-            root, index = candidate, candidate / "index.html"
+        if not candidate.is_dir():
+            continue
+        entrypoint = _find_product_entrypoint(candidate)
+        if entrypoint is not None:
+            index, asset_root = entrypoint
+            root = candidate
             break
-    if root is None or index is None:
+    if root is None or index is None or asset_root is None:
         if any(candidate.is_dir() for candidate, _ in candidates):
-            raise HTTPException(status_code=404, detail="This product has no browser preview")
+            raise HTTPException(
+                status_code=404,
+                detail="This product has no browser preview (expected index.html in the product root, frontend, public, dist, or build folder)",
+            )
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Product URLs have no trailing slash. Without a base URL, relative assets
     # such as style.css and app.js resolve under /product/ instead of this
     # mission asset route, leaving generated apps unstyled and nonfunctional.
     html = index.read_text(encoding="utf-8")
-    base_tag = f'<base href="/product/{mission_id}/">'
+    asset_prefix = asset_root.relative_to(root).as_posix()
+    base_path = f"/product/{mission_id}/"
+    if asset_prefix != ".":
+        base_path += asset_prefix.rstrip("/") + "/"
+    base_tag = f'<base href="{base_path}">'
     head_pattern = r"(<head(?:\s[^>]*)?>)"
     if re.search(head_pattern, html, flags=re.IGNORECASE):
         html = re.sub(
@@ -95,7 +127,7 @@ async def completed_products() -> JSONResponse:
     for root in sorted(roots, key=lambda item: item.name):
         if root.name in seen:
             continue
-        if not root.is_dir() or not (root / "index.html").is_file():
+        if not root.is_dir() or _find_product_entrypoint(root) is None:
             continue
         seen.add(root.name)
         products.append({
