@@ -107,7 +107,7 @@ def notes_fallback_files() -> dict[str, str]:
     const query = state.query.trim().toLocaleLowerCase();
     return state.notes
       .filter((note) => state.view !== "pinned" || note.pinned)
-      .filter((note) => !query || (note.title + "\n" + note.body).toLocaleLowerCase().includes(query))
+      .filter((note) => !query || (note.title + "\\n" + note.body).toLocaleLowerCase().includes(query))
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
   }
   function showToast(message) {
@@ -127,7 +127,7 @@ def notes_fallback_files() -> dict[str, str]:
         '<div class="card-menu"><button class="icon-button" data-action="pin" aria-label="' + (note.pinned ? 'Unpin ' : 'Pin ') + escapeHTML(note.title) + '" title="' + (note.pinned ? 'Unpin note' : 'Pin note') + '">' + (note.pinned ? '⌑' : '◇') + '</button>' +
         '<button class="icon-button" data-action="delete" aria-label="Delete ' + escapeHTML(note.title) + '" title="Delete note">×</button></div></div>' +
         '<h3>' + escapeHTML(note.title) + '</h3><p class="note-preview">' + escapeHTML(preview) + '</p>' +
-        '<div class="note-card-bottom"><span class="note-tag">' + Math.max(1, note.body.trim().split(/\s+/).filter(Boolean).length) + ' WORDS</span>' +
+        '<div class="note-card-bottom"><span class="note-tag">' + Math.max(1, note.body.trim().split(/\\s+/).filter(Boolean).length) + ' WORDS</span>' +
         '<button class="edit-link" data-action="edit">Open note ↗</button></div></article>';
     }).join("");
     empty.classList.toggle("visible", notes.length === 0);
@@ -243,7 +243,7 @@ def notes_fallback_files() -> dict[str, str]:
   render();
   window.PaperNotes = {
     getNotes: () => state.notes.map((note) => ({ ...note })),
-    search: (query) => state.notes.filter((note) => (note.title + "\n" + note.body).toLocaleLowerCase().includes(String(query).toLocaleLowerCase())),
+    search: (query) => state.notes.filter((note) => (note.title + "\\n" + note.body).toLocaleLowerCase().includes(String(query).toLocaleLowerCase())),
     saveNotes,
     visibleNotes
   };
