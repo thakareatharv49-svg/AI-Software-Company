@@ -217,6 +217,14 @@ class CompanyExecutionPipeline:
                 f"{qa_result.stderr or qa_result.stdout}"
             )
 
+        # QA repair agents can edit the workspace on disk. Reconcile those
+        # edits before security review and GitHub publishing so the delivered
+        # files are exactly the version that passed the final QA command.
+        self._sync_generated_files_from_workspace(
+            qa_request.working_directory,
+            files,
+        )
+
         self.project_engine.transition(
             project.id,
             ProjectStatus.SECURITY,
@@ -550,6 +558,78 @@ class CompanyExecutionPipeline:
             return agents[0].name
 
         raise RuntimeError("No repair agent is registered")
+
+    @staticmethod
+    def _sync_generated_files_from_workspace(
+        working_directory: str,
+        files: dict[str, str],
+    ) -> None:
+        """Refresh the deliverable file map from the post-repair workspace."""
+        root = Path(working_directory).resolve()
+        ignored_directories = {
+            ".git",
+            ".venv",
+            "venv",
+            "node_modules",
+            "__pycache__",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".factory-checkpoints",
+            "dist",
+            "build",
+        }
+        refreshed: dict[str, str] = {}
+        file_count = 0
+        total_bytes = 0
+        max_file_bytes = 2_000_000
+        max_total_bytes = 20_000_000
+        max_files = 500
+
+        if not root.is_dir():
+            raise RuntimeError(
+                f"Cannot synchronize generated files: workspace does not exist: {root}"
+            )
+
+        for path in sorted(root.rglob("*")):
+            if path.is_symlink() or not path.is_file():
+                continue
+            relative = path.relative_to(root)
+            if any(part in ignored_directories for part in relative.parts):
+                continue
+            try:
+                resolved = path.resolve()
+                resolved.relative_to(root)
+            except (OSError, ValueError):
+                continue
+
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue
+            if size > max_file_bytes:
+                # Preserve existing content only when it was already tracked and
+                # still readable; never silently publish an oversized new file.
+                continue
+            if file_count >= max_files or total_bytes + size > max_total_bytes:
+                break
+            try:
+                content = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                continue
+
+            key = relative.as_posix()
+            refreshed[key] = content
+            file_count += 1
+            total_bytes += size
+
+        if not refreshed and files:
+            raise RuntimeError(
+                "Cannot synchronize generated files: workspace contains no readable "
+                "project source files after QA."
+            )
+        files.clear()
+        files.update(refreshed)
 
     def _build_repair_callback(
         self,
