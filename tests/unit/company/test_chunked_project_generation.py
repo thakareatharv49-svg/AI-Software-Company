@@ -204,3 +204,48 @@ async def test_large_mission_reports_exhausted_manifest_transport_retries(
 
     assert calls == 2
     assert "Ollama timed out" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_later_file_prompt_includes_actual_previously_generated_source(
+    monkeypatch, tmp_path
+):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    responses = [
+        json.dumps({
+            "files": [
+                {"path": "index.html", "purpose": "Notes app interface and controls"},
+                {"path": "app.js", "purpose": "Notes interactions and state"},
+            ]
+        }),
+        json.dumps({
+            "content": (
+                '<!doctype html><html><head><title>Notes</title></head><body>'
+                '<button id="add-note">Add note</button>'
+                '<script src="app.js"></script></body></html>'
+            )
+        }),
+        json.dumps({
+            "content": (
+                'document.querySelector("#add-note")?.addEventListener("click", () => {});'
+            )
+        }),
+    ]
+    payloads = []
+
+    async def fake_call(payload):
+        payloads.append(payload)
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    project = await generator._generate_large_mission(
+        "Notes App",
+        "Create, edit, delete, pin and search notes with responsive local storage.",
+    )
+
+    assert "index.html" in project.files
+    assert "app.js" in project.files
+    later_file_prompt = payloads[2]["prompt"]
+    assert "FILE: index.html" in later_file_prompt
+    assert '<button id="add-note">Add note</button>' in later_file_prompt
+    assert '<script src="app.js"></script>' in later_file_prompt
