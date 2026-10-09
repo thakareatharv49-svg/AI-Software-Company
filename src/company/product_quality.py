@@ -47,9 +47,9 @@ def find_unfinished_product_content(files: Mapping[str, str]) -> list[str]:
 # These are deterministic signs that generated tests do not test product behavior.
 # Keep the detector deliberately narrow to avoid rejecting legitimate test suites.
 _WEAK_TEST_ASSERTIONS = (
-    r"assert\\s+True\\b",
-    r"assert\\s+1\\s*==\\s*1\\b",
-    r"assert\\s+0\\s*==\\s*0\\b",
+    r"assert\s+True\b",
+    r"assert\s+1\s*==\s*1\b",
+    r"assert\s+0\s*==\s*0\b",
 )
 
 
@@ -59,7 +59,7 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
 
     issues: list[str] = []
     for path, content in files.items():
-        normalized = path.replace("\\\\", "/").casefold()
+        normalized = path.replace("\\", "/").casefold()
         name = normalized.rsplit("/", 1)[-1]
         in_tests = (
             normalized.startswith("tests/")
@@ -76,4 +76,3 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
                 )
                 break
     return issues
-
