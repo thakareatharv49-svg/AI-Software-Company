@@ -219,10 +219,28 @@ Rules:
         if saved_checkpoint is not None:
             manifest = {"files": saved_checkpoint["manifest"]}
         else:
-            try:
-                manifest = json.loads(await self._call(manifest_payload))
-            except json.JSONDecodeError as exc:
-                raise RuntimeError("Ollama returned invalid JSON for the project file plan") from exc
+            manifest_error: json.JSONDecodeError | None = None
+            for manifest_attempt in range(1, 3):
+                try:
+                    manifest = json.loads(await self._call(manifest_payload))
+                    break
+                except json.JSONDecodeError as exc:
+                    manifest_error = exc
+                    if manifest_attempt == 2:
+                        raise RuntimeError(
+                            "Ollama returned invalid JSON for the project file plan "
+                            "after one corrective retry"
+                        ) from exc
+                    manifest_payload = dict(manifest_payload)
+                    manifest_payload["prompt"] += (
+                        "\n\nCorrective retry: the previous response was not valid JSON. "
+                        "Return only the exact JSON object requested, with no markdown "
+                        "fences or explanatory text."
+                    )
+            if manifest_error is not None and "manifest" not in locals():
+                raise RuntimeError(
+                    "Ollama could not produce a valid project file plan"
+                ) from manifest_error
 
         raw_manifest = manifest.get("files")
         if not isinstance(raw_manifest, list) or not raw_manifest:
@@ -327,12 +345,22 @@ Requirements:
             # so a transient model/JSON failure does not force regeneration of them.
             for attempt in range(1, 4):
                 attempt_payload = dict(file_payload)
+                attempt_payload["options"] = dict(file_payload["options"])
+                attempt_payload["options"]["num_predict"] = {
+                    1: 3500,
+                    2: 2400,
+                    3: 1600,
+                }[attempt]
                 if last_error is not None:
                     attempt_payload["prompt"] = (
                         file_prompt
-                        + "\n\nPrevious attempt failed with this error: "
+                        + "\n\nAdaptive recovery attempt "
+                        + str(attempt)
+                        + ": keep this file concise and implement the essential behavior "
+                        "completely. Avoid long comments and unnecessary abstraction. "
+                        "Return corrected valid JSON with a non-empty content string."
+                        + "\nPrevious attempt failed with this error: "
                         + str(last_error)[:600]
-                        + "\nReturn corrected valid JSON with a non-empty content string."
                     )
                 try:
                     parsed = json.loads(await self._call(attempt_payload))
