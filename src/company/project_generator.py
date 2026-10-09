@@ -100,10 +100,11 @@ Rules:
         if any(term in request_text for term in todo_terms):
             from src.company.todo_fallback import todo_fallback_files
 
-            return GeneratedProject(
+            fallback = GeneratedProject(
                 files=todo_fallback_files(),
                 test_command=["python", "-m", "pytest", "-q"],
             )
+            return self._validated_fallback(name, objective, fallback)
         # Expense Tracker is a supported deterministic browser product. Do not
         # let a slow/unavailable local model turn this common mission into a
         # blocked project; the generated app remains fully interactive offline.
@@ -114,11 +115,11 @@ Rules:
             # Use the deterministic product when the real local model is active.
             # Preserve injected/mocked _call implementations so generation and
             # repair behavior remain testable and extensible.
-            return self._fallback_expense_tracker()
+            return self._validated_fallback(name, objective, self._fallback_expense_tracker())
         if "calculator" in request_text:
-            return self._fallback_calculator()
+            return self._validated_fallback(name, objective, self._fallback_calculator())
         if "tic tac toe" in request_text or "tictactoe" in request_text or "tic-tac-toe" in request_text:
-            return self._fallback_tic_tac_toe()
+            return self._validated_fallback(name, objective, self._fallback_tic_tac_toe())
 
         # Large missions are generated file-by-file so one truncated or malformed
         # response cannot discard the whole product. Keep the existing single-pass
@@ -356,6 +357,16 @@ Requirements:
         return GeneratedProject(files=files, test_command=test_command)
 
     @staticmethod
+    def _validated_fallback(
+        name: str,
+        objective: str,
+        project: GeneratedProject,
+    ) -> GeneratedProject:
+        """Apply the shared output checks to deterministic products as well."""
+        OllamaProjectGenerator._validate_mission_output(name, objective, project)
+        return project
+
+    @staticmethod
     def _validate_mission_output(
         name: str,
         objective: str,
@@ -381,7 +392,9 @@ Requirements:
             "dashboard", "tracker", "planner", "storefront", "e-commerce",
             " ecommerce", "portfolio", "landing page", "management system",
             "booking system", "learning app", "educational app", "budget app",
-            "expense app", "productivity app", "build an app", "build a app",
+            "expense app", "expense tracker", "productivity app", "calculator",
+            "tic tac toe", "tictactoe", "tic-tac-toe", "todo", "to-do",
+            "task manager", "task list", "build an app", "build a app",
             "build app", "create an app", "create app",
         )
         if not any(term in mission for term in browser_terms):
