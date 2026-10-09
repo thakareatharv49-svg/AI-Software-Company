@@ -43,9 +43,11 @@ async def test_large_mission_generates_each_file_independently(monkeypatch) -> N
         return responses.pop(0)
 
     monkeypatch.setattr(generator, "_call", fake_call)
+    # Use a different large browser product here: Notes App missions now take
+    # the deterministic implementation path and should not exercise Ollama.
     project = await generator.generate(
-        "Notes App",
-        "Create, edit, delete, pin and search notes with responsive local storage.",
+        "Project Planner",
+        "Create, edit, delete and search project tasks in a responsive browser app.",
     )
 
     assert set(project.files) == {
