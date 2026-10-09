@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
 
 from company.acceptance import AcceptanceStatus, AutonomousCompanyAcceptance
 from company.autonomous_project import StageResult, StageStatus
@@ -17,9 +18,6 @@ def test_acceptance_stage_names_are_stable() -> None:
     changed = replace(stage, status=StageStatus.FAILED)
     assert stage.status == StageStatus.COMPLETED
     assert changed.status == StageStatus.FAILED
-
-
-from types import SimpleNamespace
 
 
 def _accepted_result(stage_names: tuple[str, ...] | None = None):
@@ -53,7 +51,11 @@ def test_acceptance_passes_only_when_all_delivery_checks_pass() -> None:
 
 def test_acceptance_rejects_missing_required_lifecycle_stage() -> None:
     result = _accepted_result(
-        tuple(name for name in AutonomousCompanyAcceptance.REQUIRED_STAGES if name != "deployment")
+        tuple(
+            name
+            for name in AutonomousCompanyAcceptance.REQUIRED_STAGES
+            if name != "deployment"
+        )
     )
 
     report = AutonomousCompanyAcceptance().evaluate(result)
