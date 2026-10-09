@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any
 
 from company.autonomous_project import AutonomousProjectResult
 
@@ -44,63 +45,74 @@ class AutonomousCompanyAcceptance:
         "dashboard",
     )
 
+    @staticmethod
+    def _status_value(value: Any) -> str:
+        """Read enum-backed and plain-string statuses consistently."""
+        raw = getattr(value, "value", value)
+        return str(raw).strip().lower()
+
     def evaluate(self, result: AutonomousProjectResult) -> CompanyAcceptanceReport:
         checks: list[AcceptanceCheck] = []
         stage_map = {stage.name: stage for stage in result.stages}
 
+        mission_status = self._status_value(result.ceo.mission.status)
         checks.append(
             AcceptanceCheck(
                 "mission_approved",
-                not result.ceo.decision.requires_human
-                and result.ceo.mission.status.value == "approved",
+                not result.ceo.decision.requires_human and mission_status == "approved",
                 "Mission was approved without human escalation.",
             )
         )
 
         for name in self.REQUIRED_STAGES:
             stage = stage_map.get(name)
+            stage_completed = (
+                stage is not None
+                and self._status_value(stage.status) == "completed"
+            )
             checks.append(
                 AcceptanceCheck(
                     name,
-                    stage is not None and stage.status.value == "completed",
+                    stage_completed,
                     "Required autonomous stage completed."
-                    if stage is not None and stage.status.value == "completed"
+                    if stage_completed
                     else "Required autonomous stage did not complete.",
                 )
             )
 
+        project = result.pipeline.project
         checks.append(
             AcceptanceCheck(
                 "real_project",
-                bool(result.pipeline.project.id and result.pipeline.project.name),
+                bool(project.id and project.name),
                 "Project identity is present.",
             )
         )
         checks.append(
             AcceptanceCheck(
                 "qa_passed",
-                result.pipeline.qa_result.status.value == "passed",
+                self._status_value(result.pipeline.qa_result.status) == "passed",
                 "QA gate passed.",
             )
         )
         checks.append(
             AcceptanceCheck(
                 "security_approved",
-                result.pipeline.review_result.status.value == "approved",
+                self._status_value(result.pipeline.review_result.status) == "approved",
                 "Security/code review gate approved.",
             )
         )
         checks.append(
             AcceptanceCheck(
                 "deployment_completed",
-                result.deployment.status.value == "completed",
+                self._status_value(result.deployment.status) == "completed",
                 "Deployment completed.",
             )
         )
         checks.append(
             AcceptanceCheck(
                 "monitoring_completed",
-                result.monitoring.status.value == "completed",
+                self._status_value(result.monitoring.status) == "completed",
                 "Monitoring completed.",
             )
         )
