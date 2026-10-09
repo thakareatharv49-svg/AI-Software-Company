@@ -243,19 +243,30 @@ class ProjectFactory:
                 {"attempt": project.attempts},
             )
 
-        if self.orchestrator.state.status.value != "running":
-            self.controller.start(project.mission)
-
-        self.orchestrator.events.publish(
-            CompanyEvent(
-                event_type="FACTORY_PROJECT_STARTED",
-                message=f"Factory started project: {project.mission.name}",
-                project_id=f"project:{project.mission.id}",
-            )
-        )
-
         self._last_autonomous_result = None
         try:
+            # Keep startup inside the guarded execution path. A controller/startup
+            # failure must be recorded as the real error, not misreported later as
+            # a project whose stages simply remained "planned".
+            if self.orchestrator.state.status.value != "running":
+                self.controller.start(project.mission)
+
+            startup_status = self.orchestrator.state.status.value
+            if startup_status != "running":
+                raise RuntimeError(
+                    "Mission execution did not start: "
+                    f"orchestrator_status={startup_status}; "
+                    f"mission_id={project.mission.id}"
+                )
+
+            self.orchestrator.events.publish(
+                CompanyEvent(
+                    event_type="FACTORY_PROJECT_STARTED",
+                    message=f"Factory started project: {project.mission.name}",
+                    project_id=f"project:{project.mission.id}",
+                )
+            )
+
             if self.autonomous_runner is not None:
                 autonomous_result = await self.autonomous_runner.run(
                     project.mission,
@@ -468,6 +479,10 @@ class ProjectFactory:
         audit_metadata = {
             "attempt": project.attempts,
             "stages_executed": project.stages_executed,
+            "orchestrator_status": self.orchestrator.state.status.value,
+            "execution_mode": (
+                "autonomous" if self.autonomous_runner is not None else "agent_pipeline"
+            ),
         }
         if project.last_error:
             audit_metadata["error"] = project.last_error
