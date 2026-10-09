@@ -148,3 +148,89 @@ def test_factory_persists_stage_progress_to_the_mission_job():
     persisted = job_store.get(mission.id)
     assert step(persisted.plan, "research").status == "running"
     assert step(persisted.plan, "research").detail == "Research started."
+
+
+def test_final_acceptance_failure_marks_only_the_rejected_factory_stage():
+    from types import SimpleNamespace
+
+    plan = make_plan()
+    FactoryAutonomousRunner._record_acceptance_failures(
+        plan,
+        [
+            SimpleNamespace(
+                name="qa_passed",
+                detail="Generated product tests failed.",
+            ),
+            SimpleNamespace(
+                name="security_approved",
+                detail="Security review rejected an unsafe pattern.",
+            ),
+        ],
+    )
+
+    assert step(plan, "qa").status == "failed"
+    assert "Generated product tests failed" in step(plan, "qa").detail
+    assert step(plan, "security").status == "failed"
+    assert "Security review rejected" in step(plan, "security").detail
+    assert step(plan, "research").status == "planned"
+    assert step(plan, "architecture").status == "planned"
+
+
+@pytest.mark.asyncio
+async def test_progress_persistence_failure_does_not_abort_autonomous_run(tmp_path):
+    from types import SimpleNamespace
+
+    from src.company.acceptance import AutonomousCompanyAcceptance
+
+    class Stage:
+        def __init__(self, name):
+            self.name = name
+            self.status = "completed"
+
+    class Runner:
+        async def run(self, request):
+            return SimpleNamespace(
+                stages=tuple(
+                    Stage(name)
+                    for name in AutonomousCompanyAcceptance.REQUIRED_STAGES
+                ),
+                ceo=SimpleNamespace(
+                    decision=SimpleNamespace(requires_human=False),
+                    mission=SimpleNamespace(status="approved"),
+                ),
+                pipeline=SimpleNamespace(
+                    project=SimpleNamespace(id="telemetry-ok", name="Notes"),
+                    qa_result=SimpleNamespace(status="passed"),
+                    review_result=SimpleNamespace(status="approved"),
+                ),
+                deployment=SimpleNamespace(status="completed"),
+                monitoring=SimpleNamespace(status="completed"),
+                learning=SimpleNamespace(signals=[{"kind": "success"}]),
+            )
+
+    def build_request(mission, plan):
+        from company.ceo.models import Mission as CEOMission
+        from src.company.autonomous_project import AutonomousProjectRequest
+
+        return AutonomousProjectRequest.model_construct(
+            mission=CEOMission(mission_id=mission.id, objective=mission.objective),
+            research_query=mission.objective,
+            project_request=None,
+            manager_mission=None,
+            tasks=(),
+            qa_request=None,
+            files={},
+        )
+
+    adapter = FactoryAutonomousRunner(
+        Runner(),
+        build_request,
+        workspace_service=ProjectExecutionService(tmp_path),
+    )
+    result = await adapter.run(
+        CompanyMission(name="Notes", objective="Build a notes app"),
+        make_plan(),
+        on_progress=lambda _plan: (_ for _ in ()).throw(RuntimeError("database offline")),
+    )
+
+    assert result.pipeline.project.id == "telemetry-ok"
