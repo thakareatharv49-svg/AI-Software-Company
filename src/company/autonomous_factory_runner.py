@@ -45,10 +45,29 @@ class FactoryAutonomousRunner:
         self,
         mission: CompanyMission,
         plan: MissionPlan,
+        on_progress: Callable[[MissionPlan], None] | None = None,
     ) -> AutonomousProjectResult:
-        request = self.request_builder(mission, plan)
-        if hasattr(request, "__await__"):
-            request = await request
+        def record_progress(stage_name: str, status: str, detail: str) -> None:
+            self._record_stage_progress(plan, stage_name, status, detail)
+            if on_progress is not None:
+                on_progress(plan)
+
+        record_progress(
+            "product_generation", "running", "Generating mission-specific project files."
+        )
+        try:
+            request = self.request_builder(mission, plan)
+            if hasattr(request, "__await__"):
+                request = await request
+        except Exception as exc:
+            record_progress(
+                "product_generation", "failed",
+                f"{type(exc).__name__}: {exc}",
+            )
+            raise
+        record_progress(
+            "product_generation", "completed", "Mission-specific project files generated."
+        )
         workspace = self.workspace_service.create_workspace(mission.id)
 
         try:
@@ -64,6 +83,10 @@ class FactoryAutonomousRunner:
                         }
                     ),
                 )
+            request = replace(
+                request,
+                stage_callback=record_progress,
+            )
             result = await self.runner.run(request)
             report = AutonomousCompanyAcceptance().evaluate(result)
             if not report.passed:
@@ -81,3 +104,67 @@ class FactoryAutonomousRunner:
             # Completed workspaces are intentionally retained for the product
             # viewer. Failed attempts are also retained for diagnostics/retry.
             pass
+
+    @staticmethod
+    def _record_stage_progress(
+        plan: MissionPlan,
+        stage_name: str,
+        status: str,
+        detail: str,
+    ) -> None:
+        """Project autonomous lifecycle progress onto the visible factory plan."""
+        normalized_status = str(status).strip().lower()
+        mappings: dict[str, tuple[str, ...]] = {
+            "product_generation": ("execution",),
+            "ai_ceo": ("product",),
+            "research": ("research",),
+            "research_handoff": ("research",),
+            "product_definition": ("product",),
+            "architecture": ("architecture",),
+            "engineering_qa_security_github": (
+                "tasks", "agents", "execution", "qa", "security", "github"
+            ),
+            "deployment": ("deployment",),
+            "monitoring": ("monitoring",),
+            "learning": ("learning",),
+        }
+        target_names = mappings.get(stage_name, ())
+        if not target_names:
+            return
+
+        step_by_name = {step.stage.value: step for step in plan.steps}
+        failure_text = detail.casefold()
+        if stage_name == "engineering_qa_security_github":
+            if normalized_status == "running":
+                target_names = ("tasks", "agents", "execution")
+            elif normalized_status == "failed":
+                if "qa failed" in failure_text or (
+                    "test" in failure_text and "failed" in failure_text
+                ):
+                    for name in ("tasks", "agents", "execution"):
+                        step = step_by_name.get(name)
+                        if step is not None:
+                            step.status = "completed"
+                            step.detail = "Engineering completed before QA failed."
+                    target_names = ("qa",)
+                elif "code review failed" in failure_text or "security" in failure_text:
+                    for name in ("tasks", "agents", "execution", "qa"):
+                        step = step_by_name.get(name)
+                        if step is not None:
+                            step.status = "completed"
+                            step.detail = "Stage completed before security review failed."
+                    target_names = ("security",)
+                else:
+                    for name in ("tasks", "agents"):
+                        step = step_by_name.get(name)
+                        if step is not None:
+                            step.status = "completed"
+                            step.detail = "Engineering setup completed."
+                    target_names = ("execution",)
+        targets = [step_by_name[name] for name in target_names if name in step_by_name]
+
+        for step in targets:
+            if normalized_status == "running" and step.status not in {"running", "completed"}:
+                step.attempts += 1
+            step.status = normalized_status
+            step.detail = detail
