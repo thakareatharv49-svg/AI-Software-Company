@@ -251,17 +251,36 @@ Requirements:
                 "keep_alive": "10m",
                 "options": {"temperature": 0.1, "num_predict": 3500},
             }
-            try:
-                parsed = json.loads(await self._call(file_payload))
-            except json.JSONDecodeError as exc:
-                raise RuntimeError(
-                    f"Ollama returned invalid JSON while generating '{path}'"
-                ) from exc
-            file_content = parsed.get("content")
-            if not isinstance(file_content, str) or not file_content.strip():
-                raise RuntimeError(f"Ollama returned empty content for '{path}'")
-            if len(file_content.encode("utf-8")) > 2_000_000:
-                raise RuntimeError(f"Generated file '{path}' exceeds the 2 MB safety limit")
+            last_error: Exception | None = None
+            file_content: str | None = None
+            # Retry only the current file. Earlier generated files stay in memory,
+            # so a transient model/JSON failure does not force regeneration of them.
+            for attempt in range(1, 4):
+                attempt_payload = dict(file_payload)
+                if last_error is not None:
+                    attempt_payload["prompt"] = (
+                        file_prompt
+                        + "\\n\\nPrevious attempt failed with this error: "
+                        + str(last_error)[:600]
+                        + "\\nReturn corrected valid JSON with a non-empty content string."
+                    )
+                try:
+                    parsed = json.loads(await self._call(attempt_payload))
+                    candidate = parsed.get("content")
+                    if not isinstance(candidate, str) or not candidate.strip():
+                        raise RuntimeError(f"Ollama returned empty content for '{path}'")
+                    if len(candidate.encode("utf-8")) > 2_000_000:
+                        raise RuntimeError(f"Generated file '{path}' exceeds the 2 MB safety limit")
+                    file_content = candidate
+                    break
+                except (RuntimeError, json.JSONDecodeError) as exc:
+                    last_error = exc
+                    if attempt == 3:
+                        raise RuntimeError(
+                            f"Failed to generate '{path}' after {attempt} attempts: {exc}"
+                        ) from exc
+            if file_content is None:
+                raise RuntimeError(f"Failed to generate '{path}' after 3 attempts")
             files[path] = file_content
 
         return GeneratedProject(files=files, test_command=test_command)
