@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -376,6 +379,42 @@ Requirements:
                     f"Generated browser product references missing local asset '{reference}'. "
                     "Include every referenced local script, stylesheet, and asset in the output."
                 )
+
+        OllamaProjectGenerator._validate_javascript_syntax(project.files)
+
+    @staticmethod
+    def _validate_javascript_syntax(files: dict[str, str]) -> None:
+        """Parse generated JavaScript without executing it, when Node.js is available."""
+        node = shutil.which("node")
+        if not node:
+            return
+
+        scripts = {
+            path: content
+            for path, content in files.items()
+            if path.lower().endswith((".js", ".mjs", ".cjs"))
+        }
+        if not scripts:
+            return
+
+        with tempfile.TemporaryDirectory(prefix="factory-js-check-") as temp_dir:
+            root = Path(temp_dir)
+            for path, content in scripts.items():
+                check_path = root / "generated.js"
+                check_path.write_text(content, encoding="utf-8")
+                result = subprocess.run(
+                    [node, "--check", str(check_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    check=False,
+                )
+                if result.returncode:
+                    detail = (result.stderr or result.stdout).strip()
+                    raise RuntimeError(
+                        f"Generated JavaScript has a syntax error in '{path}': "
+                        f"{detail[:1200]}"
+                    )
 
     async def repair(
         self,
