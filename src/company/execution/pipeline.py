@@ -250,14 +250,16 @@ class CompanyExecutionPipeline:
         gate = self.quality_gate.evaluate(
             qa_passed=qa_result.status == QATestStatus.PASSED,
             security_approved=review_result.status.value == "approved",
+            # Local execution must remain valid even when GitHub publishing
+            # is configured globally. GitHub readiness is required only when
+            # this run explicitly requests repository/PR publication.
             github_ready=(
+                github_repository is None
+                and pull_request_head is None
+            ) or (
                 self.github is not None
                 and github_repository is not None
                 and pull_request_head is not None
-            ) or (
-                self.github is None
-                and github_repository is None
-                and pull_request_head is None
             ),
             deployment_ready=True,
         )
