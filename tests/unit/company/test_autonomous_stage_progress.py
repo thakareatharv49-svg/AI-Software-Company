@@ -209,9 +209,17 @@ async def test_progress_persistence_failure_does_not_abort_autonomous_run(tmp_pa
             )
 
     def build_request(mission, plan):
-        return SimpleNamespace(
-            files={},
+        from company.ceo.models import Mission as CEOMission
+        from src.company.autonomous_project import AutonomousProjectRequest
+
+        return AutonomousProjectRequest.model_construct(
+            mission=CEOMission(mission_id=mission.id, objective=mission.objective),
+            research_query=mission.objective,
+            project_request=None,
+            manager_mission=None,
+            tasks=(),
             qa_request=None,
+            files={},
         )
 
     adapter = FactoryAutonomousRunner(
