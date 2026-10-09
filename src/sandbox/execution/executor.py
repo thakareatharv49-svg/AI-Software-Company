@@ -129,62 +129,14 @@ class SandboxExecutor:
         return command
 
     async def execute(self, request: SandboxRequest) -> SandboxResult:
-        request = request.model_copy(
-            update={"command": self._normalize_python_command(request.command)}
-        )
-        working_directory = self._validate(request)
+        """Execute without relying on event-loop subprocess support.
 
-        started = time.perf_counter()
-
-        process = await asyncio.create_subprocess_exec(
-            *request.command,
-            cwd=str(working_directory),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=self._build_environment(),
-        )
-
-        try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                process.communicate(),
-                timeout=request.limits.timeout_seconds,
-            )
-        except TimeoutError:
-            process.kill()
-            await process.wait()
-
-            duration_ms = int((time.perf_counter() - started) * 1000)
-
-            return SandboxResult(
-                status=SandboxStatus.TIMEOUT,
-                duration_ms=duration_ms,
-                error="Sandbox command timed out",
-            )
-
-        duration_ms = int((time.perf_counter() - started) * 1000)
-
-        stdout = self._decode_output(
-            stdout_bytes,
-            request.limits.max_output_bytes,
-        )
-        stderr = self._decode_output(
-            stderr_bytes,
-            request.limits.max_output_bytes,
-        )
-
-        status = (
-            SandboxStatus.SUCCESS
-            if process.returncode == 0
-            else SandboxStatus.FAILED
-        )
-
-        return SandboxResult(
-            status=status,
-            exit_code=process.returncode,
-            stdout=stdout,
-            stderr=stderr,
-            duration_ms=duration_ms,
-        )
+        Windows event loops used by some ASGI reload configurations do not
+        implement asyncio subprocess transports. Running the existing bounded
+        synchronous subprocess implementation in a worker thread keeps the
+        event loop responsive and works across supported loop implementations.
+        """
+        return await asyncio.to_thread(self.execute_sync, request)
 
     def execute_sync(self, request: SandboxRequest) -> SandboxResult:
         request = request.model_copy(
