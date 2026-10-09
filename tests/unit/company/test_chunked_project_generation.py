@@ -34,7 +34,7 @@ async def test_large_mission_generates_each_file_independently(monkeypatch) -> N
         json.dumps({"content": "<!doctype html><html><head><title>Notes</title></head><body><script src=\"app.js\"></script><link rel=\"stylesheet\" href=\"style.css\"></body></html>"}),
         json.dumps({"content": "body { font-family: sans-serif; }"}),
         json.dumps({"content": "function addNote(text) { return { text }; }"}),
-        json.dumps({"content": "def test_notes_app_contract():\n    assert True\n"}),
+        json.dumps({"content": "def add_note(text):\n    return {\"text\": text}\n\ndef test_add_note_preserves_content():\n    assert add_note(\"Plan\")[\"text\"] == \"Plan\"\n"}),
     ]
     payloads = []
 
