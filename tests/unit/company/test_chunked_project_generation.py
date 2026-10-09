@@ -69,3 +69,28 @@ async def test_large_mission_rejects_unsafe_manifest_paths(monkeypatch) -> None:
     monkeypatch.setattr(generator, "_call", fake_call)
     with pytest.raises(RuntimeError, match="Unsafe path"):
         await generator._generate_large_mission("Notes App", "Create, edit, delete, pin, search notes.")
+
+
+@pytest.mark.asyncio
+async def test_large_mission_retries_only_the_failed_file(monkeypatch) -> None:
+    generator = OllamaProjectGenerator()
+    responses = [
+        json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
+        "not valid JSON",
+        json.dumps({"content": "<!doctype html><title>Recovered</title>"}),
+    ]
+    prompts = []
+
+    async def fake_call(payload):
+        prompts.append(payload["prompt"])
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    project = await generator._generate_large_mission(
+        "Large app",
+        "Create, edit, delete, pin and search items with responsive UI.",
+    )
+
+    assert project.files["index.html"] == "<!doctype html><title>Recovered</title>"
+    assert len(prompts) == 3
+    assert "Previous attempt failed with this error" in prompts[2]
