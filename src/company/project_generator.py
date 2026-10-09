@@ -418,14 +418,43 @@ def test_game_contains_core_features():
         raise RuntimeError("Ollama repair failed and no deterministic repair is available")
 
     async def _call(self, payload: dict) -> str:
-        async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
-            response = await client.post(
-                f"{settings.ollama_base_url.rstrip('/')}/api/generate",
-                json=payload,
+        model = str(payload.get("model", settings.ollama_model))
+        try:
+            async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
+                response = await client.post(
+                    f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                    json=payload,
+                )
+                response.raise_for_status()
+                data = response.json()
+        except httpx.TimeoutException as exc:
+            raise RuntimeError(
+                "Ollama project generation timed out after "
+                f"{settings.ollama_timeout:g}s for model '{model}'. "
+                "Increase OLLAMA_TIMEOUT or use a faster/smaller mission."
+            ) from exc
+        except httpx.HTTPStatusError as exc:
+            body = exc.response.text[:500].replace("\\n", " ")
+            raise RuntimeError(
+                f"Ollama returned HTTP {exc.response.status_code} for model "
+                f"'{model}': {body}"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise RuntimeError(
+                f"Could not reach Ollama at {settings.ollama_base_url}: {exc}"
+            ) from exc
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Ollama returned a non-JSON API response for model '{model}'"
+            ) from exc
+
+        result = data.get("response")
+        if not isinstance(result, str) or not result.strip():
+            raise RuntimeError(
+                f"Ollama returned an empty generation for model '{model}'. "
+                "Try a smaller mission or a model with a larger context window."
             )
-            response.raise_for_status()
-            data = response.json()
-        return str(data.get("response", ""))
+        return result
 
     def _parse(self, response: str) -> GeneratedProject:
         try:
