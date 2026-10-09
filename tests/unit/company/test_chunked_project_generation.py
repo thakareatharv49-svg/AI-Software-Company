@@ -95,3 +95,57 @@ async def test_large_mission_retries_only_the_failed_file(monkeypatch, tmp_path)
     assert project.files["index.html"] == "<!doctype html><title>Recovered</title>"
     assert len(prompts) == 3
     assert "Previous attempt failed with this error" in prompts[2]
+
+
+@pytest.mark.asyncio
+async def test_large_mission_adapts_file_token_budget_after_invalid_json(monkeypatch, tmp_path):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    responses = [
+        json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
+        "not valid JSON",
+        json.dumps({"content": "<!doctype html><title>Recovered compact file</title>"}),
+    ]
+    payloads = []
+
+    async def fake_call(payload):
+        payloads.append(payload)
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    project = await generator._generate_large_mission(
+        "Large app",
+        "Create, edit, delete, pin and search items with responsive UI.",
+    )
+
+    assert project.files["index.html"] == "<!doctype html><title>Recovered compact file</title>"
+    assert [payload["options"]["num_predict"] for payload in payloads] == [
+        1800,
+        3500,
+        2400,
+    ]
+    assert "Adaptive recovery attempt 2" in payloads[-1]["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_large_mission_retries_invalid_file_manifest(monkeypatch, tmp_path):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    responses = [
+        "not valid JSON",
+        json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
+        json.dumps({"content": "<!doctype html><title>Manifest recovered</title>"}),
+    ]
+    payloads = []
+
+    async def fake_call(payload):
+        payloads.append(payload)
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    project = await generator._generate_large_mission(
+        "Large app",
+        "Create, edit, delete, pin and search items with responsive UI.",
+    )
+
+    assert project.files["index.html"] == "<!doctype html><title>Manifest recovered</title>"
+    assert len(payloads) == 3
+    assert "Corrective retry" in payloads[1]["prompt"]
