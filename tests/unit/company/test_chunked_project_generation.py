@@ -72,8 +72,9 @@ async def test_large_mission_rejects_unsafe_manifest_paths(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_large_mission_retries_only_the_failed_file(monkeypatch) -> None:
-    generator = OllamaProjectGenerator()
+async def test_large_mission_retries_only_the_failed_file(monkeypatch, tmp_path) -> None:
+    # Use a fresh checkpoint store so prior local test runs cannot skip mocked calls.
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
     responses = [
         json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
         "not valid JSON",
