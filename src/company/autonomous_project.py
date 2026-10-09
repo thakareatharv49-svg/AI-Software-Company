@@ -261,8 +261,9 @@ class AutonomousProjectRunner:
         try:
             result = action()
         except Exception as exc:
-            stages.append(StageResult(name, StageStatus.FAILED, str(exc)))
-            raise
+            detail = f"{type(exc).__name__}: {exc}"
+            stages.append(StageResult(name, StageStatus.FAILED, detail))
+            raise RuntimeError(f"Autonomous stage '{name}' failed: {detail}") from exc
         stages.append(StageResult(name, StageStatus.COMPLETED, "Stage completed."))
         return result
 
@@ -275,8 +276,9 @@ class AutonomousProjectRunner:
         try:
             result = await action()
         except Exception as exc:
-            stages.append(StageResult(name, StageStatus.FAILED, str(exc)))
-            raise
+            detail = f"{type(exc).__name__}: {exc}"
+            stages.append(StageResult(name, StageStatus.FAILED, detail))
+            raise RuntimeError(f"Autonomous stage '{name}' failed: {detail}") from exc
         stages.append(StageResult(name, StageStatus.COMPLETED, "Stage completed."))
         return result
 
