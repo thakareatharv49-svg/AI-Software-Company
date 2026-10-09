@@ -104,9 +104,10 @@ class AutonomousProjectRunner:
             on_stage=request.stage_callback,
         )
         if ceo.decision.requires_human or ceo.mission.status.value != "approved":
-            raise RuntimeError(
-                f"Mission was not approved: {ceo.decision.reason}"
-            )
+            detail = f"Mission was not approved: {ceo.decision.reason}"
+            if request.stage_callback is not None:
+                request.stage_callback("ai_ceo", StageStatus.FAILED.value, detail)
+            raise RuntimeError(detail)
 
         research = self._run_stage(
             stages,
