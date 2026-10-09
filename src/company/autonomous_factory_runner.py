@@ -46,9 +46,22 @@ class FactoryAutonomousRunner:
         mission: CompanyMission,
         plan: MissionPlan,
     ) -> AutonomousProjectResult:
-        request = self.request_builder(mission, plan)
-        if hasattr(request, "__await__"):
-            request = await request
+        self._record_stage_progress(
+            plan, "product_generation", "running", "Generating mission-specific project files."
+        )
+        try:
+            request = self.request_builder(mission, plan)
+            if hasattr(request, "__await__"):
+                request = await request
+        except Exception as exc:
+            self._record_stage_progress(
+                plan, "product_generation", "failed",
+                f"{type(exc).__name__}: {exc}",
+            )
+            raise
+        self._record_stage_progress(
+            plan, "product_generation", "completed", "Mission-specific project files generated."
+        )
         workspace = self.workspace_service.create_workspace(mission.id)
 
         try:
@@ -64,6 +77,12 @@ class FactoryAutonomousRunner:
                         }
                     ),
                 )
+            request = replace(
+                request,
+                stage_callback=lambda name, status, detail: self._record_stage_progress(
+                    plan, name, status, detail
+                ),
+            )
             result = await self.runner.run(request)
             report = AutonomousCompanyAcceptance().evaluate(result)
             if not report.passed:
@@ -81,3 +100,47 @@ class FactoryAutonomousRunner:
             # Completed workspaces are intentionally retained for the product
             # viewer. Failed attempts are also retained for diagnostics/retry.
             pass
+
+    @staticmethod
+    def _record_stage_progress(
+        plan: MissionPlan,
+        stage_name: str,
+        status: str,
+        detail: str,
+    ) -> None:
+        """Project autonomous lifecycle progress onto the visible factory plan."""
+        normalized_status = str(status).strip().lower()
+        mappings: dict[str, tuple[str, ...]] = {
+            "product_generation": ("execution",),
+            "ai_ceo": ("research",),
+            "research": ("research",),
+            "research_handoff": ("research",),
+            "product_definition": ("product",),
+            "architecture": ("architecture",),
+            "engineering_qa_security_github": (
+                "tasks", "agents", "execution", "qa", "security", "github"
+            ),
+            "deployment": ("deployment",),
+            "monitoring": ("monitoring",),
+            "learning": ("learning",),
+        }
+        target_names = mappings.get(stage_name, ())
+        if not target_names:
+            return
+
+        step_by_name = {step.stage.value: step for step in plan.steps}
+        targets = [step_by_name[name] for name in target_names if name in step_by_name]
+        failure_text = detail.casefold()
+        if normalized_status == "failed" and stage_name == "engineering_qa_security_github":
+            if "qa failed" in failure_text or "test" in failure_text and "failed" in failure_text:
+                targets = [step_by_name[name] for name in ("qa",) if name in step_by_name]
+            elif "code review failed" in failure_text or "security" in failure_text:
+                targets = [step_by_name[name] for name in ("security",) if name in step_by_name]
+            else:
+                targets = [step_by_name[name] for name in ("execution",) if name in step_by_name]
+
+        for step in targets:
+            if normalized_status == "running":
+                step.attempts += 1
+            step.status = normalized_status
+            step.detail = detail
