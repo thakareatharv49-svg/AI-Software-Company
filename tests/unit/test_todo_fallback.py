@@ -22,6 +22,7 @@ def test_todo_fallback_has_a_runnable_browser_entry_and_local_assets() -> None:
 
 def test_todo_fallback_supports_crud_filters_and_persistence_without_seed_data() -> None:
     files = todo_fallback_files()
+    html = files["index.html"]
     js = files["app.js"]
     for behavior in (
         "localStorage.getItem",
@@ -32,10 +33,11 @@ def test_todo_fallback_supports_crud_filters_and_persistence_without_seed_data()
         'data-action="edit"',
         'data-action="delete"',
         'data-action="toggle"',
-        'data-filter="pending"',
-        'data-filter="completed"',
     ):
         assert behavior in js
+    for filter_name in ("all", "pending", "completed"):
+        assert f'data-filter="{filter_name}"' in html
+    assert 'document.querySelectorAll("[data-filter]")' in js
     assert 'localStorage.getItem(STORAGE_KEY) || "[]"' in js
     assert "sampleTasks" not in js
     assert "demoTasks" not in js
