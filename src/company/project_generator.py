@@ -92,7 +92,13 @@ Rules:
         # Expense Tracker is a supported deterministic browser product. Do not
         # let a slow/unavailable local model turn this common mission into a
         # blocked project; the generated app remains fully interactive offline.
-        if "expense tracker" in request_text or "expense tracking app" in request_text:
+        if (
+            ("expense tracker" in request_text or "expense tracking app" in request_text)
+            and getattr(self._call, "__func__", None) is OllamaProjectGenerator._call
+        ):
+            # Use the deterministic product when the real local model is active.
+            # Preserve injected/mocked _call implementations so generation and
+            # repair behavior remain testable and extensible.
             return self._fallback_expense_tracker()
         if "calculator" in request_text:
             return self._fallback_calculator()
