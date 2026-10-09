@@ -149,3 +149,58 @@ async def test_large_mission_retries_invalid_file_manifest(monkeypatch, tmp_path
     assert project.files["index.html"] == "<!doctype html><title>Manifest recovered</title>"
     assert len(payloads) == 3
     assert "Corrective retry" in payloads[1]["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_large_mission_retries_transient_manifest_request_failure(monkeypatch, tmp_path):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    manifest = json.dumps({
+        "files": [{"path": "index.html", "purpose": "Browser app entry point"}]
+    })
+    responses = [
+        RuntimeError("Could not reach Ollama"),
+        manifest,
+        json.dumps({"content": "<!doctype html><title>Recovered</title>"}),
+    ]
+    prompts = []
+
+    async def fake_call(payload):
+        prompts.append(payload["prompt"])
+        response = responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    project = await generator._generate_large_mission(
+        "Project Planner",
+        "Create, edit, delete and search project tasks with a responsive dashboard.",
+    )
+
+    assert project.files["index.html"] == "<!doctype html><title>Recovered</title>"
+    assert len(prompts) == 3
+    assert "Recovery retry" in prompts[1]
+    assert "Could not reach Ollama" not in prompts[1]
+
+
+@pytest.mark.asyncio
+async def test_large_mission_reports_exhausted_manifest_transport_retries(
+    monkeypatch, tmp_path
+):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    calls = 0
+
+    async def fake_call(payload):
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("Ollama timed out")
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    with pytest.raises(RuntimeError, match="could not generate the project file plan") as exc:
+        await generator._generate_large_mission(
+            "Project Planner",
+            "Create, edit, delete and search project tasks with a responsive dashboard.",
+        )
+
+    assert calls == 2
+    assert "Ollama timed out" in str(exc.value)
