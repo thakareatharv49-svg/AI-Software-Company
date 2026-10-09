@@ -50,7 +50,12 @@ class FactoryAutonomousRunner:
         def record_progress(stage_name: str, status: str, detail: str) -> None:
             self._record_stage_progress(plan, stage_name, status, detail)
             if on_progress is not None:
-                on_progress(plan)
+                # Progress persistence is diagnostic telemetry. A storage outage
+                # must not abort generation or the autonomous lifecycle itself.
+                try:
+                    on_progress(plan)
+                except Exception:
+                    pass
 
         record_progress(
             "product_generation", "running", "Generating mission-specific project files."
@@ -90,10 +95,18 @@ class FactoryAutonomousRunner:
             result = await self.runner.run(request)
             report = AutonomousCompanyAcceptance().evaluate(result)
             if not report.passed:
+                failed_checks = [check for check in report.checks if not check.passed]
+                self._record_acceptance_failures(plan, failed_checks)
+                if on_progress is not None:
+                    # Persist the actionable failure state before raising. This
+                    # callback is best-effort just like ordinary stage telemetry.
+                    try:
+                        on_progress(plan)
+                    except Exception:
+                        pass
                 failures = [
                     f"{check.name}: {check.detail}"
-                    for check in report.checks
-                    if not check.passed
+                    for check in failed_checks
                 ]
                 raise RuntimeError(
                     "Autonomous project failed final acceptance: "
@@ -104,6 +117,35 @@ class FactoryAutonomousRunner:
             # Completed workspaces are intentionally retained for the product
             # viewer. Failed attempts are also retained for diagnostics/retry.
             pass
+
+    @staticmethod
+    def _record_acceptance_failures(plan: MissionPlan, failed_checks) -> None:
+        """Mark the precise factory stages rejected by final acceptance."""
+        check_to_stage = {
+            "mission_approved": "product",
+            "ai_ceo": "product",
+            "research": "research",
+            "research_handoff": "research",
+            "product_definition": "product",
+            "architecture": "architecture",
+            "engineering_qa_security_github": "execution",
+            "real_project": "execution",
+            "qa_passed": "qa",
+            "security_approved": "security",
+            "deployment_completed": "deployment",
+            "monitoring_completed": "monitoring",
+            "learning_recorded": "learning",
+        }
+        steps = {step.stage.value: step for step in plan.steps}
+        for check in failed_checks:
+            stage_name = check_to_stage.get(check.name, "execution")
+            step = steps.get(stage_name)
+            if step is None:
+                continue
+            step.status = "failed"
+            step.detail = (
+                f"Final acceptance failed ({check.name}): {check.detail}"
+            )
 
     @staticmethod
     def _record_stage_progress(
