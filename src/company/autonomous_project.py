@@ -52,6 +52,7 @@ class AutonomousProjectRequest:
     repair_agent_executor: Callable[..., Any] | None = None
     github_repository: GitHubRepository | None = None
     pull_request_head: str | None = None
+    stage_callback: Callable[[str, str, str], None] | None = None
 
     @classmethod
     def model_construct(cls, **values: object) -> AutonomousProjectRequest:
@@ -100,6 +101,7 @@ class AutonomousProjectRunner:
             stages,
             "ai_ceo",
             lambda: self._ceo.evaluate(request.mission),
+            on_stage=request.stage_callback,
         )
         if ceo.decision.requires_human or ceo.mission.status.value != "approved":
             raise RuntimeError(
@@ -110,24 +112,28 @@ class AutonomousProjectRunner:
             stages,
             "research",
             lambda: self._research.research(request.research_query),
+            on_stage=request.stage_callback,
         )
 
         handoff = self._run_stage(
             stages,
             "research_handoff",
             lambda: self._handoff(request.mission.mission_id, research),
+            on_stage=request.stage_callback,
         )
 
         product_definition = self._run_stage(
             stages,
             "product_definition",
             lambda: self._define_product(ceo, research),
+            on_stage=request.stage_callback,
         )
 
         architecture = self._run_stage(
             stages,
             "architecture",
             lambda: self._define_architecture(ceo, request),
+            on_stage=request.stage_callback,
         )
 
         pipeline_result = await self._run_async_stage(
@@ -144,6 +150,7 @@ class AutonomousProjectRunner:
                 github_repository=request.github_repository,
                 pull_request_head=request.pull_request_head,
             ),
+            on_stage=request.stage_callback,
         )
 
         deployment = await self._delivery_stage(
@@ -151,12 +158,14 @@ class AutonomousProjectRunner:
             "deployment",
             self._deployment,
             pipeline_result,
+            on_stage=request.stage_callback,
         )
         monitoring = await self._delivery_stage(
             stages,
             "monitoring",
             self._monitoring,
             pipeline_result,
+            on_stage=request.stage_callback,
         )
 
         learning = self._run_stage(
@@ -173,6 +182,7 @@ class AutonomousProjectRunner:
                     }
                 ]
             ),
+            on_stage=request.stage_callback,
         )
 
         dashboard = self._build_dashboard(
@@ -191,6 +201,11 @@ class AutonomousProjectRunner:
                 "Company state snapshot generated from the autonomous run.",
             )
         )
+        if request.stage_callback is not None:
+            request.stage_callback(
+                "dashboard", StageStatus.COMPLETED.value,
+                "Company state snapshot generated from the autonomous run.",
+            )
 
         return AutonomousProjectResult(
             ceo=ceo,
@@ -258,7 +273,10 @@ class AutonomousProjectRunner:
         stages: list[StageResult],
         name: str,
         action: Callable[[], Any],
+        on_stage: Callable[[str, str, str], None] | None = None,
     ) -> Any:
+        if on_stage is not None:
+            on_stage(name, StageStatus.RUNNING.value, "Stage started.")
         try:
             result = action()
         except Exception as exc:
@@ -266,8 +284,12 @@ class AutonomousProjectRunner:
             trace = traceback.format_exc().strip()
             detail = f"{detail}\nTraceback:\n{trace}"
             stages.append(StageResult(name, StageStatus.FAILED, detail))
+            if on_stage is not None:
+                on_stage(name, StageStatus.FAILED.value, detail)
             raise RuntimeError(f"Autonomous stage '{name}' failed: {detail}") from exc
         stages.append(StageResult(name, StageStatus.COMPLETED, "Stage completed."))
+        if on_stage is not None:
+            on_stage(name, StageStatus.COMPLETED.value, "Stage completed.")
         return result
 
     @staticmethod
@@ -275,7 +297,10 @@ class AutonomousProjectRunner:
         stages: list[StageResult],
         name: str,
         action: Callable[[], Awaitable[Any]],
+        on_stage: Callable[[str, str, str], None] | None = None,
     ) -> Any:
+        if on_stage is not None:
+            on_stage(name, StageStatus.RUNNING.value, "Stage started.")
         try:
             result = await action()
         except Exception as exc:
@@ -283,8 +308,12 @@ class AutonomousProjectRunner:
             trace = traceback.format_exc().strip()
             detail = f"{detail}\nTraceback:\n{trace}"
             stages.append(StageResult(name, StageStatus.FAILED, detail))
+            if on_stage is not None:
+                on_stage(name, StageStatus.FAILED.value, detail)
             raise RuntimeError(f"Autonomous stage '{name}' failed: {detail}") from exc
         stages.append(StageResult(name, StageStatus.COMPLETED, "Stage completed."))
+        if on_stage is not None:
+            on_stage(name, StageStatus.COMPLETED.value, "Stage completed.")
         return result
 
     async def _delivery_stage(
@@ -293,7 +322,10 @@ class AutonomousProjectRunner:
         name: str,
         hook: DeploymentHook | MonitoringHook | None,
         pipeline: PipelineResult,
+        on_stage: Callable[[str, str, str], None] | None = None,
     ) -> StageResult:
+        if on_stage is not None:
+            on_stage(name, StageStatus.RUNNING.value, "Stage started.")
         if hook is None:
             result = StageResult(
                 name,
@@ -301,6 +333,8 @@ class AutonomousProjectRunner:
                 f"{name} hook is required for M36 end-to-end delivery.",
             )
             stages.append(result)
+            if on_stage is not None:
+                on_stage(name, StageStatus.FAILED.value, result.detail)
             raise RuntimeError(result.detail)
 
         try:
@@ -310,10 +344,14 @@ class AutonomousProjectRunner:
         except Exception as exc:
             result = StageResult(name, StageStatus.FAILED, str(exc))
             stages.append(result)
+            if on_stage is not None:
+                on_stage(name, StageStatus.FAILED.value, result.detail)
             raise
 
         result = StageResult(name, StageStatus.COMPLETED, str(detail))
         stages.append(result)
+        if on_stage is not None:
+            on_stage(name, StageStatus.COMPLETED.value, result.detail)
         return result
 
     @staticmethod
