@@ -93,6 +93,25 @@ Rules:
         # Prefer it before contacting Ollama so the factory never spends the model
         # timeout on a task whose safe implementation is already known.
         request_text = f"{name} {objective}".lower()
+        # Notes App missions have a deterministic, fully offline browser product.
+        # This known multi-feature workflow should not fail because a small local
+        # model struggles to coordinate HTML, styling, persistence and CRUD behavior.
+        if (
+            "notes app" in request_text
+            or "note taking app" in request_text
+            or "note-taking app" in request_text
+        ):
+            from src.company.notes_fallback import notes_fallback_files
+
+            return self._validated_fallback(
+                name,
+                objective,
+                GeneratedProject(
+                    files=notes_fallback_files(),
+                    test_command=["python", "-m", "pytest", "-q"],
+                ),
+            )
+
         # Common task-list missions have a deterministic, tested browser product.
         # Route these to the local implementation instead of making several
         # sequential Ollama calls for a predictable CRUD application.
