@@ -80,7 +80,13 @@ Rules:
         if "tic tac toe" in request_text or "tictactoe" in request_text or "tic-tac-toe" in request_text:
             return self._fallback_tic_tac_toe()
 
-        generated = self._parse(await self._call(payload))
+        # Large missions are generated file-by-file so one truncated or malformed
+        # response cannot discard the whole product. Keep the existing single-pass
+        # path for small objectives to avoid unnecessary local model calls.
+        if self._is_large_mission(name, objective):
+            generated = await self._generate_large_mission(name, objective)
+        else:
+            generated = self._parse(await self._call(payload))
         try:
             self._validate_mission_output(name, objective, generated)
             return generated
@@ -101,6 +107,164 @@ Rules:
                     f"{repair_error}"
                 ) from repair_error
             return repaired
+
+    @staticmethod
+    def _is_large_mission(name: str, objective: str) -> bool:
+        """Route broad, multi-feature missions through bounded file generation."""
+        text = f"{name} {objective}".casefold()
+        feature_markers = (
+            "search", "create", "edit", "delete", "pin", "filter", "sort",
+            "export", "import", "settings", "authentication", "dashboard",
+            "calendar", "statistics", "responsive", "localstorage", "local storage",
+            "confirmation", "empty state", "validation", "notifications",
+        )
+        marker_count = sum(1 for marker in feature_markers if marker in text)
+        return len(objective) >= 280 or marker_count >= 5
+
+    async def _generate_large_mission(
+        self,
+        name: str,
+        objective: str,
+    ) -> GeneratedProject:
+        """Plan a bounded file manifest, then generate each file independently."""
+        manifest_prompt = f"""Plan a small, complete software product for this mission.
+Project name: {name}
+Mission objective: {objective}
+
+Return only JSON in this exact shape:
+{{"files":[{{"path":"index.html","purpose":"Application entry point"}}]}}
+
+Rules:
+- Prefer a directly runnable browser app unless the mission explicitly requests another type.
+- For browser apps include index.html, style.css, app.js, and tests/test_project.py.
+- Include every local file referenced by another file.
+- Use no more than 10 files. Avoid build tools, CDNs, remote APIs, and external dependencies unless explicitly required.
+- Every file must have a clear purpose and be necessary for the requested product.
+- Paths must be safe relative paths; never use absolute paths or parent-directory segments.
+- The plan must implement the requested category and all key user workflows, not a generic demo.
+"""
+        manifest_payload = {
+            "model": settings.ollama_model,
+            "prompt": manifest_prompt,
+            "stream": False,
+            "format": {
+                "type": "object",
+                "properties": {
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "path": {"type": "string"},
+                                "purpose": {"type": "string"},
+                            },
+                            "required": ["path", "purpose"],
+                        },
+                    },
+                },
+                "required": ["files"],
+            },
+            "keep_alive": "10m",
+            "options": {"temperature": 0.1, "num_predict": 1800},
+        }
+        try:
+            manifest = json.loads(await self._call(manifest_payload))
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("Ollama returned invalid JSON for the project file plan") from exc
+
+        raw_manifest = manifest.get("files")
+        if not isinstance(raw_manifest, list) or not raw_manifest:
+            raise RuntimeError("Ollama returned an empty project file plan")
+        if len(raw_manifest) > 10:
+            raise RuntimeError(
+                f"Project file plan contains {len(raw_manifest)} files; the safe limit is 10. "
+                "Reduce the mission scope or split it into separate missions."
+            )
+
+        manifest_items: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for item in raw_manifest:
+            if not isinstance(item, dict):
+                raise RuntimeError("Project file plan contains an invalid entry")
+            raw_path = str(item.get("path", "")).strip().replace("\\", "/")
+            path = PurePosixPath(raw_path)
+            if (
+                not raw_path
+                or path.is_absolute()
+                or ".." in path.parts
+                or ":" in raw_path
+                or "\n" in raw_path
+            ):
+                raise RuntimeError(f"Unsafe path in project file plan: {raw_path!r}")
+            normalized = path.as_posix()
+            if normalized in seen:
+                raise RuntimeError(f"Duplicate path in project file plan: {normalized}")
+            seen.add(normalized)
+            purpose = str(item.get("purpose", "")).strip()
+            if not purpose:
+                raise RuntimeError(f"Project file plan has no purpose for {normalized}")
+            manifest_items.append((normalized, purpose))
+
+        files: dict[str, str] = {}
+        test_command = ["python", "-m", "pytest", "-q"]
+        for path, purpose in manifest_items:
+            previous_files = "\\n".join(
+                f"- {existing_path}: {manifest_purpose}"
+                for existing_path, manifest_purpose in manifest_items
+            )
+            existing_summary = "\\n".join(
+                f"- {existing_path} ({len(existing_content)} characters)"
+                for existing_path, existing_content in files.items()
+            ) or "(none yet)"
+            file_prompt = f"""Implement exactly one file for a runnable software product.
+Project name: {name}
+Mission objective: {objective}
+
+Full file plan:
+{previous_files}
+
+File to generate: {path}
+Purpose: {purpose}
+
+Already generated files:
+{existing_summary}
+
+Return only JSON: {{"content":"complete file contents for {path}"}}
+
+Requirements:
+- Implement the mission's actual features and coherent polished responsive UI where relevant.
+- Keep interfaces and identifiers consistent with the file plan and previously generated files.
+- Do not return markdown fences, explanations, or another file.
+- No placeholders for required behavior, remote dependencies, CDNs, secrets, or network calls.
+- For tests, verify meaningful mission-specific behavior and edge cases; do not test only file existence or copied strings.
+- Keep this file complete and runnable with the other planned files.
+"""
+            file_payload = {
+                "model": settings.ollama_model,
+                "prompt": file_prompt,
+                "stream": False,
+                "format": {
+                    "type": "object",
+                    "properties": {"content": {"type": "string"}},
+                    "required": ["content"],
+                },
+                "keep_alive": "10m",
+                "options": {"temperature": 0.1, "num_predict": 3500},
+            }
+            try:
+                parsed = json.loads(await self._call(file_payload))
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"Ollama returned invalid JSON while generating '{path}'"
+                ) from exc
+            file_content = parsed.get("content")
+            if not isinstance(file_content, str) or not file_content.strip():
+                raise RuntimeError(f"Ollama returned empty content for '{path}'")
+            if len(file_content.encode("utf-8")) > 2_000_000:
+                raise RuntimeError(f"Generated file '{path}' exceeds the 2 MB safety limit")
+            files[path] = file_content
+
+        return GeneratedProject(files=files, test_command=test_command)
 
     @staticmethod
     def _validate_mission_output(

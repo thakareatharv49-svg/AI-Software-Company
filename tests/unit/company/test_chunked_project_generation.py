@@ -1,0 +1,71 @@
+import json
+
+import pytest
+
+from src.company.project_generator import OllamaProjectGenerator
+
+
+def test_large_mission_uses_chunked_generation() -> None:
+    assert OllamaProjectGenerator._is_large_mission(
+        "Notes App",
+        "Create, edit, delete, pin, search and filter notes with responsive local storage.",
+    )
+
+
+def test_small_mission_keeps_single_pass_generation() -> None:
+    assert not OllamaProjectGenerator._is_large_mission(
+        "Tiny utility",
+        "Print one greeting.",
+    )
+
+
+@pytest.mark.asyncio
+async def test_large_mission_generates_each_file_independently(monkeypatch) -> None:
+    generator = OllamaProjectGenerator()
+    responses = [
+        json.dumps({
+            "files": [
+                {"path": "index.html", "purpose": "Accessible app entry point"},
+                {"path": "style.css", "purpose": "Responsive visual design"},
+                {"path": "app.js", "purpose": "Notes CRUD and search behavior"},
+                {"path": "tests/test_project.py", "purpose": "Mission-specific tests"},
+            ]
+        }),
+        json.dumps({"content": "<!doctype html><html><head><title>Notes</title></head><body><script src=\"app.js\"></script><link rel=\"stylesheet\" href=\"style.css\"></body></html>"}),
+        json.dumps({"content": "body { font-family: sans-serif; }"}),
+        json.dumps({"content": "function addNote(text) { return { text }; }"}),
+        json.dumps({"content": "def test_notes_app_contract():\n    assert True\n"}),
+    ]
+    payloads = []
+
+    async def fake_call(payload):
+        payloads.append(payload)
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    project = await generator.generate(
+        "Notes App",
+        "Create, edit, delete, pin and search notes with responsive local storage.",
+    )
+
+    assert set(project.files) == {
+        "index.html",
+        "style.css",
+        "app.js",
+        "tests/test_project.py",
+    }
+    assert len(payloads) == 5
+    assert project.test_command == ["python", "-m", "pytest", "-q"]
+    assert all("num_predict" in payload["options"] for payload in payloads)
+
+
+@pytest.mark.asyncio
+async def test_large_mission_rejects_unsafe_manifest_paths(monkeypatch) -> None:
+    generator = OllamaProjectGenerator()
+
+    async def fake_call(payload):
+        return json.dumps({"files": [{"path": "../outside.txt", "purpose": "unsafe"}]})
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    with pytest.raises(RuntimeError, match="Unsafe path"):
+        await generator._generate_large_mission("Notes App", "Create, edit, delete, pin, search notes.")
