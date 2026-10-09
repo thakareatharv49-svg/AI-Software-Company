@@ -24,7 +24,6 @@ def test_checkpoint_round_trips_and_is_scoped_to_mission(tmp_path) -> None:
 
 def test_corrupt_checkpoint_is_ignored(tmp_path) -> None:
     store = GenerationCheckpointStore(tmp_path, key="mission")
-    store.directory.mkdir(parents=True)
     store.path.write_text("{not json", encoding="utf-8")
 
     assert store.load() is None
