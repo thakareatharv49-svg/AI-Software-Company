@@ -417,7 +417,7 @@ async def test_factory_can_use_real_m36_runner_adapter() -> None:
 
     assert result == [project]
     assert project.status == "completed"
-    assert project.stages_executed == 12
+    assert project.stages_executed == len(AutonomousCompanyAcceptance.REQUIRED_STAGES)
     assert output_store.manifests[0].project_id == "real-project-1"
     assert output_store.manifests[0].repository == "owner/real-project"
     assert output_store.manifests[0].github_message == "pull request created"
