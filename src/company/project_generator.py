@@ -69,6 +69,10 @@ Rules:
 - Do not include secrets, credentials, shell commands, or network calls in generated source.
 - File keys must be plain relative filenames only.
 - The test command must run from the project root.
+- Before returning, perform a final product review against the mission: core workflows work end-to-end, every visible control has a real action, form input is validated, state changes are reflected in the UI, and empty/error/success states are handled.
+- Do not ship unfinished copy or stub behavior such as "coming soon", "lorem ipsum", "TODO: implement", "not implemented yet", or "functionality will be added later".
+- Prefer useful, mission-specific defaults and realistic empty states over fake demo records that imply user data already exists.
+- Make tests exercise behavior and edge cases; a test that only checks a title, file existence, or an assertion against itself is not sufficient.
 """
         payload = {
             "model": settings.ollama_model,
@@ -301,6 +305,8 @@ Requirements:
 - No placeholders for required behavior, remote dependencies, CDNs, secrets, or network calls.
 - For tests, verify meaningful mission-specific behavior and edge cases; do not test only file existence or copied strings.
 - Keep this file complete and runnable with the other planned files.
+- Never return "coming soon", "lorem ipsum", "TODO: implement", or stub behavior for required functionality.
+- Keep the visual design and interactions consistent across all files; use real accessible controls and useful empty states.
 """
             file_payload = {
                 "model": settings.ollama_model,
@@ -356,6 +362,15 @@ Requirements:
         project: GeneratedProject,
     ) -> None:
         """Reject browser-app output that cannot be opened in the product preview."""
+        from src.company.product_quality import find_unfinished_product_content
+
+        quality_issues = find_unfinished_product_content(project.files)
+        if quality_issues:
+            raise RuntimeError(
+                "Generated product failed cross-product quality checks: "
+                + " ".join(quality_issues)
+            )
+
         mission = f"{name} {objective}".casefold()
         browser_terms = (
             "web app", "web application", "website", "web site", "browser",
@@ -468,6 +483,8 @@ Rules:
 - If this is a browser/web app, preserve and improve the visual polish and responsive behavior; do not reduce it to a bare functional demo.
 - Keep tests under tests/.
 - Use only safe relative file paths.
+- Remove unfinished placeholder copy and implement the required behavior instead.
+- Re-check the complete mission workflow, responsive layout, form validation, state persistence, and empty/error/success feedback before returning.
 """
         if "calculator" in f"{failure} {project}".lower():
             return self._fallback_calculator()
