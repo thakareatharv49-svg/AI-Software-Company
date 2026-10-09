@@ -35,6 +35,9 @@ def test_queued_company_accepts_multiple_missions() -> None:
 @pytest.mark.asyncio
 async def test_explicit_factory_launch_prioritizes_selected_mission() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
+    # This test covers priority ordering, not restoration of pending jobs from
+    # previous local runs. Start with only the missions created below.
+    center._factory.queue.clear()
     older = center.submit_mission(
         MissionSubmission(name="Restored mission", objective="Run older work")
     )
