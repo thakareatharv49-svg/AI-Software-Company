@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from inspect import signature
 from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
 
@@ -208,6 +210,7 @@ class ProjectFactory:
         for step in project.plan.steps:
             if step.status in {"failed", "running"}:
                 step.status = "planned"
+                step.detail = None
 
         project.last_error = None
         self._last_autonomous_result = None
@@ -268,10 +271,22 @@ class ProjectFactory:
             )
 
             if self.autonomous_runner is not None:
-                autonomous_result = await self.autonomous_runner.run(
-                    project.mission,
-                    project.plan,
-                )
+                runner = self.autonomous_runner.run
+                try:
+                    supports_progress = "on_progress" in signature(runner).parameters
+                except (TypeError, ValueError):
+                    supports_progress = False
+                if supports_progress:
+                    autonomous_result = await runner(
+                        project.mission,
+                        project.plan,
+                        on_progress=lambda _plan: self._persist_plan_progress(project),
+                    )
+                else:
+                    autonomous_result = await runner(
+                        project.mission,
+                        project.plan,
+                    )
                 # Capture the authoritative result immediately. Processing optional
                 # stage telemetry below must never erase a completed pipeline result.
                 self._last_autonomous_result = autonomous_result
@@ -595,6 +610,20 @@ class ProjectFactory:
             return None
         return self.job_store.get(mission_id)
 
+    def _persist_plan_progress(self, project: FactoryProject) -> None:
+        """Persist live stage status so the dashboard never shows stale all-planned work."""
+        self._save(project)
+        job = self._load_job(project.mission.id)
+        if job is not None:
+            self._save_job(
+                job.model_copy(
+                    update={
+                        "plan": project.plan,
+                        "updated_at": datetime.now(UTC),
+                    }
+                )
+            )
+
     def _save_job(self, job: MissionJob) -> None:
         if self.job_store is not None:
             self.job_store.save(job)
@@ -609,7 +638,12 @@ class ProjectFactory:
         if job is not None:
             self._save_job(
                 transition_job(
-                    job.model_copy(update={"attempts": project.attempts}),
+                    job.model_copy(
+                        update={
+                            "attempts": project.attempts,
+                            "plan": project.plan,
+                        }
+                    ),
                     status,
                     message,
                 )
