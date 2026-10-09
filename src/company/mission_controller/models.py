@@ -24,6 +24,8 @@ class PlannedStep(BaseModel):
     stage: MissionStage
     objective: str
     status: str = "planned"
+    attempts: int = 0
+    detail: str | None = None
 
 
 class MissionPlan(BaseModel):
