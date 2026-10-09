@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
-    ollama_timeout: float = 120.0
+    ollama_timeout: float = 600.0
 
     github_token: str = ""
     github_api_base_url: str = "https://api.github.com"
