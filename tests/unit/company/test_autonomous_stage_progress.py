@@ -97,3 +97,54 @@ async def test_generation_failure_is_recorded_on_execution_step(tmp_path):
     execution = step(plan, "execution")
     assert execution.status == "failed"
     assert "Ollama timed out" in execution.detail
+
+def test_factory_persists_stage_progress_to_the_mission_job():
+    from src.company.mission_jobs import MissionJob, MissionJobStatus
+    from src.company.project_factory import FactoryProject, ProjectFactory
+
+    class Store:
+        def __init__(self):
+            self.projects = []
+
+        def save(self, project):
+            self.projects.append(project)
+
+    class JobStore:
+        def __init__(self):
+            self.jobs = {}
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, job):
+            self.jobs[job.id] = job
+
+    mission = CompanyMission(name="Notes App", objective="Build a searchable notes app")
+    plan = make_plan()
+    job_store = JobStore()
+    job_store.save(
+        MissionJob(
+            id=mission.id,
+            mission=mission,
+            plan=plan,
+            status=MissionJobStatus.RUNNING,
+            message="Running",
+        )
+    )
+    project = FactoryProject(mission=mission, plan=plan)
+    factory = ProjectFactory(
+        orchestrator=object(),
+        controller=object(),
+        pipeline=object(),
+        store=Store(),
+        job_store=job_store,
+    )
+
+    FactoryAutonomousRunner._record_stage_progress(
+        plan, "research", "running", "Research started."
+    )
+    factory._persist_plan_progress(project)
+
+    persisted = job_store.get(mission.id)
+    assert step(persisted.plan, "research").status == "running"
+    assert step(persisted.plan, "research").detail == "Research started."
