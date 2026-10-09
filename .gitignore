@@ -46,3 +46,6 @@ dist/
 Thumbs.db
 
 data/
+
+# Local AI generation checkpoints (may contain generated project source)
+.factory-checkpoints/

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+
+from src.company.generation_checkpoints import GenerationCheckpointStore
 
 import httpx
 
@@ -17,6 +19,15 @@ class GeneratedProject:
 
 class OllamaProjectGenerator:
     """Generate and repair small runnable projects."""
+
+    def __init__(self, checkpoint_dir: str | Path | None = None) -> None:
+        self.checkpoint_dir = Path(checkpoint_dir or ".factory-checkpoints")
+
+    def _checkpoint(self, name: str, objective: str) -> GenerationCheckpointStore:
+        return GenerationCheckpointStore(
+            self.checkpoint_dir,
+            key=f"{name}\0{objective}",
+        )
 
     async def generate(self, name: str, objective: str) -> GeneratedProject:
         prompt = f"""Build a distinct, complete, runnable software product for this mission. Treat the mission objective as the source of truth; do not default to a calculator, Tic-Tac-Toe, todo list, or generic landing page unless that exact product is requested.
@@ -83,12 +94,15 @@ Rules:
         # Large missions are generated file-by-file so one truncated or malformed
         # response cannot discard the whole product. Keep the existing single-pass
         # path for small objectives to avoid unnecessary local model calls.
-        if self._is_large_mission(name, objective):
+        large_mission = self._is_large_mission(name, objective)
+        if large_mission:
             generated = await self._generate_large_mission(name, objective)
         else:
             generated = self._parse(await self._call(payload))
         try:
             self._validate_mission_output(name, objective, generated)
+            if large_mission:
+                self._checkpoint(name, objective).clear()
             return generated
         except RuntimeError as validation_error:
             # A structural validation failure is actionable: give the model one
@@ -106,6 +120,8 @@ Rules:
                     f"Generated product failed preview validation after one repair: "
                     f"{repair_error}"
                 ) from repair_error
+            if large_mission:
+                self._checkpoint(name, objective).clear()
             return repaired
 
     @staticmethod
@@ -125,8 +141,11 @@ Rules:
         self,
         name: str,
         objective: str,
+        checkpoint: GenerationCheckpointStore | None = None,
     ) -> GeneratedProject:
-        """Plan a bounded file manifest, then generate each file independently."""
+        """Plan a bounded file manifest and resume from durable file checkpoints."""
+        checkpoint = checkpoint or self._checkpoint(name, objective)
+        saved_checkpoint = checkpoint.load()
         manifest_prompt = f"""Plan a small, complete software product for this mission.
 Project name: {name}
 Mission objective: {objective}
@@ -167,10 +186,13 @@ Rules:
             "keep_alive": "10m",
             "options": {"temperature": 0.1, "num_predict": 1800},
         }
-        try:
-            manifest = json.loads(await self._call(manifest_payload))
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("Ollama returned invalid JSON for the project file plan") from exc
+        if saved_checkpoint is not None:
+            manifest = {"files": saved_checkpoint["manifest"]}
+        else:
+            try:
+                manifest = json.loads(await self._call(manifest_payload))
+            except json.JSONDecodeError as exc:
+                raise RuntimeError("Ollama returned invalid JSON for the project file plan") from exc
 
         raw_manifest = manifest.get("files")
         if not isinstance(raw_manifest, list) or not raw_manifest:
@@ -205,9 +227,25 @@ Rules:
                 raise RuntimeError(f"Project file plan has no purpose for {normalized}")
             manifest_items.append((normalized, purpose))
 
-        files: dict[str, str] = {}
+        allowed_paths = {path for path, _ in manifest_items}
+        cached_files = (saved_checkpoint or {}).get("files", {})
+        files: dict[str, str] = {
+            path: content
+            for path, content in cached_files.items()
+            if path in allowed_paths
+            and isinstance(content, str)
+            and content.strip()
+            and len(content.encode("utf-8")) <= 2_000_000
+        }
+        normalized_manifest = [
+            {"path": path, "purpose": purpose}
+            for path, purpose in manifest_items
+        ]
+        checkpoint.save(manifest=normalized_manifest, files=files)
         test_command = ["python", "-m", "pytest", "-q"]
         for path, purpose in manifest_items:
+            if path in files:
+                continue
             previous_files = "\\n".join(
                 f"- {existing_path}: {manifest_purpose}"
                 for existing_path, manifest_purpose in manifest_items
@@ -282,6 +320,7 @@ Requirements:
             if file_content is None:
                 raise RuntimeError(f"Failed to generate '{path}' after 3 attempts")
             files[path] = file_content
+            checkpoint.save(manifest=normalized_manifest, files=files)
 
         return GeneratedProject(files=files, test_command=test_command)
 
