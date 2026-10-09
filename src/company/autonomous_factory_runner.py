@@ -45,22 +45,28 @@ class FactoryAutonomousRunner:
         self,
         mission: CompanyMission,
         plan: MissionPlan,
+        on_progress: Callable[[MissionPlan], None] | None = None,
     ) -> AutonomousProjectResult:
-        self._record_stage_progress(
-            plan, "product_generation", "running", "Generating mission-specific project files."
+        def record_progress(stage_name: str, status: str, detail: str) -> None:
+            self._record_stage_progress(plan, stage_name, status, detail)
+            if on_progress is not None:
+                on_progress(plan)
+
+        record_progress(
+            "product_generation", "running", "Generating mission-specific project files."
         )
         try:
             request = self.request_builder(mission, plan)
             if hasattr(request, "__await__"):
                 request = await request
         except Exception as exc:
-            self._record_stage_progress(
-                plan, "product_generation", "failed",
+            record_progress(
+                "product_generation", "failed",
                 f"{type(exc).__name__}: {exc}",
             )
             raise
-        self._record_stage_progress(
-            plan, "product_generation", "completed", "Mission-specific project files generated."
+        record_progress(
+            "product_generation", "completed", "Mission-specific project files generated."
         )
         workspace = self.workspace_service.create_workspace(mission.id)
 
@@ -79,9 +85,7 @@ class FactoryAutonomousRunner:
                 )
             request = replace(
                 request,
-                stage_callback=lambda name, status, detail: self._record_stage_progress(
-                    plan, name, status, detail
-                ),
+                stage_callback=record_progress,
             )
             result = await self.runner.run(request)
             report = AutonomousCompanyAcceptance().evaluate(result)
