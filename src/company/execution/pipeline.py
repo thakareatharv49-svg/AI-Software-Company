@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -216,6 +217,14 @@ class CompanyExecutionPipeline:
                 f"QA failed for project {project.id}: "
                 f"{qa_result.stderr or qa_result.stdout}"
             )
+
+        # QA repair agents can edit the workspace on disk. Reconcile those
+        # edits before security review and GitHub publishing so the delivered
+        # files are exactly the version that passed the final QA command.
+        self._sync_generated_files_from_workspace(
+            qa_request.working_directory,
+            files,
+        )
 
         self.project_engine.transition(
             project.id,
@@ -550,6 +559,83 @@ class CompanyExecutionPipeline:
             return agents[0].name
 
         raise RuntimeError("No repair agent is registered")
+
+    @staticmethod
+    def _sync_generated_files_from_workspace(
+        working_directory: str,
+        files: dict[str, str],
+    ) -> None:
+        """Refresh the deliverable file map from the post-repair workspace."""
+        root = Path(working_directory).resolve()
+        ignored_directories = {
+            ".git",
+            ".venv",
+            "venv",
+            "node_modules",
+            "__pycache__",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".factory-checkpoints",
+            "dist",
+            "build",
+        }
+        refreshed: dict[str, str] = {}
+        file_count = 0
+        total_bytes = 0
+        max_file_bytes = 2_000_000
+        max_total_bytes = 20_000_000
+        max_files = 500
+
+        if not root.is_dir():
+            raise RuntimeError(
+                f"Cannot synchronize generated files: workspace does not exist: {root}"
+            )
+
+        for current_root, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+            current = Path(current_root)
+            directories[:] = sorted(
+                name
+                for name in directories
+                if name not in ignored_directories
+                and not (current / name).is_symlink()
+            )
+            for filename in sorted(filenames):
+                path = current / filename
+                if path.is_symlink() or not path.is_file():
+                    continue
+                try:
+                    relative = path.relative_to(root)
+                    resolved = path.resolve()
+                    resolved.relative_to(root)
+                    size = path.stat().st_size
+                except (OSError, ValueError):
+                    continue
+                if size > max_file_bytes:
+                    # Do not publish oversized or potentially binary artifacts.
+                    continue
+                if file_count >= max_files or total_bytes + size > max_total_bytes:
+                    break
+                try:
+                    file_content = path.read_text(encoding="utf-8")
+                except (OSError, UnicodeError):
+                    continue
+
+                refreshed[relative.as_posix()] = file_content
+                file_count += 1
+                total_bytes += size
+            if file_count >= max_files or total_bytes >= max_total_bytes:
+                break
+
+        # Some pipeline callers and legacy integrations keep generated files only
+        # in memory instead of materializing them in the QA workspace. In that case,
+        # preserve the original deliverable rather than failing before security review.
+        # When the workspace does contain readable files, it remains authoritative:
+        # this synchronizes repairs and additions while removing stale/deleted files.
+        if not refreshed:
+            return
+        files.clear()
+        files.update(refreshed)
 
     def _build_repair_callback(
         self,

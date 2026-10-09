@@ -332,3 +332,40 @@ async def test_run_end_to_end_creates_observability_audit_trail(tmp_path: Path):
     assert metrics["events"] == len(records)
     assert metrics["completed"] == 1
     assert result.project.status.value == "completed"
+
+
+def test_workspace_sync_delivers_repaired_and_new_files_without_stale_files(tmp_path: Path):
+    from src.company.execution.pipeline import CompanyExecutionPipeline
+
+    (tmp_path / "app.js").write_text("const value = 2;\\n", encoding="utf-8")
+    (tmp_path / "index.html").write_text("<main>Repaired</main>\\n", encoding="utf-8")
+    (tmp_path / ".pytest_cache").mkdir()
+    (tmp_path / ".pytest_cache" / "cache.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "node_modules" / "dependency.js").write_text("ignored()", encoding="utf-8")
+
+    files = {
+        "app.js": "const value = 1;\\n",
+        "deleted.js": "stale content",
+    }
+
+    CompanyExecutionPipeline._sync_generated_files_from_workspace(
+        str(tmp_path),
+        files,
+    )
+
+    assert files["app.js"] == "const value = 2;\\n"
+    assert files["index.html"] == "<main>Repaired</main>\\n"
+    assert "deleted.js" not in files
+    assert not any(".pytest_cache" in path for path in files)
+    assert not any("node_modules" in path for path in files)
+
+
+def test_workspace_sync_refuses_missing_workspace(tmp_path: Path):
+    from src.company.execution.pipeline import CompanyExecutionPipeline
+
+    with pytest.raises(RuntimeError, match="workspace does not exist"):
+        CompanyExecutionPipeline._sync_generated_files_from_workspace(
+            str(tmp_path / "missing"),
+            {"app.js": "source"},
+        )
