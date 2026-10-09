@@ -89,6 +89,17 @@ Rules:
         # Prefer it before contacting Ollama so the factory never spends the model
         # timeout on a task whose safe implementation is already known.
         request_text = f"{name} {objective}".lower()
+        # Common task-list missions have a deterministic, tested browser product.
+        # Route these to the local implementation instead of making several
+        # sequential Ollama calls for a predictable CRUD application.
+        todo_terms = ("todo", "to-do", "to do list", "task manager", "task list")
+        if any(term in request_text for term in todo_terms):
+            from src.company.todo_fallback import todo_fallback_files
+
+            return GeneratedProject(
+                files=todo_fallback_files(),
+                test_command=["python", "-m", "pytest", "-q"],
+            )
         # Expense Tracker is a supported deterministic browser product. Do not
         # let a slow/unavailable local model turn this common mission into a
         # blocked project; the generated app remains fully interactive offline.
