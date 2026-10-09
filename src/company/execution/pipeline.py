@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -591,37 +592,40 @@ class CompanyExecutionPipeline:
                 f"Cannot synchronize generated files: workspace does not exist: {root}"
             )
 
-        for path in sorted(root.rglob("*")):
-            if path.is_symlink() or not path.is_file():
-                continue
-            relative = path.relative_to(root)
-            if any(part in ignored_directories for part in relative.parts):
-                continue
-            try:
-                resolved = path.resolve()
-                resolved.relative_to(root)
-            except (OSError, ValueError):
-                continue
+        for current_root, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+            current = Path(current_root)
+            directories[:] = sorted(
+                name
+                for name in directories
+                if name not in ignored_directories
+                and not (current / name).is_symlink()
+            )
+            for filename in sorted(filenames):
+                path = current / filename
+                if path.is_symlink() or not path.is_file():
+                    continue
+                try:
+                    relative = path.relative_to(root)
+                    resolved = path.resolve()
+                    resolved.relative_to(root)
+                    size = path.stat().st_size
+                except (OSError, ValueError):
+                    continue
+                if size > max_file_bytes:
+                    # Do not publish oversized or potentially binary artifacts.
+                    continue
+                if file_count >= max_files or total_bytes + size > max_total_bytes:
+                    break
+                try:
+                    file_content = path.read_text(encoding="utf-8")
+                except (OSError, UnicodeError):
+                    continue
 
-            try:
-                size = path.stat().st_size
-            except OSError:
-                continue
-            if size > max_file_bytes:
-                # Preserve existing content only when it was already tracked and
-                # still readable; never silently publish an oversized new file.
-                continue
-            if file_count >= max_files or total_bytes + size > max_total_bytes:
+                refreshed[relative.as_posix()] = file_content
+                file_count += 1
+                total_bytes += size
+            if file_count >= max_files or total_bytes >= max_total_bytes:
                 break
-            try:
-                content = path.read_text(encoding="utf-8")
-            except (OSError, UnicodeError):
-                continue
-
-            key = relative.as_posix()
-            refreshed[key] = content
-            file_count += 1
-            total_bytes += size
 
         if not refreshed and files:
             raise RuntimeError(
