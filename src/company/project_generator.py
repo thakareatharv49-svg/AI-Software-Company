@@ -219,13 +219,11 @@ Rules:
         if saved_checkpoint is not None:
             manifest = {"files": saved_checkpoint["manifest"]}
         else:
-            manifest_error: json.JSONDecodeError | None = None
             for manifest_attempt in range(1, 3):
                 try:
                     manifest = json.loads(await self._call(manifest_payload))
                     break
                 except json.JSONDecodeError as exc:
-                    manifest_error = exc
                     if manifest_attempt == 2:
                         raise RuntimeError(
                             "Ollama returned invalid JSON for the project file plan "
@@ -237,10 +235,6 @@ Rules:
                         "Return only the exact JSON object requested, with no markdown "
                         "fences or explanatory text."
                     )
-            if manifest_error is not None and "manifest" not in locals():
-                raise RuntimeError(
-                    "Ollama could not produce a valid project file plan"
-                ) from manifest_error
 
         raw_manifest = manifest.get("files")
         if not isinstance(raw_manifest, list) or not raw_manifest:
