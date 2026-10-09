@@ -627,11 +627,13 @@ class CompanyExecutionPipeline:
             if file_count >= max_files or total_bytes >= max_total_bytes:
                 break
 
-        if not refreshed and files:
-            raise RuntimeError(
-                "Cannot synchronize generated files: workspace contains no readable "
-                "project source files after QA."
-            )
+        # Some pipeline callers and legacy integrations keep generated files only
+        # in memory instead of materializing them in the QA workspace. In that case,
+        # preserve the original deliverable rather than failing before security review.
+        # When the workspace does contain readable files, it remains authoritative:
+        # this synchronizes repairs and additions while removing stale/deleted files.
+        if not refreshed:
+            return
         files.clear()
         files.update(refreshed)
 
