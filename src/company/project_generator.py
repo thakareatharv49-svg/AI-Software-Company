@@ -260,9 +260,9 @@ Requirements:
                 if last_error is not None:
                     attempt_payload["prompt"] = (
                         file_prompt
-                        + "\\n\\nPrevious attempt failed with this error: "
+                        + "\n\nPrevious attempt failed with this error: "
                         + str(last_error)[:600]
-                        + "\\nReturn corrected valid JSON with a non-empty content string."
+                        + "\nReturn corrected valid JSON with a non-empty content string."
                     )
                 try:
                     parsed = json.loads(await self._call(attempt_payload))
