@@ -116,7 +116,7 @@ class FactoryAutonomousRunner:
         normalized_status = str(status).strip().lower()
         mappings: dict[str, tuple[str, ...]] = {
             "product_generation": ("execution",),
-            "ai_ceo": ("research",),
+            "ai_ceo": ("product",),
             "research": ("research",),
             "research_handoff": ("research",),
             "product_definition": ("product",),
@@ -133,18 +133,38 @@ class FactoryAutonomousRunner:
             return
 
         step_by_name = {step.stage.value: step for step in plan.steps}
-        targets = [step_by_name[name] for name in target_names if name in step_by_name]
         failure_text = detail.casefold()
-        if normalized_status == "failed" and stage_name == "engineering_qa_security_github":
-            if "qa failed" in failure_text or "test" in failure_text and "failed" in failure_text:
-                targets = [step_by_name[name] for name in ("qa",) if name in step_by_name]
-            elif "code review failed" in failure_text or "security" in failure_text:
-                targets = [step_by_name[name] for name in ("security",) if name in step_by_name]
-            else:
-                targets = [step_by_name[name] for name in ("execution",) if name in step_by_name]
+        if stage_name == "engineering_qa_security_github":
+            if normalized_status == "running":
+                target_names = ("tasks", "agents", "execution")
+            elif normalized_status == "failed":
+                if "qa failed" in failure_text or (
+                    "test" in failure_text and "failed" in failure_text
+                ):
+                    for name in ("tasks", "agents", "execution"):
+                        step = step_by_name.get(name)
+                        if step is not None:
+                            step.status = "completed"
+                            step.detail = "Engineering completed before QA failed."
+                    target_names = ("qa",)
+                elif "code review failed" in failure_text or "security" in failure_text:
+                    for name in ("tasks", "agents", "execution", "qa"):
+                        step = step_by_name.get(name)
+                        if step is not None:
+                            step.status = "completed"
+                            step.detail = "Stage completed before security review failed."
+                    target_names = ("security",)
+                else:
+                    for name in ("tasks", "agents"):
+                        step = step_by_name.get(name)
+                        if step is not None:
+                            step.status = "completed"
+                            step.detail = "Engineering setup completed."
+                    target_names = ("execution",)
+        targets = [step_by_name[name] for name in target_names if name in step_by_name]
 
         for step in targets:
-            if normalized_status == "running":
+            if normalized_status == "running" and step.status not in {"running", "completed"}:
                 step.attempts += 1
             step.status = normalized_status
             step.detail = detail
