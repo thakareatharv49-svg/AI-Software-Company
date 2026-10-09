@@ -334,23 +334,41 @@ async def test_factory_can_use_real_m36_runner_adapter() -> None:
     from src.company.autonomous_project import AutonomousProjectRequest
     from src.company.project_outputs import ProjectOutputManifest
 
+    from types import SimpleNamespace
+
+    from company.acceptance import AutonomousCompanyAcceptance
+
     class Stage:
-        def __init__(self, status: str):
+        def __init__(self, name: str, status: str):
+            self.name = name
             self.status = status
 
     class Project:
         id = "real-project-1"
+        name = "Real M36"
         repository = "owner/real-project"
 
     class Pipeline:
         project = Project()
+        qa_result = SimpleNamespace(status=SimpleNamespace(value="passed"))
+        review_result = SimpleNamespace(status=SimpleNamespace(value="approved"))
         github_message = "pull request created"
         memory_id = "memory-1"
 
     class Result:
-        # Stage status may be an enum or a differently-cased string from adapters.
-        stages = tuple(Stage("COMPLETED") for _ in range(12))
+        # Simulate a result that satisfies the same lifecycle acceptance contract.
+        stages = tuple(
+            Stage(name, "COMPLETED")
+            for name in AutonomousCompanyAcceptance.REQUIRED_STAGES
+        )
+        ceo = SimpleNamespace(
+            decision=SimpleNamespace(requires_human=False),
+            mission=SimpleNamespace(status=SimpleNamespace(value="approved")),
+        )
         pipeline = Pipeline()
+        deployment = SimpleNamespace(status=SimpleNamespace(value="completed"))
+        monitoring = SimpleNamespace(status=SimpleNamespace(value="completed"))
+        learning = SimpleNamespace(signals=[{"kind": "success"}])
 
     class Runner:
         async def run(self, request: AutonomousProjectRequest):
@@ -399,7 +417,7 @@ async def test_factory_can_use_real_m36_runner_adapter() -> None:
 
     assert result == [project]
     assert project.status == "completed"
-    assert project.stages_executed == 12
+    assert project.stages_executed == len(AutonomousCompanyAcceptance.REQUIRED_STAGES)
     assert output_store.manifests[0].project_id == "real-project-1"
     assert output_store.manifests[0].repository == "owner/real-project"
     assert output_store.manifests[0].github_message == "pull request created"
@@ -413,18 +431,39 @@ async def test_factory_autonomous_runner_materializes_project_workspace(tmp_path
     from src.company.workspace import ProjectExecutionService
     from src.qa.models.contracts import QATestRequest
 
+    from types import SimpleNamespace
+
+    from company.acceptance import AutonomousCompanyAcceptance
+
     class Stage:
-        def __init__(self, status: str):
+        def __init__(self, name: str, status: str):
+            self.name = name
             self.status = status
 
     class Pipeline:
-        project = type("Project", (), {"id": "workspace-project", "repository": None})()
+        project = type(
+            "Project",
+            (),
+            {"id": "workspace-project", "name": "Workspace", "repository": None},
+        )()
+        qa_result = SimpleNamespace(status=SimpleNamespace(value="passed"))
+        review_result = SimpleNamespace(status=SimpleNamespace(value="approved"))
         github_message = None
         memory_id = None
 
     class Result:
-        stages = tuple(Stage("completed") for _ in range(12))
+        stages = tuple(
+            Stage(name, "completed")
+            for name in AutonomousCompanyAcceptance.REQUIRED_STAGES
+        )
+        ceo = SimpleNamespace(
+            decision=SimpleNamespace(requires_human=False),
+            mission=SimpleNamespace(status=SimpleNamespace(value="approved")),
+        )
         pipeline = Pipeline()
+        deployment = SimpleNamespace(status=SimpleNamespace(value="completed"))
+        monitoring = SimpleNamespace(status=SimpleNamespace(value="completed"))
+        learning = SimpleNamespace(signals=[{"kind": "success"}])
 
     class Runner:
         async def run(self, request: AutonomousProjectRequest):

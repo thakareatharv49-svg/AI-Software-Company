@@ -10,6 +10,7 @@ from src.company.autonomous_project import (
     AutonomousProjectResult,
     AutonomousProjectRunner,
 )
+from src.company.acceptance import AutonomousCompanyAcceptance
 from src.company.mission_controller.models import MissionPlan
 from src.company.models.contracts import CompanyMission
 from src.company.workspace import ProjectExecutionService
@@ -63,7 +64,19 @@ class FactoryAutonomousRunner:
                         }
                     ),
                 )
-            return await self.runner.run(request)
+            result = await self.runner.run(request)
+            report = AutonomousCompanyAcceptance().evaluate(result)
+            if not report.passed:
+                failures = [
+                    f"{check.name}: {check.detail}"
+                    for check in report.checks
+                    if not check.passed
+                ]
+                raise RuntimeError(
+                    "Autonomous project failed final acceptance: "
+                    + "; ".join(failures)
+                )
+            return result
         finally:
             # Completed workspaces are intentionally retained for the product
             # viewer. Failed attempts are also retained for diagnostics/retry.
