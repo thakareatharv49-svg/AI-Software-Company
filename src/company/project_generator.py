@@ -362,9 +362,13 @@ Requirements:
         project: GeneratedProject,
     ) -> None:
         """Reject browser-app output that cannot be opened in the product preview."""
-        from src.company.product_quality import find_unfinished_product_content
+        from src.company.product_quality import (
+            find_unfinished_product_content,
+            find_weak_product_tests,
+        )
 
         quality_issues = find_unfinished_product_content(project.files)
+        quality_issues.extend(find_weak_product_tests(project.files))
         if quality_issues:
             raise RuntimeError(
                 "Generated product failed cross-product quality checks: "
