@@ -223,18 +223,30 @@ Rules:
                 try:
                     manifest = json.loads(await self._call(manifest_payload))
                     break
-                except json.JSONDecodeError as exc:
+                except (json.JSONDecodeError, RuntimeError) as exc:
                     if manifest_attempt == 2:
+                        if isinstance(exc, json.JSONDecodeError):
+                            detail = "Ollama returned invalid JSON for the project file plan"
+                        else:
+                            detail = f"Ollama could not generate the project file plan: {exc}"
                         raise RuntimeError(
-                            "Ollama returned invalid JSON for the project file plan "
-                            "after one corrective retry"
+                            f"{detail} after one retry"
                         ) from exc
+
                     manifest_payload = dict(manifest_payload)
-                    manifest_payload["prompt"] += (
-                        "\n\nCorrective retry: the previous response was not valid JSON. "
-                        "Return only the exact JSON object requested, with no markdown "
-                        "fences or explanatory text."
-                    )
+                    if isinstance(exc, json.JSONDecodeError):
+                        recovery_prompt = (
+                            "\n\nCorrective retry: the previous response was not valid JSON. "
+                            "Return only the exact JSON object requested, with no markdown "
+                            "fences or explanatory text."
+                        )
+                    else:
+                        recovery_prompt = (
+                            "\n\nRecovery retry: the previous model request failed before "
+                            "a usable file plan was returned. Retry the same plan request, "
+                            "and return only the exact JSON object requested."
+                        )
+                    manifest_payload["prompt"] += recovery_prompt
 
         raw_manifest = manifest.get("files")
         if not isinstance(raw_manifest, list) or not raw_manifest:
