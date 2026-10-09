@@ -186,14 +186,14 @@ Rules:
         for item in raw_manifest:
             if not isinstance(item, dict):
                 raise RuntimeError("Project file plan contains an invalid entry")
-            raw_path = str(item.get("path", "")).strip().replace("\\\\", "/")
+            raw_path = str(item.get("path", "")).strip().replace("\\", "/")
             path = PurePosixPath(raw_path)
             if (
                 not raw_path
                 or path.is_absolute()
                 or ".." in path.parts
                 or ":" in raw_path
-                or "\\n" in raw_path
+                or "\n" in raw_path
             ):
                 raise RuntimeError(f"Unsafe path in project file plan: {raw_path!r}")
             normalized = path.as_posix()
