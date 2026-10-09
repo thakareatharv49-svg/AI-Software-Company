@@ -304,10 +304,25 @@ Rules:
                 f"- {existing_path}: {manifest_purpose}"
                 for existing_path, manifest_purpose in manifest_items
             )
-            existing_summary = "\\n".join(
-                f"- {existing_path} ({len(existing_content)} characters)"
-                for existing_path, existing_content in files.items()
-            ) or "(none yet)"
+            # Give the model the actual interfaces and markup already generated,
+            # not just filenames and character counts. A bounded excerpt helps keep
+            # later files consistent without allowing a large source file to exhaust
+            # the model context window.
+            existing_context_parts: list[str] = []
+            remaining_context_chars = 12_000
+            for existing_path, existing_content in files.items():
+                header = f"FILE: {existing_path}\n"
+                if remaining_context_chars <= len(header) + 80:
+                    break
+                available = remaining_context_chars - len(header) - 80
+                excerpt = existing_content[:available]
+                truncated = len(excerpt) < len(existing_content)
+                block = header + excerpt
+                if truncated:
+                    block += "\n[Earlier file excerpt truncated to fit the shared context budget.]"
+                existing_context_parts.append(block)
+                remaining_context_chars -= len(block) + 2
+            existing_summary = "\n\n".join(existing_context_parts) or "(none yet)"
             file_prompt = f"""Implement exactly one file for a runnable software product.
 Project name: {name}
 Mission objective: {objective}
