@@ -606,18 +606,33 @@ Requirements:
         if not node:
             return
 
+        import re
+
         scripts = {
             path: content
             for path, content in files.items()
             if path.lower().endswith((".js", ".mjs", ".cjs"))
         }
+        # Inline scripts are executable product code too. Checking only standalone
+        # .js files misses syntax errors in otherwise valid-looking HTML previews.
+        for html_path, html_content in files.items():
+            if not html_path.lower().endswith((".html", ".htm")):
+                continue
+            inline_scripts = re.findall(
+                r"""<script\\b(?![^>]*\\bsrc\\s*=)[^>]*>(.*?)</script\\s*>""",
+                html_content,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            for index, content in enumerate(inline_scripts, start=1):
+                scripts[f"{html_path}:inline-script-{index}"] = content
+
         if not scripts:
             return
 
         with tempfile.TemporaryDirectory(prefix="factory-js-check-") as temp_dir:
             root = Path(temp_dir)
-            for path, content in scripts.items():
-                check_path = root / "generated.js"
+            for index, (path, content) in enumerate(scripts.items()):
+                check_path = root / f"generated-{index}.js"
                 check_path.write_text(content, encoding="utf-8")
                 result = subprocess.run(
                     [node, "--check", str(check_path)],
