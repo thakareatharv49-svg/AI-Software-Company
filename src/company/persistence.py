@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, DateTime, Integer, String, create_engine, delete, select
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, create_engine, delete, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from src.company.audit import MissionAuditEntry
@@ -54,7 +54,7 @@ class MissionJobRow(Base):
     plan: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     message: Mapped[str] = mapped_column(String(5000), nullable=False)
-    workspace_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    workspace_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
