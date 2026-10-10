@@ -365,10 +365,31 @@ class ProjectFactory:
                     (
                         step
                         for step in project.plan.steps
-                        if step.status in {"running", "planned"}
+                        if step.status == "running"
                     ),
                     None,
                 )
+                if active_step is None and self.autonomous_runner is not None:
+                    # Startup can fail before the autonomous adapter emits stage
+                    # telemetry. Attribute that failure to execution rather than
+                    # falsely reporting that research itself failed.
+                    active_step = next(
+                        (
+                            step
+                            for step in project.plan.steps
+                            if step.stage.value == "execution"
+                        ),
+                        None,
+                    )
+                if active_step is None:
+                    active_step = next(
+                        (
+                            step
+                            for step in project.plan.steps
+                            if step.status == "planned"
+                        ),
+                        None,
+                    )
                 if active_step is not None:
                     active_step.status = "failed"
                     active_step.detail = project.last_error
