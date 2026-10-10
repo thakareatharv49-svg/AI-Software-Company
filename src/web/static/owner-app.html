@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Owner Console — AI Software Company</title>
+<link rel="stylesheet" href="/app/static/owner.css?v=1">
+<script src="/app/static/owner.js?v=1" defer></script>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="/owner"><span class="brand-mark">A</span><span><b>ASC</b><small>OWNER CONSOLE</small></span></a>
+  <div class="nav-label">MANAGEMENT</div>
+  <a class="nav active" href="#overview">◈ <span>Overview</span></a>
+  <a class="nav" href="#factory">⌘ <span>Factory health</span></a>
+  <a class="nav" href="#missions">▤ <span>Missions</span></a>
+  <a class="nav" href="#events">◉ <span>Activity &amp; events</span></a>
+  <a class="nav" href="#platform">◇ <span>Platform readiness</span></a>
+  <div class="sidebar-bottom"><span class="secure-dot"></span><div><b>Private owner area</b><small>Server-authorized session</small></div></div>
+</aside>
+<main class="main">
+<header class="topbar"><div><span class="eyebrow">PRIVATE ADMINISTRATION</span><h1>Owner Console</h1><p>Operate the software company from one place.</p></div><div class="top-actions"><span class="live"><i></i><span id="connection">Connecting</span></span><button id="refresh" class="button secondary">Refresh data ↻</button><a class="button primary" href="/app">Open Factory ↗</a></div></header>
+<section id="overview" class="welcome panel"><div><span class="eyebrow">COMPANY OVERVIEW</span><h2>Good operations start with visibility.</h2><p>Monitor the factory and platform health. Customer billing and revenue metrics will appear when verified billing records are connected.</p></div><div class="welcome-icon">⌘</div></section>
+<section class="metrics">
+<article class="metric panel"><span>Tracked missions</span><strong id="metric-missions">—</strong><small>From company control center</small></article>
+<article class="metric panel"><span>Active / running</span><strong id="metric-running">—</strong><small>Current mission statuses</small></article>
+<article class="metric panel"><span>Completed</span><strong id="metric-completed">—</strong><small>Recorded completed missions</small></article>
+<article class="metric panel"><span>Factory status</span><strong id="metric-factory" class="status-value">—</strong><small id="factory-detail">Waiting for health data</small></article>
+</section>
+<section id="factory" class="content-grid">
+<article class="panel section"><div class="section-head"><div><span class="eyebrow">OPERATIONS</span><h2>Factory health</h2></div><span id="health-pill" class="pill neutral">Checking</span></div><div id="factory-health" class="health-list"><div class="placeholder">Loading company state…</div></div><div class="actions"><a class="button secondary" href="/app#factory-section">Manage factory ↗</a><a class="button secondary" href="/api/company/readiness" target="_blank" rel="noopener">Readiness report ↗</a></div></article>
+<article id="platform" class="panel section"><div class="section-head"><div><span class="eyebrow">LAUNCH CHECKLIST</span><h2>Platform readiness</h2></div><span id="readiness-pill" class="pill neutral">Checking</span></div><div id="readiness-list" class="health-list"><div class="placeholder">Loading readiness checks…</div></div></article>
+</section>
+<section id="missions" class="panel section"><div class="section-head"><div><span class="eyebrow">WORK QUEUE</span><h2>Recent missions</h2></div><a class="text-link" href="/app#missions-section">Open mission manager ↗</a></div><div class="table-wrap"><table><thead><tr><th>Mission</th><th>Status</th><th>Updated / created</th></tr></thead><tbody id="mission-rows"><tr><td colspan="3" class="placeholder">Loading missions…</td></tr></tbody></table></div></section>
+<section class="content-grid lower-grid">
+<article id="events" class="panel section"><div class="section-head"><div><span class="eyebrow">AUDIT FEED</span><h2>Recent activity</h2></div></div><div id="event-list" class="event-list"><div class="placeholder">Loading events…</div></div></article>
+<article class="panel section"><div class="section-head"><div><span class="eyebrow">CUSTOMER BUSINESS</span><h2>Customers &amp; revenue</h2></div><span class="pill neutral">Not connected</span></div><p class="muted">This panel deliberately shows no invented numbers. Customer accounts, verified subscriptions, payment webhooks, revenue, refunds and demo conversions still need their billing/admin data layer.</p><div class="integration-note"><b>Next integration</b><span>Verified payment events → subscription ledger → owner analytics.</span></div><div class="integration-note"><b>Security boundary</b><span>Owner-only data; customers must never access this console.</span></div></article>
+</section>
+<footer>AI Software Company · Owner Console <span>Private routes require an authenticated owner membership.</span></footer>
+</main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
