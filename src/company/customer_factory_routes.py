@@ -218,6 +218,14 @@ async def list_customer_missions(
                 "status": job.status.value,
                 "message": job.message,
                 "attempts": job.attempts,
+                "stages": [
+                    {
+                        "name": str(getattr(step.stage, "value", step.stage)),
+                        "status": str(getattr(step.status, "value", step.status)),
+                        "detail": step.detail,
+                    }
+                    for step in job.plan.steps
+                ],
                 "created_at": job.created_at.isoformat(),
                 "updated_at": job.updated_at.isoformat(),
             }
