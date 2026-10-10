@@ -45,3 +45,14 @@ def test_authentication_endpoints_remain_reachable_without_a_session() -> None:
     response = client.get("/auth/google/start", follow_redirects=False)
     assert response.status_code in (302, 503)
     assert response.status_code != 401
+
+
+def test_owner_console_shell_loads_before_authentication() -> None:
+    client = TestClient(app)
+    response = client.get("/owner")
+
+    assert response.status_code == 200
+    assert "Owner Console" in response.text
+    assert "/auth/google/start" in response.text
+    assert "/auth/github/start" in response.text
+

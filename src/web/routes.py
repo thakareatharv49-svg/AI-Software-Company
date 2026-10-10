@@ -1,15 +1,16 @@
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from src.security.authorization import require_company_owner
 
 router = APIRouter(tags=["web"])
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 PRODUCTS_DIR = Path(__file__).resolve().parents[2] / "generated-products"
 LEGACY_PRODUCTS_DIR = Path(__import__("tempfile").gettempdir()) / "ai-software-company-workspaces"
 
-@router.get("/app")
+@router.get("/app", dependencies=[Depends(require_company_owner)])
 async def company_app() -> FileResponse:
     return FileResponse(
         STATIC_DIR / "index.html",
@@ -37,7 +38,7 @@ def _find_product_entrypoint(root: Path) -> tuple[Path, Path] | None:
     return None
 
 
-@router.get("/product/{mission_id}", include_in_schema=False)
+@router.get("/product/{mission_id}", include_in_schema=False, dependencies=[Depends(require_company_owner)])
 async def completed_product(mission_id: str) -> HTMLResponse:
     """Open the generated product browser entry point."""
     if not mission_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in mission_id):
@@ -91,7 +92,7 @@ async def completed_product(mission_id: str) -> HTMLResponse:
         html = base_tag + html
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
-@router.get("/product/{mission_id}/{file_path:path}", include_in_schema=False)
+@router.get("/product/{mission_id}/{file_path:path}", include_in_schema=False, dependencies=[Depends(require_company_owner)])
 async def completed_product_asset(mission_id: str, file_path: str) -> FileResponse:
     """Serve browser assets belonging to a generated product."""
     if not mission_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in mission_id):
@@ -115,7 +116,7 @@ async def completed_product_asset(mission_id: str, file_path: str) -> FileRespon
     return FileResponse(target, headers={"Cache-Control": "no-store"})
 
 
-@router.get("/api/products")
+@router.get("/api/products", dependencies=[Depends(require_company_owner)])
 async def completed_products() -> JSONResponse:
     """List generated browser products that actually have an index.html."""
     PRODUCTS_DIR.mkdir(parents=True, exist_ok=True)

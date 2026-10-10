@@ -20,6 +20,8 @@ From the web app you can:
 
 The browser UI is intentionally part of the main application, so there is no separate frontend server to configure.
 
+The private owner console is available at **http://127.0.0.1:8000/owner**. Its sign-in page loads before authentication; the company APIs and factory controls remain owner-protected. To sign in, configure `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `OWNER_EMAIL` in `.env` (or configure the equivalent GitHub OAuth credentials). Set `PUBLIC_BASE_URL` to the exact local app origin, and register the matching callback URL with the provider, for example `http://127.0.0.1:8000/auth/google/callback`. Without provider credentials, the OAuth start endpoint intentionally returns HTTP 503; without a valid owner session, protected APIs return HTTP 401/403.
+
 ## What it does
 
 1. You give the company a software mission from the web control center.
