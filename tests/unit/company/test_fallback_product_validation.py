@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from src.company.project_generator import GeneratedProject, OllamaProjectGenerator
@@ -55,3 +57,25 @@ def test_browser_fallback_categories_require_a_root_entry_point() -> None:
             "Create a calculator",
             project,
         )
+
+
+
+
+def test_parsed_browser_product_gets_automated_smoke_test() -> None:
+    generator = OllamaProjectGenerator()
+    project = generator._parse(
+        json.dumps(
+            {
+                "files": {
+                    "index.html": "<!doctype html><html><body><h1>Calculator</h1></body></html>",
+                    "app.js": "function calculate(a, b) { return a + b; }",
+                },
+                "test_command": ["python", "-m", "pytest", "-q"],
+            }
+        )
+    )
+
+    assert "tests/test_generated_project.py" in project.files
+    assert "test_browser_entrypoint_and_local_assets_exist" in project.files[
+        "tests/test_generated_project.py"
+    ]
