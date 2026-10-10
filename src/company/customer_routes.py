@@ -17,7 +17,7 @@ async def _entitlement(db: AsyncSession, workspace_id: str) -> WorkspaceEntitlem
     result = await db.execute(select(WorkspaceEntitlementModel).where(WorkspaceEntitlementModel.workspace_id == workspace_id))
     entitlement = result.scalar_one_or_none()
     if entitlement is None:
-        entitlement = WorkspaceEntitlementModel(workspace_id=workspace_id, plan="free", status="active", monthly_run_limit=PLAN_LIMITS["free"].monthly_runs, project_limit=PLAN_LIMITS["free"].projects, updated_at=datetime.now(UTC))
+        entitlement = WorkspaceEntitlementModel(workspace_id=workspace_id, plan="demo", status="active", monthly_run_limit=PLAN_LIMITS["demo"].monthly_runs, project_limit=PLAN_LIMITS["demo"].projects, updated_at=datetime.now(UTC))
         db.add(entitlement)
         await db.flush()
     return entitlement
