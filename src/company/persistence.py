@@ -54,6 +54,7 @@ class MissionJobRow(Base):
     plan: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     message: Mapped[str] = mapped_column(String(5000), nullable=False)
+    workspace_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -90,6 +91,7 @@ class MissionJobStore:
                 "plan": job.plan.model_dump(mode="json"),
                 "status": getattr(job.status, "value", job.status),
                 "message": job.message,
+                "workspace_id": job.workspace_id,
                 "attempts": job.attempts,
                 "created_at": job.created_at,
                 "updated_at": job.updated_at,
@@ -112,6 +114,7 @@ class MissionJobStore:
                 plan=MissionPlan.model_validate(row.plan),
                 status=MissionJobStatus(row.status),
                 message=row.message,
+                workspace_id=row.workspace_id,
                 attempts=row.attempts,
                 created_at=row.created_at,
                 updated_at=row.updated_at,
@@ -130,6 +133,7 @@ class MissionJobStore:
                     plan=MissionPlan.model_validate(row.plan),
                     status=MissionJobStatus(row.status),
                     message=row.message,
+                    workspace_id=row.workspace_id,
                     attempts=row.attempts,
                     created_at=row.created_at,
                     updated_at=row.updated_at,
