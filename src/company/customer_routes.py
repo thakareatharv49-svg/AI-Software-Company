@@ -57,3 +57,8 @@ async def consume_customer_run(context: Annotated[tuple, Depends(require_custome
     usage.updated_at = now
     await db.commit()
     return {"accepted": True, "runs_used": usage.runs_used, "monthly_run_limit": limit, "remaining": max(0, limit - usage.runs_used)}
+
+
+# Keep customer workspace and project APIs under the same authenticated customer surface.
+from src.company.customer_project_routes import router as customer_project_router
+router.include_router(customer_project_router)
