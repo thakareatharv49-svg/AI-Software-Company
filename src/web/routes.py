@@ -120,13 +120,29 @@ async def completed_product_asset(mission_id: str, file_path: str) -> FileRespon
 async def completed_products() -> JSONResponse:
     """List the company platform and generated products with browser previews."""
     PRODUCTS_DIR.mkdir(parents=True, exist_ok=True)
-    products = [{
-        "id": "ai-software-company",
-        "name": "AI Software Company",
-        "kind": "platform",
-        "status": "core platform",
-        "url": "/app",
-    }]
+    products = [
+        {
+            "id": "ai-software-company",
+            "name": "AI Software Company",
+            "kind": "platform",
+            "status": "Core platform",
+            "url": "/app",
+        },
+        {
+            "id": "ai-software-maker",
+            "name": "AI Software Maker",
+            "kind": "company_product",
+            "status": "Launch link not connected",
+            "url": None,
+        },
+        {
+            "id": "ai-opensource-engineer",
+            "name": "AI Open Source Engineer",
+            "kind": "repository",
+            "status": "Public GitHub repository",
+            "url": "https://github.com/thakareatharv49-svg/AI-OpenSource-Engineer-",
+        },
+    ]
     roots = list(PRODUCTS_DIR.iterdir())
     if LEGACY_PRODUCTS_DIR.is_dir():
         roots.extend(LEGACY_PRODUCTS_DIR.iterdir())
