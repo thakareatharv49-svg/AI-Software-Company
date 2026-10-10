@@ -100,6 +100,27 @@ function renderMissions() {
     card.append(top,node("p","",mission.message || mission.objective || "No status message yet."));
     const meta=node("p","muted","Attempts: "+(mission.attempts ?? 0)+(mission.updated_at ? " · Updated "+new Date(mission.updated_at).toLocaleString() : ""));
     card.append(meta);
+    const stages=Array.isArray(mission.stages) ? mission.stages : [];
+    if (stages.length) {
+      const completed=stages.filter(stage=>stage.status==="completed").length;
+      const progress=node("div","stage-progress");
+      const progressHead=node("div","stage-progress-head");
+      progressHead.append(node("span","","Factory stages"),node("span","muted",completed+" / "+stages.length+" complete"));
+      const meter=node("div","meter stage-meter");
+      const fill=node("i","");
+      fill.style.width=(completed/stages.length*100)+"%";
+      meter.append(fill);
+      progress.append(progressHead,meter);
+      const stageList=node("div","stage-list");
+      for (const stage of stages) {
+        const row=node("div","stage-row");
+        row.append(statusPill(stage.status),node("span","stage-name",String(stage.name||"Stage").replaceAll("_"," ")));
+        if (stage.detail) row.append(node("p","stage-detail",stage.detail));
+        stageList.append(row);
+      }
+      progress.append(stageList);
+      card.append(progress);
+    }
     const actions=node("div","item-actions");
     if (mission.status==="failed" || mission.status==="blocked") {
       const retry=action("Retry run ↻","primary",button=>retryMission(mission.id,button));
