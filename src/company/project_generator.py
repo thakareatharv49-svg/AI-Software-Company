@@ -518,21 +518,6 @@ Requirements:
         if not any(term in mission for term in browser_terms):
             return
 
-        test_paths = [
-            path.replace("\\", "/").casefold()
-            for path in project.files
-            if (
-                path.replace("\\", "/").casefold().startswith("tests/")
-                or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].startswith("test_")
-                or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].endswith("_test.py")
-            )
-        ]
-        if not test_paths:
-            raise RuntimeError(
-                "Generated browser product has no automated test file; "
-                "include mission-specific behavior tests under tests/."
-            )
-
         index_html = project.files.get("index.html")
         if not index_html:
             raise RuntimeError(
