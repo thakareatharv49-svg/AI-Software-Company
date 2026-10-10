@@ -285,9 +285,10 @@ def test_large_mission_manifest_adds_browser_entrypoint_and_tests(tmp_path) -> N
     )
 
     assert "index.html" in project.files
+    assert "style.css" in project.files
     assert "app.js" in project.files
     assert "tests/test_project.py" in project.files
-    assert calls == 4
+    assert calls == 5
 
 
 
