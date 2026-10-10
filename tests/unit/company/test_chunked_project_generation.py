@@ -81,6 +81,8 @@ async def test_large_mission_retries_only_the_failed_file(monkeypatch, tmp_path)
         json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
         "not valid JSON",
         json.dumps({"content": "<!doctype html><title>Recovered</title>"}),
+        json.dumps({"content": "body { font-family: sans-serif; }"}),
+        json.dumps({"content": "document.title = 'Recovered';"}),
         json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     prompts = []
@@ -92,11 +94,13 @@ async def test_large_mission_retries_only_the_failed_file(monkeypatch, tmp_path)
     monkeypatch.setattr(generator, "_call", fake_call)
     project = await generator._generate_large_mission(
         "Large app",
-        "Create, edit, delete, pin and search items with responsive UI.",
+        "Create, edit, delete, pin and search items in a responsive browser app.",
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Recovered</title>"
-    assert len(prompts) == 4
+    assert len(prompts) == 6
+    assert "style.css" in project.files
+    assert "app.js" in project.files
     assert "tests/test_project.py" in project.files
     assert "Previous attempt failed with this error" in prompts[2]
 
@@ -170,6 +174,8 @@ async def test_large_mission_retries_transient_manifest_request_failure(monkeypa
         RuntimeError("Could not reach Ollama"),
         manifest,
         json.dumps({"content": "<!doctype html><title>Recovered</title>"}),
+        json.dumps({"content": "body { font-family: sans-serif; }"}),
+        json.dumps({"content": "document.title = 'Recovered';"}),
         json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     prompts = []
@@ -188,7 +194,9 @@ async def test_large_mission_retries_transient_manifest_request_failure(monkeypa
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Recovered</title>"
-    assert len(prompts) == 4
+    assert len(prompts) == 6
+    assert "style.css" in project.files
+    assert "app.js" in project.files
     assert "tests/test_project.py" in project.files
     assert "Recovery retry" in prompts[1]
     assert "Could not reach Ollama" not in prompts[1]
