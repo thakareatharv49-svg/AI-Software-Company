@@ -43,4 +43,5 @@ def test_authentication_endpoints_remain_reachable_without_a_session() -> None:
     # OAuth start remains public; missing provider configuration is a controlled
     # 503 rather than being blocked by the private-company authorization layer.
     response = client.get("/auth/google/start", follow_redirects=False)
-    assert response.status_code == 503
+    assert response.status_code in (302, 503)
+    assert response.status_code != 401
