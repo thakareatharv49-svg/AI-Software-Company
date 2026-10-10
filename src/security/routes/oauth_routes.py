@@ -83,7 +83,7 @@ async def oauth_start(provider: str) -> RedirectResponse:
     else:
         params["scope"] = "read:user user:email"
     response = RedirectResponse(
-        httpx.URL(authorize_url).copy_with(params=params).human_repr(), status_code=302
+        str(httpx.URL(authorize_url).copy_merge_params(params)), status_code=302
     )
     _set_short_cookie(response, _STATE_COOKIE, state)
     _set_short_cookie(response, _VERIFIER_COOKIE, verifier)
@@ -208,7 +208,7 @@ async def oauth_callback(
             ))
         db.add(WorkspaceMembershipModel(
             id=str(uuid4()), workspace_id=workspace_id, user_id=user.id,
-            role="owner" if is_owner else "owner", created_at=now,
+            role="owner", created_at=now,
         ))
     raw_token, token_hash = issue_session_token()
     expires_at = session_expiry(now=now)
