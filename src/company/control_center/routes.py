@@ -119,6 +119,14 @@ def mission_jobs(center: CompanyControlCenter = ControlCenter) -> list[MissionJo
     return center.mission_jobs()
 
 
+@router.post("/missions/cleanup")
+def cleanup_missions(center: CompanyControlCenter = ControlCenter) -> dict[str, object]:
+    try:
+        return center.delete_queued_and_blocked_missions()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.get("/missions/{mission_id}/plan")
 def mission_plan(
     mission_id: str,
