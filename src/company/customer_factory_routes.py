@@ -285,10 +285,14 @@ async def retry_customer_mission(
     job = center.mission_job(mission_id)
     if job is None or job.workspace_id != workspace.id:
         raise HTTPException(status_code=404, detail="Mission not found")
-    if job.status not in {MissionJobStatus.FAILED, MissionJobStatus.BLOCKED}:
+    status_value = str(getattr(job.status, "value", job.status))
+    if status_value not in {
+        MissionJobStatus.FAILED.value,
+        MissionJobStatus.BLOCKED.value,
+    }:
         raise HTTPException(
             status_code=409,
-            detail=f"Mission cannot be retried from status '{job.status.value}'",
+            detail=f"Mission cannot be retried from status '{status_value}'",
         )
 
     now = datetime.now(UTC)
