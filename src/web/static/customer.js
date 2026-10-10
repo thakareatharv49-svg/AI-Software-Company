@@ -39,7 +39,7 @@ function node(tag, className, text) {
 function action(label, cls, handler) {
   const b = node("button", "button " + cls, label);
   b.type = "button";
-  b.addEventListener("click", handler);
+  b.addEventListener("click", () => handler(b));
   return b;
 }
 function showMessage(text, error = false) {
@@ -77,7 +77,7 @@ function renderProjects() {
     }
     const actions=node("div","item-actions");
     if (project.status === "planned" || project.status === "queued") {
-      const launch=action(project.status==="queued" ? "Resume factory run ↻" : "Launch factory ✦","primary",()=>launchProject(project));
+      const launch=action(project.status==="queued" ? "Resume factory run ↻" : "Launch factory ✦","primary",button=>launchProject(project,button));
       actions.append(launch);
     }
     if (project.mission_id && project.status !== "planned") {
@@ -101,6 +101,10 @@ function renderMissions() {
     const meta=node("p","muted","Attempts: "+(mission.attempts ?? 0)+(mission.updated_at ? " · Updated "+new Date(mission.updated_at).toLocaleString() : ""));
     card.append(meta);
     const actions=node("div","item-actions");
+    if (mission.status==="failed" || mission.status==="blocked") {
+      const retry=action("Retry run ↻","primary",button=>retryMission(mission.id,button));
+      actions.append(retry);
+    }
     if (mission.status==="completed") {
       const preview=action("Open product ↗","primary",()=>window.open("/customer/products/"+encodeURIComponent(mission.id),"_blank","noopener"));
       actions.append(preview);
@@ -131,8 +135,7 @@ async function showOutputs(id, card) {
     }
   } catch (e) {section.replaceChildren(node("p","message error","Could not load outputs: "+e.message));}
 }
-async function launchProject(project) {
-  const button=[...document.querySelectorAll("button")].find(b=>b.textContent.startsWith("Launch factory")||b.textContent.startsWith("Resume factory run"));
+async function launchProject(project, button) {
   if(button) button.disabled=true;
   showMessage("Sending project to the factory…");
   try {
@@ -144,6 +147,20 @@ async function launchProject(project) {
     notify(e.message,true);
     await refresh();
   } finally {if(button)button.disabled=false;}
+}
+async function retryMission(id, button) {
+  if (button) { button.disabled = true; button.textContent = "Retrying…"; }
+  notify("Re-queueing the failed mission…");
+  try {
+    await api("/api/customer/missions/" + encodeURIComponent(id) + "/retry", {method:"POST"});
+    notify("Mission queued for another factory attempt.");
+    await refresh();
+  } catch (e) {
+    notify(e.message, true);
+    await refresh();
+  } finally {
+    if (button) { button.disabled = false; button.textContent = "Retry run ↻"; }
+  }
 }
 async function createProject(event) {
   event.preventDefault();

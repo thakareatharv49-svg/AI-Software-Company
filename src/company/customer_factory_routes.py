@@ -266,3 +266,89 @@ async def get_customer_mission_outputs(
             for item in center.project_outputs(mission_id)
         ],
     }
+
+
+@router.post("/missions/{mission_id}/retry", status_code=202)
+async def retry_customer_mission(
+    mission_id: str,
+    context: Annotated[tuple, Depends(require_customer_workspace)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    center: Annotated[CompanyControlCenter, Depends(get_control_center)],
+) -> dict[str, object]:
+    """Retry a failed customer mission without exposing other workspaces."""
+    _, workspace = context
+    if center.factory_running():
+        raise HTTPException(
+            status_code=409,
+            detail="The factory is busy; retry this mission when it is idle",
+        )
+    job = center.mission_job(mission_id)
+    if job is None or job.workspace_id != workspace.id:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    status_value = str(getattr(job.status, "value", job.status))
+    if status_value not in {
+        MissionJobStatus.FAILED.value,
+        MissionJobStatus.BLOCKED.value,
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Mission cannot be retried from status '{status_value}'",
+        )
+
+    now = datetime.now(UTC)
+    period = _period_start(now)
+    entitlement = await _ensure_entitlement(db, workspace.id)
+    limits = resolve_limits(entitlement.plan, status=entitlement.status)
+    limit = min(entitlement.monthly_run_limit, limits.monthly_runs)
+    usage_result = await db.execute(
+        select(WorkspaceUsageModel).where(
+            WorkspaceUsageModel.workspace_id == workspace.id,
+            WorkspaceUsageModel.period_start == period,
+        ).with_for_update()
+    )
+    usage = usage_result.scalar_one_or_none()
+    if usage is None:
+        usage = WorkspaceUsageModel(
+            id=str(uuid4()), workspace_id=workspace.id, period_start=period,
+            runs_used=0, updated_at=now,
+        )
+        db.add(usage)
+        await db.flush()
+    if not can_consume_run(
+        runs_used=usage.runs_used, limit=limit, status=entitlement.status
+    ):
+        await db.rollback()
+        raise HTTPException(
+            status_code=429,
+            detail="Monthly run quota exhausted or subscription inactive",
+        )
+
+    try:
+        queued = center.retry_mission(mission_id)
+    except (RuntimeError, ValueError, KeyError) as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    usage.runs_used += 1
+    usage.updated_at = now
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+    try:
+        await center.run_factory(
+            max_projects=1, max_retries=2, mission_id=mission_id
+        )
+    except (RuntimeError, ValueError, KeyError) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Mission queued but factory could not start: {exc}",
+        ) from exc
+    return {
+        "accepted": True,
+        "mission_id": mission_id,
+        "status": queued.status.value,
+        "runs_used": usage.runs_used,
+        "monthly_run_limit": limit,
+        "remaining": max(0, limit - usage.runs_used),
+    }
