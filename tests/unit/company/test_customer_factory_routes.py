@@ -28,6 +28,9 @@ class _FakeCenter:
         self.owned = _job("owned-mission", "workspace-a")
         self.foreign = _job("foreign-mission", "workspace-b")
 
+    def factory_running(self):
+        return False
+
     def mission_jobs(self):
         return [self.owned, self.foreign]
 
@@ -66,5 +69,30 @@ def test_customer_cannot_read_another_workspaces_mission_or_outputs():
         assert client.get(
             "/api/customer/missions/foreign-mission/outputs"
         ).status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_customer_cannot_retry_another_workspaces_mission():
+    center = _FakeCenter()
+    workspace = SimpleNamespace(id="workspace-a")
+    app.dependency_overrides[require_customer_workspace] = lambda: (None, workspace)
+    app.dependency_overrides[get_control_center] = lambda: center
+    try:
+        response = TestClient(app).post("/api/customer/missions/foreign-mission/retry")
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_customer_cannot_retry_a_queued_mission():
+    center = _FakeCenter()
+    workspace = SimpleNamespace(id="workspace-a")
+    app.dependency_overrides[require_customer_workspace] = lambda: (None, workspace)
+    app.dependency_overrides[get_control_center] = lambda: center
+    try:
+        response = TestClient(app).post("/api/customer/missions/owned-mission/retry")
+        assert response.status_code == 409
+        assert "queued" in response.json()["detail"]
     finally:
         app.dependency_overrides.clear()
