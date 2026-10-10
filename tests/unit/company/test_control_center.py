@@ -8,6 +8,7 @@ from src.company.control_center.service import CompanyControlCenter, MissionSubm
 from src.company.models.contracts import CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.main import app
+from src.security.authorization import require_company_owner
 
 
 def test_submit_mission_queues_company_work() -> None:
@@ -64,6 +65,7 @@ async def test_explicit_factory_launch_prioritizes_selected_mission() -> None:
 def test_control_api_serves_mission_and_app() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
     try:
         client = TestClient(app)
         response = client.post("/api/missions", json={"name": "Build X", "objective": "Create X"})
