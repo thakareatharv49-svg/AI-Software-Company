@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.company.control_center.routes import get_control_center
+from src.company.control_center.service import CompanyControlCenter
 from src.company.customer_entitlements import PLAN_LIMITS, resolve_limits
 from src.db.models.entitlement import WorkspaceEntitlementModel
 from src.db.models.project import ProjectModel
@@ -27,12 +29,33 @@ class ProjectCreate(BaseModel):
 async def list_projects(
     context: Annotated[tuple, Depends(require_customer_workspace)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    center: Annotated[CompanyControlCenter, Depends(get_control_center)],
 ) -> dict[str, object]:
     _, workspace = context
     result = await db.execute(select(ProjectModel).where(
         ProjectModel.workspace_id == workspace.id
     ).order_by(ProjectModel.created_at.desc()))
     projects = result.scalars().all()
+    changed = False
+    for project in projects:
+        if not project.mission_id:
+            continue
+        job = center.mission_job(project.mission_id)
+        if job is None or job.workspace_id != workspace.id:
+            continue
+        live_status = job.status.value
+        if project.status != live_status:
+            project.status = live_status
+            project.updated_at = datetime.now(UTC)
+            changed = True
+        if live_status == "completed" and not project.repository:
+            outputs = center.project_outputs(project.mission_id)
+            repository = next((item.repository for item in outputs if getattr(item, "repository", None)), None)
+            if repository:
+                project.repository = repository
+                changed = True
+    if changed:
+        await db.commit()
     return {"items": [{"id": p.id, "name": p.name, "description": p.description,
                        "objective": p.objective, "status": p.status,
                        "repository": p.repository, "mission_id": p.mission_id, "created_at": p.created_at.isoformat()}

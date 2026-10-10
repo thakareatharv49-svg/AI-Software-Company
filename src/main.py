@@ -14,6 +14,7 @@ from src.security.authorization import require_company_owner
 from src.security.routes.oauth_routes import router as oauth_router
 from src.security.routes.routes import router as security_router
 from src.web.routes import router as web_router
+from src.web.customer_routes import router as customer_web_router
 
 configure_logging()
 
@@ -39,6 +40,7 @@ app.include_router(dashboard_router, dependencies=[Depends(require_company_owner
 app.include_router(security_router, dependencies=[Depends(require_company_owner)])
 app.include_router(oauth_router)
 app.include_router(customer_router)
+app.include_router(customer_web_router)
 app.include_router(control_router, dependencies=[Depends(require_company_owner)])
 app.include_router(owner_router, dependencies=[Depends(require_company_owner)])
 app.include_router(web_router, dependencies=[Depends(require_company_owner)])

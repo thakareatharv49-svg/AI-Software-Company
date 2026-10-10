@@ -255,7 +255,7 @@ async def oauth_callback(
         expires_at=expires_at, revoked=False, created_at=now,
     ))
     await db.commit()
-    redirect = RedirectResponse(url="/app", status_code=303)
+    redirect = RedirectResponse(url="/app" if is_owner else "/customer", status_code=303)
     redirect.delete_cookie(_STATE_COOKIE, path="/auth")
     redirect.delete_cookie(_VERIFIER_COOKIE, path="/auth")
     redirect.set_cookie(
