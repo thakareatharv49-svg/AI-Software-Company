@@ -1,11 +1,13 @@
-from src.company.customer_entitlements import PLAN_LIMITS, can_consume_run, resolve_limits
+from src.company.customer_entitlements import DEFAULT_CUSTOMER_PLAN, PLAN_LIMITS, can_consume_run, resolve_limits
 from src.db.base import Base
 from src.db.models.entitlement import WorkspaceEntitlementModel, WorkspaceUsageModel
 
 
 def test_plan_limits_are_server_defined_and_increasing() -> None:
+    assert DEFAULT_CUSTOMER_PLAN == "demo"
     assert PLAN_LIMITS["demo"].monthly_runs == 3
     assert PLAN_LIMITS["demo"].projects == 1
+    assert PLAN_LIMITS[DEFAULT_CUSTOMER_PLAN].monthly_runs == 3
     assert PLAN_LIMITS["pro"].monthly_runs > PLAN_LIMITS["free"].monthly_runs
     assert PLAN_LIMITS["team"].projects > PLAN_LIMITS["pro"].projects
 
