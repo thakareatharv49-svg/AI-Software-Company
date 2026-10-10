@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.company.customer_entitlements import PLAN_LIMITS, can_consume_run, resolve_limits
+from src.company.customer_project_routes import router as customer_project_router
 from src.db.models.entitlement import WorkspaceEntitlementModel, WorkspaceUsageModel
 from src.db.session import get_db
 from src.security.customer_authorization import require_customer_workspace
@@ -59,6 +60,4 @@ async def consume_customer_run(context: Annotated[tuple, Depends(require_custome
     return {"accepted": True, "runs_used": usage.runs_used, "monthly_run_limit": limit, "remaining": max(0, limit - usage.runs_used)}
 
 
-# Keep customer workspace and project APIs under the same authenticated customer surface.
-from src.company.customer_project_routes import router as customer_project_router
 router.include_router(customer_project_router)
