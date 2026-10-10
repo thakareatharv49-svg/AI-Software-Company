@@ -43,7 +43,7 @@ app.include_router(customer_router)
 app.include_router(customer_web_router)
 app.include_router(control_router, dependencies=[Depends(require_company_owner)])
 app.include_router(owner_router, dependencies=[Depends(require_company_owner)])
-app.include_router(web_router, dependencies=[Depends(require_company_owner)])
+app.include_router(web_router)
 
 app.mount(
     "/app/static",
