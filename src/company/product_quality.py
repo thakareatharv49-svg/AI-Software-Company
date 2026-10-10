@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import ast
 
 # These phrases are strong signals that the model returned an unfinished product.
 # Deliberately avoid generic words such as "placeholder" or "todo", which can be
@@ -53,6 +54,27 @@ _WEAK_TEST_ASSERTIONS = (
 )
 
 
+def _has_literal_only_assertion(content: str) -> bool:
+    """Detect asserts that compare constants instead of exercising product behavior."""
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        # Syntax validity is checked by the normal generated-project test runner.
+        return False
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assert):
+            continue
+        expression = node.test
+        if isinstance(expression, ast.Constant):
+            return True
+        if isinstance(expression, ast.Compare):
+            operands = [expression.left, *expression.comparators]
+            if all(isinstance(operand, ast.Constant) for operand in operands):
+                return True
+    return False
+
+
 def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
     """Reject generated test files whose assertions are obvious tautologies."""
     import re
@@ -68,11 +90,13 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
         )
         if not in_tests or not name.endswith(".py"):
             continue
-        for marker in _WEAK_TEST_ASSERTIONS:
-            if re.search(marker, content, flags=re.IGNORECASE):
-                issues.append(
-                    f"Generated tests '{path}' contain a tautological assertion; "
-                    "test an actual product behavior and an edge case."
-                )
-                break
+        has_regex_tautology = any(
+            re.search(marker, content, flags=re.IGNORECASE)
+            for marker in _WEAK_TEST_ASSERTIONS
+        )
+        if has_regex_tautology or _has_literal_only_assertion(content):
+            issues.append(
+                f"Generated tests '{path}' contain a tautological assertion; "
+                "test an actual product behavior and an edge case."
+            )
     return issues
