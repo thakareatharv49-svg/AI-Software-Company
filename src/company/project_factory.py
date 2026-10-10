@@ -351,7 +351,30 @@ class ProjectFactory:
                     max_stages=max_stages,
                 )
         except Exception as exc:
-            project.last_error = str(exc)
+            project.last_error = f"{type(exc).__name__}: {exc}"
+            # Failures can occur before the autonomous runner emits its first
+            # progress callback (for example, while preparing the request). Mark
+            # a concrete stage and persist it so the customer dashboard does not
+            # misleadingly leave every stage as "planned".
+            failed_step = next(
+                (step for step in project.plan.steps if step.status == "failed"),
+                None,
+            )
+            if failed_step is None:
+                active_step = next(
+                    (
+                        step
+                        for step in project.plan.steps
+                        if step.status in {"running", "planned"}
+                    ),
+                    None,
+                )
+                if active_step is not None:
+                    active_step.status = "failed"
+                    active_step.detail = project.last_error
+            elif not failed_step.detail:
+                failed_step.detail = project.last_error
+            self._persist_plan_progress(project)
             results = []
         project.stages_executed += len(results)
 

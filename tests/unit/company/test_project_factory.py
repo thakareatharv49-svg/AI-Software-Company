@@ -588,3 +588,34 @@ async def test_factory_preserves_pipeline_result_when_stage_telemetry_is_malform
     assert results == [project]
     assert project.status == "completed"
     assert project.last_error is None
+
+@pytest.mark.asyncio
+async def test_factory_persists_pre_progress_failure_stage() -> None:
+    class FailingAutonomousRunner:
+        async def run(self, mission, plan):
+            raise RuntimeError("request setup exploded")
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        autonomous_runner=FailingAutonomousRunner(),
+    )
+    project = factory.enqueue(
+        CompanyMission(name="Large mission", objective="Build a multi-feature web app")
+    )
+
+    await factory.run(max_projects=1, max_retries=0)
+
+    failed_steps = [step for step in project.plan.steps if step.status == "failed"]
+    assert len(failed_steps) == 1
+    assert failed_steps[0].detail == "RuntimeError: request setup exploded"
+    assert project.last_error == "RuntimeError: request setup exploded"
+
