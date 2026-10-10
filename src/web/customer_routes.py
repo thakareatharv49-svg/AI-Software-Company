@@ -85,8 +85,8 @@ async def customer_product(
 async def customer_product_asset(
     mission_id: str,
     file_path: str,
-    context=Depends(require_customer_workspace),
-    center: CompanyControlCenter = Depends(get_control_center),
+    context: Annotated[tuple, Depends(require_customer_workspace)],
+    center: Annotated[CompanyControlCenter, Depends(get_control_center)],
 ) -> FileResponse:
     root, _ = await _owned_product_root(mission_id, context, center)
     target = (root / file_path).resolve()
