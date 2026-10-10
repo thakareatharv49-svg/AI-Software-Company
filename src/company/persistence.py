@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, DateTime, Integer, String, create_engine, select
+from sqlalchemy import JSON, DateTime, Integer, String, create_engine, delete, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from src.company.audit import MissionAuditEntry
@@ -160,6 +160,16 @@ class MissionJobStore:
                 )
                 for row in rows
             ]
+
+    def delete_many(self, mission_ids: set[str]) -> int:
+        if not mission_ids:
+            return 0
+        with Session(self._engine) as session:
+            result = session.execute(
+                delete(MissionJobRow).where(MissionJobRow.id.in_(mission_ids))
+            )
+            session.commit()
+            return int(result.rowcount or 0)
 
     def close(self) -> None:
         self._engine.dispose()
@@ -328,6 +338,16 @@ class ProjectStore:
                 }
                 for row in rows
             ]
+
+    def delete_many(self, mission_ids: set[str]) -> int:
+        if not mission_ids:
+            return 0
+        with Session(self._engine) as session:
+            result = session.execute(
+                delete(FactoryProjectRow).where(FactoryProjectRow.id.in_(mission_ids))
+            )
+            session.commit()
+            return int(result.rowcount or 0)
 
     def close(self) -> None:
         self._engine.dispose()
