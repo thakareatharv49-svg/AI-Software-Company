@@ -261,3 +261,27 @@ async def test_later_file_prompt_includes_actual_previously_generated_source(
     assert "FILE: index.html" in later_file_prompt
     assert '<button id="add-note">Add note</button>' in later_file_prompt
     assert '<script src="app.js"></script>' in later_file_prompt
+
+
+
+@pytest.mark.asyncio
+async def test_large_mission_rejects_manifest_that_exceeds_limit_after_required_files(
+    monkeypatch, tmp_path
+):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    manifest = {
+        "files": [
+            {"path": f"src/module_{index}.py", "purpose": f"Module {index}"}
+            for index in range(10)
+        ]
+    }
+
+    async def fake_call(payload):
+        return json.dumps(manifest)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    with pytest.raises(RuntimeError, match="safe 10-file limit"):
+        await generator._generate_large_mission(
+            "Browser Dashboard",
+            "Build a browser dashboard with search, filters, settings, and responsive layout.",
+        )
