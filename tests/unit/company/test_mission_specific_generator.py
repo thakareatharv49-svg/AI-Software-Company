@@ -340,3 +340,21 @@ def test_small_mission_reports_both_failed_generation_attempts() -> None:
         raise AssertionError("Generation must fail clearly after bounded retries")
 
     assert calls == 2
+
+
+def test_multi_feature_mission_uses_staged_generation_threshold() -> None:
+    from src.company.project_generator import OllamaProjectGenerator
+
+    assert OllamaProjectGenerator._is_large_mission(
+        "Personal Finance App",
+        "Build a personal finance app with search, filters, and export.",
+    )
+
+
+def test_simple_mission_stays_on_single_pass_generation() -> None:
+    from src.company.project_generator import OllamaProjectGenerator
+
+    assert not OllamaProjectGenerator._is_large_mission(
+        "Text Normalizer",
+        "Create a small text normalization utility.",
+    )
