@@ -123,7 +123,7 @@ class ProjectFactory:
                 )
         project = FactoryProject(mission=mission, plan=plan)
         # Preserve FIFO ordering: the first submitted mission must execute first.
-        # This also ensures a blocked project stops the run before later queued work.
+        # A terminal failure is recorded per mission; it must not discard unrelated work.
         self.queue.append(project)
         self._save(project)
         self._audit(
@@ -580,8 +580,9 @@ class ProjectFactory:
                 if project.status != "queued" and project.mission.id not in completed_ids:
                     completed.append(project)
                     completed_ids.add(project.mission.id)
-                if project.status == "blocked":
-                    break
+                # A blocked mission is terminal for that mission only. Continue
+                # with other queued missions so one bad project cannot stall the factory.
+                # The next run_next() call restarts the orchestrator for its next mission.
             self.orchestrator.events.publish(
                 CompanyEvent(
                     event_type="FACTORY_RUN_COMPLETED",
