@@ -46,8 +46,10 @@
 </form><div id="message" class="message"></div>
 </section>
 <section class="card" id="factory-section">
-<h2>Factory pipeline</h2><p class="muted">Live stage for the selected mission.</p>
+<h2>Factory pipeline</h2><p class="muted">Run one mission or process the queued backlog in order.</p>
 <div id="pipeline" class="pipeline"><div class="pipeline-step active"><b>01</b><span>Waiting</span><small>Select a mission</small></div></div>
+<button id="run-queue" class="primary" type="button">Run queued projects</button>
+<div id="queue-message" class="message" role="status" aria-live="polite"></div>
 <button id="stop" class="secondary" type="button">Stop company</button>
 </section>
 </div>
@@ -59,5 +61,6 @@
 </main>
 </div>
 <script src="/app/static/app.js?v=13" defer></script>
+<script src="/app/static/queue-run.js?v=1" defer></script>
 </body>
 </html>
