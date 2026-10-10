@@ -619,7 +619,7 @@ Requirements:
             if not html_path.lower().endswith((".html", ".htm")):
                 continue
             inline_scripts = re.findall(
-                r"""<script\\b(?![^>]*\\bsrc\\s*=)[^>]*>(.*?)</script\\s*>""",
+                r"""<script\b(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script\s*>""",
                 html_content,
                 flags=re.IGNORECASE | re.DOTALL,
             )
