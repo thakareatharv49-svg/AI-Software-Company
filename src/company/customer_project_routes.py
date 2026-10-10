@@ -35,7 +35,7 @@ async def list_projects(
     projects = result.scalars().all()
     return {"items": [{"id": p.id, "name": p.name, "description": p.description,
                        "objective": p.objective, "status": p.status,
-                       "repository": p.repository, "created_at": p.created_at.isoformat()}
+                       "repository": p.repository, "mission_id": p.mission_id, "created_at": p.created_at.isoformat()}
                       for p in projects]}
 
 
