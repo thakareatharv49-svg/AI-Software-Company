@@ -326,3 +326,40 @@ def test_generic_application_without_entry_point_fails_preview_validation() -> N
             ),
         )
 
+
+
+@pytest.mark.asyncio
+async def test_large_mission_stops_repeating_slow_non_json_file_failures(
+    monkeypatch, tmp_path
+):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    responses = [
+        json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
+        json.dumps({"content": "<!doctype html><html><head><title>Recovery</title></head><body></body></html>"}),
+        RuntimeError("Ollama timed out"),
+        RuntimeError("Ollama timed out again"),
+    ]
+    calls = 0
+
+    async def fake_call(payload):
+        nonlocal calls
+        calls += 1
+        response = responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    with pytest.raises(RuntimeError, match="after 2 attempts: Ollama timed out again"):
+        await generator._generate_large_mission(
+            "Large app",
+            "Create, edit, delete, pin and search items in a responsive browser app.",
+        )
+
+    assert calls == 4
+    checkpoint = generator._checkpoint(
+        "Large app",
+        "Create, edit, delete, pin and search items in a responsive browser app.",
+    ).load()
+    assert checkpoint is not None
+    assert checkpoint["files"]["index.html"].startswith("<!doctype html>")
