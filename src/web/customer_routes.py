@@ -72,7 +72,7 @@ async def customer_product(
     if asset_root != ".":
         base_path += asset_root.rstrip("/") + "/"
     base_tag = f'<base href="{base_path}">'
-    pattern = r"(<head(?:\\s[^>]*)?>)"
+    pattern = r"(<head(?:\s[^>]*)?>)"
     if re.search(pattern, html, flags=re.IGNORECASE):
         html = re.sub(pattern, lambda match: match.group(1) + base_tag, html, count=1, flags=re.IGNORECASE)
     else:
