@@ -130,7 +130,7 @@ async def test_large_mission_adapts_file_token_budget_after_invalid_json(monkeyp
     ]
     assert len(payloads) == 4
     assert "tests/test_project.py" in project.files
-    assert "Adaptive recovery attempt 2" in payloads[-1]["prompt"]
+    assert "Adaptive recovery attempt 2" in payloads[2]["prompt"]
 
 
 @pytest.mark.asyncio
