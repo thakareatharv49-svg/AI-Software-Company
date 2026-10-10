@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from api.routes.health import router as health_router
@@ -8,6 +8,7 @@ from config.settings import settings
 from dashboard.routes.routes import router as dashboard_router
 from observability.logging import configure_logging
 from src.company.control_center.routes import router as control_router
+from src.security.authorization import require_company_owner
 from src.security.routes.oauth_routes import router as oauth_router
 from src.security.routes.routes import router as security_router
 from src.web.routes import router as web_router
@@ -32,11 +33,11 @@ async def security_headers_middleware(request, call_next):
 
 
 app.include_router(health_router)
-app.include_router(dashboard_router)
-app.include_router(security_router)
+app.include_router(dashboard_router, dependencies=[Depends(require_company_owner)])
+app.include_router(security_router, dependencies=[Depends(require_company_owner)])
 app.include_router(oauth_router)
-app.include_router(control_router)
-app.include_router(web_router)
+app.include_router(control_router, dependencies=[Depends(require_company_owner)])
+app.include_router(web_router, dependencies=[Depends(require_company_owner)])
 
 app.mount(
     "/app/static",
