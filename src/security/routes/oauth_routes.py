@@ -52,6 +52,31 @@ def _callback_url(provider: str) -> str:
     return f"{settings.public_base_url.rstrip('/')}/auth/{provider}/callback"
 
 
+async def _ensure_company_workspace(db: AsyncSession, now: datetime) -> WorkspaceModel:
+    """Ensure the fixed company workspace exists before creating memberships.
+
+    Migrations normally provision this row, but bootstrapping it here also
+    repairs databases created before the company-workspace seed was installed.
+    """
+    result = await db.execute(
+        select(WorkspaceModel).where(WorkspaceModel.id == _COMPANY_WORKSPACE_ID)
+    )
+    workspace = result.scalar_one_or_none()
+    if workspace is None:
+        workspace = WorkspaceModel(
+            id=_COMPANY_WORKSPACE_ID,
+            name="AI Software Company",
+            kind="company",
+            owner_user_id=None,
+            expires_at=None,
+            created_at=now,
+        )
+        db.add(workspace)
+        # Flush the parent row so the membership insert always satisfies the FK.
+        await db.flush()
+    return workspace
+
+
 def _set_short_cookie(response: Response, name: str, value: str) -> None:
     response.set_cookie(
         name,
@@ -196,16 +221,13 @@ async def oauth_callback(
         )
         workspace_id = _COMPANY_WORKSPACE_ID if is_owner else str(uuid4())
         if is_owner:
-            company_result = await db.execute(
-                select(WorkspaceModel).where(WorkspaceModel.id == _COMPANY_WORKSPACE_ID)
-            )
-            if company_result.scalar_one_or_none() is None:
-                raise HTTPException(status_code=503, detail="Company workspace migration is required")
+            await _ensure_company_workspace(db, now)
         else:
             db.add(WorkspaceModel(
                 id=workspace_id, name=f"{display_name or 'My'} Workspace", kind="personal",
                 owner_user_id=user.id, expires_at=None, created_at=now,
             ))
+            await db.flush()
         db.add(WorkspaceMembershipModel(
             id=str(uuid4()), workspace_id=workspace_id, user_id=user.id,
             role="owner", created_at=now,
@@ -219,15 +241,7 @@ async def oauth_callback(
         and email.casefold() == settings.owner_email.strip().casefold()
     )
     if is_owner:
-        company_result = await db.execute(
-            select(WorkspaceModel).where(WorkspaceModel.id == _COMPANY_WORKSPACE_ID)
-        )
-        company_workspace = company_result.scalar_one_or_none()
-        if company_workspace is None:
-            raise HTTPException(
-                status_code=503,
-                detail="Company workspace migration is required",
-            )
+        await _ensure_company_workspace(db, now)
         membership_result = await db.execute(
             select(WorkspaceMembershipModel).where(
                 WorkspaceMembershipModel.workspace_id == _COMPANY_WORKSPACE_ID,
