@@ -89,6 +89,7 @@ def test_stop_control_changes_company_state() -> None:
 def test_mission_plan_api_exposes_internal_pipeline() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
     try:
         client = TestClient(app)
         response = client.post(
@@ -107,6 +108,7 @@ def test_mission_plan_api_exposes_internal_pipeline() -> None:
 def test_mission_job_api_exposes_persistent_lifecycle() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
     try:
         client = TestClient(app)
         response = client.post(
@@ -131,6 +133,7 @@ def test_mission_job_api_exposes_persistent_lifecycle() -> None:
 def test_mission_cancel_and_retry_api() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
     try:
         client = TestClient(app)
         response = client.post(
@@ -159,6 +162,7 @@ def test_mission_cancel_and_retry_api() -> None:
 def test_mission_audit_api_supports_filters() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
     try:
         client = TestClient(app)
         response = client.post(
@@ -182,6 +186,7 @@ def test_mission_audit_api_supports_filters() -> None:
 def test_project_outputs_api() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
     try:
         client = TestClient(app)
         response = client.post(
@@ -202,6 +207,7 @@ def test_project_outputs_api() -> None:
 async def test_factory_run_api_starts_the_requested_mission() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
     started: list[str] = []
 
     async def fake_run(**kwargs):
@@ -268,6 +274,7 @@ def test_cleanup_endpoint_deletes_only_queued_and_blocked_missions() -> None:
 
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
     try:
         client = TestClient(app)
         queued = client.post("/api/missions", json={"name": "Queued cleanup", "objective": "Remove queued mission"}).json()
@@ -300,6 +307,7 @@ def test_cleanup_is_rejected_while_factory_is_running() -> None:
 
     center = CompanyControlCenter(CompanyOrchestrator())
     app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
     center._factory_task = SimpleNamespace(done=lambda: False)
     try:
         response = TestClient(app).post("/api/missions/cleanup")
