@@ -14,7 +14,7 @@ from src.db.models.project import ProjectModel
 from src.db.session import get_db
 from src.security.customer_authorization import require_customer_workspace
 
-router = APIRouter(prefix="/api/customer/projects", tags=["customer-projects"])
+router = APIRouter(prefix="/projects", tags=["customer-projects"])
 
 
 class ProjectCreate(BaseModel):
