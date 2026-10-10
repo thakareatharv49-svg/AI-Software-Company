@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Workspace — AI Software Company</title>
+<link rel="stylesheet" href="/app/static/customer.css?v=1">
+<script src="/app/static/customer.js?v=1" defer></script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/customer"><span class="mark">A</span><span><b>AI Software Company</b><small>YOUR WORKSPACE</small></span></a><div class="account"><span id="account-label">Checking session…</span><button id="logout" class="button secondary" hidden>Sign out</button></div></header>
+<main class="page">
+<section id="signed-out" class="hero panel" hidden><div class="eyebrow">YOUR SOFTWARE, BUILT FOR YOU</div><h1>Turn your idea into a working product.</h1><p>Sign in to create projects, launch factory runs, follow progress and open completed browser products.</p><div class="sign-in"><a class="button primary" href="/auth/google/start">Continue with Google ↗</a><a class="button secondary" href="/auth/github/start">Continue with GitHub ↗</a></div><p class="hint">Your projects and results are scoped to your personal workspace.</p></section>
+<div id="workspace" hidden>
+<section class="welcome"><div><div class="eyebrow">CUSTOMER WORKSPACE</div><h1 id="welcome-title">Your projects, one place.</h1><p>Build a product, track the factory and inspect the results.</p></div><div class="plan"><span id="plan-name">Demo plan</span><b id="usage-label">Loading usage…</b><div class="meter"><i id="usage-meter"></i></div><small id="project-limit">Loading project limit…</small></div></section>
+<section class="metrics"><article class="panel metric"><span>Projects</span><strong id="metric-projects">—</strong></article><article class="panel metric"><span>Active runs</span><strong id="metric-active">—</strong></article><article class="panel metric"><span>Completed</span><strong id="metric-completed">—</strong></article><article class="panel metric"><span>Monthly runs left</span><strong id="metric-remaining">—</strong></article></section>
+<div class="layout-grid"><section class="panel section"><div class="section-head"><div><div class="eyebrow">NEW PROJECT</div><h2>What should we build?</h2></div></div><form id="project-form"><label>Project name<input id="project-name" maxlength="255" required placeholder="e.g. Personal finance tracker"></label><label>What should it do?<textarea id="project-objective" maxlength="20000" required placeholder="Describe the users, main features, expected behavior, and how you will verify it." rows="6"></textarea></label><label>Additional details <span class="muted">(optional)</span><textarea id="project-description" maxlength="10000" rows="3" placeholder="Design preferences, constraints, integrations…"></textarea></label><button id="create-project" class="button primary" type="submit">Create project</button><p id="form-message" class="message" role="status" aria-live="polite"></p></form></section>
+<section class="panel section"><div class="section-head"><div><div class="eyebrow">YOUR WORK</div><h2>Projects</h2></div><button id="refresh" class="button secondary" type="button">Refresh ↻</button></div><div id="projects-list" class="items"><p class="muted">Loading projects…</p></div></section></div>
+<section class="panel section"><div class="section-head"><div><div class="eyebrow">FACTORY ACTIVITY</div><h2>Runs and results</h2></div><span id="mission-summary" class="muted"></span></div><div id="missions-list" class="items"><p class="muted">Loading runs…</p></div></section>
+</div>
+<footer>AI Software Company <span>Projects are private to your authenticated workspace.</span></footer>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
