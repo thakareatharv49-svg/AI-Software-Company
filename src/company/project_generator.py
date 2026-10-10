@@ -625,7 +625,7 @@ Requirements:
         project = "\n\n".join(
             f"FILE: {path}\n{content}" for path, content in files.items()
         )
-        prompt = f"""Repair this generated Python project so its tests pass.
+        prompt = f"""Repair this generated software product so its tests pass.
 
 QA FAILURE:
 {failure}
