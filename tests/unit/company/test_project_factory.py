@@ -590,7 +590,7 @@ async def test_factory_preserves_pipeline_result_when_stage_telemetry_is_malform
     assert project.last_error is None
 
 @pytest.mark.asyncio
-async def test_factory_records_stage_when_autonomous_runner_fails_before_progress() -> None:
+async def test_factory_persists_pre_progress_failure_stage() -> None:
     class FailingAutonomousRunner:
         async def run(self, mission, plan):
             raise RuntimeError("request setup exploded")
