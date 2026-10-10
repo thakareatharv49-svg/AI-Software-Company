@@ -289,3 +289,54 @@ def test_large_mission_manifest_adds_browser_entrypoint_and_tests(tmp_path) -> N
     assert "tests/test_project.py" in project.files
     assert calls == 4
 
+
+
+def test_small_mission_retries_transient_generation_failure() -> None:
+    generator = OllamaProjectGenerator()
+    calls: list[dict] = []
+
+    async def flaky_call(payload: dict) -> str:
+        calls.append(payload)
+        if len(calls) == 1:
+            raise RuntimeError("Ollama temporarily unavailable")
+        return json.dumps({
+            "files": {
+                "main.py": "def normalize(value):\n    return value.strip().lower()\n",
+                "tests/test_main.py": (
+                    "from main import normalize\n\n"
+                    "def test_normalize_trims_and_lowercases():\n"
+                    "    assert normalize('  Hello  ') == 'hello'\n"
+                ),
+            },
+            "test_command": ["python", "-m", "pytest", "-q"],
+        })
+
+    generator._call = flaky_call  # type: ignore[method-assign]
+    project = asyncio.run(generator.generate("Text Normalizer", "Create a small text normalization utility."))
+
+    assert len(calls) == 2
+    assert "Recovery retry" not in calls[0]["prompt"]
+    assert "Recovery retry" in calls[1]["prompt"]
+    assert "main.py" in project.files
+    assert "tests/test_main.py" in project.files
+
+
+def test_small_mission_reports_both_failed_generation_attempts() -> None:
+    generator = OllamaProjectGenerator()
+    calls = 0
+
+    async def failing_call(payload: dict) -> str:
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("Ollama timed out")
+
+    generator._call = failing_call  # type: ignore[method-assign]
+    try:
+        asyncio.run(generator.generate("Text Normalizer", "Create a small text normalization utility."))
+    except RuntimeError as exc:
+        assert "after one recovery retry" in str(exc)
+        assert "Ollama timed out" in str(exc)
+    else:
+        raise AssertionError("Generation must fail clearly after bounded retries")
+
+    assert calls == 2

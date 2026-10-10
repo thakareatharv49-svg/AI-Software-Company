@@ -147,7 +147,7 @@ Rules:
         if large_mission:
             generated = await self._generate_large_mission(name, objective)
         else:
-            generated = self._parse(await self._call(payload))
+            generated = await self._generate_small_mission_with_retry(payload)
         try:
             self._validate_mission_output(name, objective, generated)
             if large_mission:
@@ -172,6 +172,31 @@ Rules:
             if large_mission:
                 self._checkpoint(name, objective).clear()
             return repaired
+
+    async def _generate_small_mission_with_retry(
+        self,
+        payload: dict,
+    ) -> GeneratedProject:
+        """Retry one transient/model-format failure for a single-pass mission."""
+        request_payload = dict(payload)
+        for attempt in range(2):
+            try:
+                return self._parse(await self._call(request_payload))
+            except RuntimeError as exc:
+                if attempt == 1:
+                    raise RuntimeError(
+                        "Small mission generation failed after one recovery retry: "
+                        f"{exc}"
+                    ) from exc
+                request_payload = dict(request_payload)
+                request_payload["prompt"] = (
+                    str(request_payload.get("prompt", ""))
+                    + "\n\nRecovery retry: the previous generation did not return "
+                    "usable project JSON. Retry the same mission and return only the "
+                    "complete JSON object in the requested schema. Preserve the "
+                    "mission-specific product and include complete source and tests."
+                )
+        raise RuntimeError("Small mission generation exhausted its recovery attempts")
 
     @staticmethod
     def _is_large_mission(name: str, objective: str) -> bool:
