@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from src.company.product_quality import find_unfinished_product_content
+from src.company.product_quality import (
+    find_unfinished_product_content,
+    find_weak_product_tests,
+)
 
 
 def test_detects_obvious_placeholder_copy_in_generated_ui() -> None:
@@ -39,3 +42,34 @@ def test_detects_unimplemented_feature_copy_in_javascript() -> None:
 
     assert len(issues) == 1
     assert "app.js" in issues[0]
+
+    
+def test_rejects_assertions_that_compare_only_literal_values() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_app.py": "def test_title():\n    assert \"Expense Tracker\" in \"Expense Tracker\"\n"
+    })
+
+    assert len(issues) == 1
+    assert "tautological assertion" in issues[0]
+
+
+def test_accepts_assertions_that_exercise_runtime_values() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_app.py": (
+            "def test_total_uses_expenses():\n"
+            "    expenses = [{\"amount\": 12}, {\"amount\": 8}]\n"
+            "    total = sum(item[\"amount\"] for item in expenses)\n"
+            "    assert total == 20\n"
+            "    assert total != 0\n"
+        )
+    })
+
+    assert issues == []
+
+
+def test_rejects_constant_boolean_assertion() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_app.py": "def test_app():\n    assert True\n"
+    })
+
+    assert len(issues) == 1
