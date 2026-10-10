@@ -6,6 +6,7 @@ never persisted. Provider identities are not auto-linked by email.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import uuid4
 
 import httpx
@@ -155,7 +156,7 @@ async def oauth_callback(
     response: Response,
     code: str,
     state: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RedirectResponse:
     client_id, client_secret, _, _ = _provider_config(provider)
     expected_state = request.cookies.get(_STATE_COOKIE)
@@ -238,7 +239,7 @@ def secrets_compare(left: str, right: str) -> bool:
 @router.get("/me")
 async def current_user(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, str | None]:
     """Return the signed-in identity only when its server-side session is valid."""
     from src.security.session_tokens import hash_session_token
@@ -272,7 +273,7 @@ async def current_user(
 async def logout(
     request: Request,
     response: Response,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Response:
     """Revoke the current server-side session and clear the browser cookie."""
     from src.security.session_tokens import hash_session_token
