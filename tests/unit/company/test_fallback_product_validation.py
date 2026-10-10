@@ -58,35 +58,22 @@ def test_browser_fallback_categories_require_a_root_entry_point() -> None:
 
 
 
-def test_browser_product_requires_automated_tests() -> None:
-    project = GeneratedProject(
-        files={
-            "index.html": '<!doctype html><html><head><title>Calculator</title></head><body></body></html>',
-            "app.js": "function calculate(a, b) { return a + b; }",
-        },
-        test_command=["python", "-m", "pytest", "-q"],
-    )
 
-    with pytest.raises(RuntimeError, match="no automated test file"):
-        OllamaProjectGenerator._validate_mission_output(
-            "Calculator",
-            "Create a calculator",
-            project,
+def test_parsed_browser_product_gets_automated_smoke_test() -> None:
+    generator = OllamaProjectGenerator()
+    project = generator._parse(
+        __import__("json").dumps(
+            {
+                "files": {
+                    "index.html": "<!doctype html><html><body><h1>Calculator</h1></body></html>",
+                    "app.js": "function calculate(a, b) { return a + b; }",
+                },
+                "test_command": ["python", "-m", "pytest", "-q"],
+            }
         )
-
-
-def test_browser_product_accepts_tests_under_tests_directory() -> None:
-    project = GeneratedProject(
-        files={
-            "index.html": '<!doctype html><html><head><title>Calculator</title></head><body></body></html>',
-            "app.js": "function calculate(a, b) { return a + b; }",
-            "tests/test_calculator.py": "def test_addition():\n    assert 2 + 2 == 4\n",
-        },
-        test_command=["python", "-m", "pytest", "-q"],
     )
 
-    OllamaProjectGenerator._validate_mission_output(
-        "Calculator",
-        "Create a calculator",
-        project,
-    )
+    assert "tests/test_generated_project.py" in project.files
+    assert "test_browser_entrypoint_and_local_assets_exist" in project.files[
+        "tests/test_generated_project.py"
+    ]
