@@ -1,10 +1,12 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from runtime.models.messages import ModelResponse
 from src.agents.execution.executor import AgentExecutor
 from src.agents.registry.registry import AgentRegistry
+from src.company.autonomous_factory_runner import FactoryAutonomousRunner
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.planner import build_mission_plan
@@ -618,3 +620,45 @@ async def test_factory_persists_pre_progress_failure_stage() -> None:
     assert len(failed_steps) == 1
     assert failed_steps[0].detail == "RuntimeError: request setup exploded"
     assert project.last_error == "RuntimeError: request setup exploded"
+
+
+@pytest.mark.asyncio
+async def test_workspace_preparation_failure_is_recorded_as_execution_failure() -> None:
+    mission = CompanyMission(name="Workspace failure", objective="Build a web app")
+    plan = build_mission_plan(mission)
+
+    class BrokenWorkspaceService:
+        def create_workspace(self, mission_id: str):
+            raise OSError("workspace disk is unavailable")
+
+    class UnusedRunner:
+        async def run(self, request):
+            raise AssertionError("runner must not start without a workspace")
+
+    adapter = FactoryAutonomousRunner(
+        runner=UnusedRunner(),
+        request_builder=lambda _mission, _plan: SimpleNamespace(
+            files={"index.html": "<main>App</main>"},
+            qa_request=None,
+        ),
+        workspace_service=BrokenWorkspaceService(),
+    )
+    persisted_plans = []
+
+    with pytest.raises(OSError, match="workspace disk is unavailable"):
+        await adapter.run(
+            mission,
+            plan,
+            on_progress=lambda current_plan: persisted_plans.append(
+                current_plan.model_copy(deep=True)
+            ),
+        )
+
+    execution = next(step for step in plan.steps if step.stage.value == "execution")
+    assert execution.status == "failed"
+    assert "Workspace preparation failed" in execution.detail
+    assert "workspace disk is unavailable" in execution.detail
+    assert persisted_plans
+    assert next(
+        step for step in persisted_plans[-1].steps if step.stage.value == "execution"
+    ).status == "failed"
