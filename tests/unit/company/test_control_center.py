@@ -73,7 +73,7 @@ def test_control_api_serves_mission_and_app() -> None:
         assert response.json()["status"] == "queued"
         assert client.get("/api/company/state").json()["status"] == "idle"
         assert client.get("/app").status_code == 200
-        assert "AI Software Company" in client.get("/app").text
+        assert "AI Software Developer" in client.get("/app").text
     finally:
         app.dependency_overrides.clear()
 
