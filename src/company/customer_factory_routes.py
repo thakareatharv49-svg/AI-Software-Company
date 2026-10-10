@@ -25,7 +25,7 @@ from src.db.models.project import ProjectModel
 from src.db.session import get_db
 from src.security.customer_authorization import require_customer_workspace
 
-router = APIRouter(prefix="/api/customer", tags=["customer-factory"])
+router = APIRouter(tags=["customer-factory"])
 
 
 def _period_start(now: datetime) -> datetime:
