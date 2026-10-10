@@ -255,3 +255,32 @@ def test_browser_smoke_test_fails_when_a_referenced_local_asset_is_missing(tmp_p
         assert "app.js" in str(exc)
     else:
         raise AssertionError("Browser smoke test must reject missing local assets")
+
+def test_large_mission_manifest_adds_browser_entrypoint_and_tests(tmp_path) -> None:
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    calls = 0
+
+    async def fake_call(payload: dict) -> str:
+        nonlocal calls
+        calls += 1
+        prompt = payload["prompt"]
+        if calls == 1:
+            return json.dumps(
+                {"files": [{"path": "app.js", "purpose": "Dashboard interactions"}]}
+            )
+        path = prompt.split("File to generate: ", 1)[1].splitlines()[0]
+        return json.dumps({"content": f"// generated {path}"})
+
+    generator._call = fake_call  # type: ignore[method-assign]
+    project = asyncio.run(
+        generator._generate_large_mission(
+            "Personal Dashboard",
+            "Build a browser dashboard with search, create, edit, delete, filters, and responsive layout.",
+        )
+    )
+
+    assert "index.html" in project.files
+    assert "app.js" in project.files
+    assert "tests/test_project.py" in project.files
+    assert calls == 4
+

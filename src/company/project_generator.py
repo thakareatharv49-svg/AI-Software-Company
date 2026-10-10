@@ -300,6 +300,39 @@ Rules:
                 raise RuntimeError(f"Project file plan has no purpose for {normalized}")
             manifest_items.append((normalized, purpose))
 
+        # A large-model manifest is only a plan, not a guarantee. Ensure the
+        # generated product has the root entry point expected by the preview
+        # and at least one test file expected by the QA stage.
+        mission_text = f"{name} {objective}".casefold()
+        browser_terms = (
+            "web app", "web application", "website", "web site", "browser",
+            "dashboard", "tracker", "planner", "storefront", "e-commerce",
+            " ecommerce", "portfolio", "landing page", "management system",
+            "booking system", "learning app", "educational app", "budget app",
+            "expense app", "expense tracker", "productivity app", "calculator",
+            "tic tac toe", "tictactoe", "tic-tac-toe", "todo", "to-do",
+            "task manager", "task list", "build an app", "build a app",
+            "build app", "create an app", "create app",
+        )
+        if (
+            any(term in mission_text for term in browser_terms)
+            and not any(path == "index.html" for path, _ in manifest_items)
+        ):
+            manifest_items.append(
+                ("index.html", "Root browser entry point required by product preview")
+            )
+
+        has_tests = any(
+            path.lower().startswith("tests/")
+            or path.lower().startswith("test_")
+            or path.lower().endswith("_test.py")
+            for path, _ in manifest_items
+        )
+        if not has_tests:
+            manifest_items.append(
+                ("tests/test_project.py", "Automated tests for mission-specific behavior")
+            )
+
         allowed_paths = {path for path, _ in manifest_items}
         cached_files = (saved_checkpoint or {}).get("files", {})
         files: dict[str, str] = {
