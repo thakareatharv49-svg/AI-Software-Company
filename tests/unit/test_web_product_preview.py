@@ -84,4 +84,8 @@ def test_completed_products_lists_nested_browser_entrypoints(tmp_path, monkeypat
     products = json.loads(response.body.decode("utf-8"))
 
     assert response.status_code == 200
-    assert {"mission_id": mission_id, "url": f"/product/{mission_id}"} in products
+    assert any(
+        product.get("mission_id") == mission_id
+        and product.get("url") == f"/product/{mission_id}"
+        for product in products
+    )
