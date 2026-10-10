@@ -333,6 +333,14 @@ Rules:
                 ("tests/test_project.py", "Automated tests for mission-specific behavior")
             )
 
+        if len(manifest_items) > 10:
+            raise RuntimeError(
+                "Project file plan exceeds the safe 10-file limit after required "
+                "browser entry point and test files were added "
+                f"({len(manifest_items)} files). Reduce the mission scope or split "
+                "it into smaller missions."
+            )
+
         allowed_paths = {path for path, _ in manifest_items}
         cached_files = (saved_checkpoint or {}).get("files", {})
         files: dict[str, str] = {
