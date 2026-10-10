@@ -153,7 +153,6 @@ async def _provider_profile(
 async def oauth_callback(
     provider: str,
     request: Request,
-    response: Response,
     code: str,
     state: str,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -211,6 +210,44 @@ async def oauth_callback(
             id=str(uuid4()), workspace_id=workspace_id, user_id=user.id,
             role="owner", created_at=now,
         ))
+    # Owner access is reconciled on every successful sign-in, not only when
+    # the OAuth identity is first created. This supports configuring OWNER_EMAIL
+    # after an account already exists without granting access by unverified email.
+    is_owner = bool(
+        settings.owner_email
+        and email
+        and email.casefold() == settings.owner_email.strip().casefold()
+    )
+    if is_owner:
+        company_result = await db.execute(
+            select(WorkspaceModel).where(WorkspaceModel.id == _COMPANY_WORKSPACE_ID)
+        )
+        company_workspace = company_result.scalar_one_or_none()
+        if company_workspace is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Company workspace migration is required",
+            )
+        membership_result = await db.execute(
+            select(WorkspaceMembershipModel).where(
+                WorkspaceMembershipModel.workspace_id == _COMPANY_WORKSPACE_ID,
+                WorkspaceMembershipModel.user_id == user.id,
+            )
+        )
+        membership = membership_result.scalar_one_or_none()
+        if membership is None:
+            db.add(
+                WorkspaceMembershipModel(
+                    id=str(uuid4()),
+                    workspace_id=_COMPANY_WORKSPACE_ID,
+                    user_id=user.id,
+                    role="owner",
+                    created_at=now,
+                )
+            )
+        elif membership.role != "owner":
+            membership.role = "owner"
+
     raw_token, token_hash = issue_session_token()
     expires_at = session_expiry(now=now)
     db.add(AuthSessionModel(
