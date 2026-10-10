@@ -662,3 +662,40 @@ async def test_workspace_preparation_failure_is_recorded_as_execution_failure() 
     assert next(
         step for step in persisted_plans[-1].steps if step.stage.value == "execution"
     ).status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_autonomous_startup_failure_is_attributed_to_execution() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+
+    def fail_start(_mission):
+        raise RuntimeError("orchestrator startup unavailable")
+
+    controller.start = fail_start
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        autonomous_runner=object(),
+    )
+    project = factory.enqueue(
+        CompanyMission(name="Startup failure", objective="Build a notes app")
+    )
+
+    result = await factory.run_next(max_retries=0)
+
+    assert result is project
+    assert project.status == "blocked"
+    assert project.last_error is not None
+    assert "orchestrator startup unavailable" in project.last_error
+    execution = next(step for step in project.plan.steps if step.stage.value == "execution")
+    research = next(step for step in project.plan.steps if step.stage.value == "research")
+    assert execution.status == "failed"
+    assert "orchestrator startup unavailable" in execution.detail
+    assert research.status == "planned"
