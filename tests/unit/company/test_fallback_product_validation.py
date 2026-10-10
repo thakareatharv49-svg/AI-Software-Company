@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from src.company.project_generator import GeneratedProject, OllamaProjectGenerator
@@ -62,7 +64,7 @@ def test_browser_fallback_categories_require_a_root_entry_point() -> None:
 def test_parsed_browser_product_gets_automated_smoke_test() -> None:
     generator = OllamaProjectGenerator()
     project = generator._parse(
-        __import__("json").dumps(
+        json.dumps(
             {
                 "files": {
                     "index.html": "<!doctype html><html><body><h1>Calculator</h1></body></html>",
