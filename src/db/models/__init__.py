@@ -10,6 +10,8 @@ __all__ = [
     "OAuthIdentityModel",
     "ProjectModel",
     "TaskModel",
+    "WorkspaceEntitlementModel",
+    "WorkspaceUsageModel",
     "UserModel",
     "WorkspaceMembershipModel",
     "WorkspaceModel",
