@@ -47,7 +47,7 @@ async def test_factory_runs_projects_sequentially() -> None:
 
 
 @pytest.mark.asyncio
-async def test_factory_stops_after_blocked_project() -> None:
+async def test_factory_continues_after_blocked_project() -> None:
     class FailingRuntime:
         async def generate(self, request):
             raise RuntimeError("model unavailable")
@@ -62,13 +62,13 @@ async def test_factory_stops_after_blocked_project() -> None:
     factory = ProjectFactory(orchestrator, controller, pipeline)
 
     project = factory.enqueue(CompanyMission(name="Blocked", objective="Fail safely"))
-    queued = factory.enqueue(CompanyMission(name="Later", objective="Should remain queued"))
+    later = factory.enqueue(CompanyMission(name="Later", objective="Should also be attempted"))
 
     results = await factory.run(max_projects=2, max_retries=0)
 
     assert project.status == "blocked"
-    assert queued.status == "queued"
-    assert len(results) == 1
+    assert later.status == "blocked"
+    assert len(results) == 2
     assert orchestrator.state.status.value == "blocked"
 
 
@@ -618,4 +618,3 @@ async def test_factory_persists_pre_progress_failure_stage() -> None:
     assert len(failed_steps) == 1
     assert failed_steps[0].detail == "RuntimeError: request setup exploded"
     assert project.last_error == "RuntimeError: request setup exploded"
-
