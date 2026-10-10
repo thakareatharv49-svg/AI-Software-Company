@@ -232,3 +232,63 @@ def secrets_compare(left: str, right: str) -> bool:
     import hmac
 
     return hmac.compare_digest(left, right)
+
+
+
+@router.get("/me")
+async def current_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str | None]:
+    """Return the signed-in identity only when its server-side session is valid."""
+    from src.security.session_tokens import hash_session_token
+
+    raw_token = request.cookies.get(_SESSION_COOKIE)
+    if not raw_token:
+        raise HTTPException(status_code=401, detail="Sign-in required")
+    result = await db.execute(
+        select(AuthSessionModel).where(
+            AuthSessionModel.token_hash == hash_session_token(raw_token),
+            AuthSessionModel.revoked.is_(False),
+            AuthSessionModel.expires_at > datetime.now(UTC),
+        )
+    )
+    session = result.scalar_one_or_none()
+    if session is None or session.user_id is None:
+        raise HTTPException(status_code=401, detail="Session is invalid or expired")
+    user_result = await db.execute(select(UserModel).where(UserModel.id == session.user_id))
+    user = user_result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Account is inactive")
+    return {
+        "id": user.id,
+        "email": user.email,
+        "display_name": user.display_name,
+        "avatar_url": user.avatar_url,
+    }
+
+
+@router.post("/logout", status_code=204)
+async def logout(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Revoke the current server-side session and clear the browser cookie."""
+    from src.security.session_tokens import hash_session_token
+
+    raw_token = request.cookies.get(_SESSION_COOKIE)
+    if raw_token:
+        result = await db.execute(
+            select(AuthSessionModel).where(
+                AuthSessionModel.token_hash == hash_session_token(raw_token),
+                AuthSessionModel.revoked.is_(False),
+            )
+        )
+        session = result.scalar_one_or_none()
+        if session is not None:
+            session.revoked = True
+            await db.commit()
+    response.delete_cookie(_SESSION_COOKIE, path="/")
+    response.status_code = 204
+    return response
