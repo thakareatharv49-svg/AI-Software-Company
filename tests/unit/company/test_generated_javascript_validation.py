@@ -57,3 +57,50 @@ def test_non_javascript_files_do_not_run_node(monkeypatch) -> None:
     OllamaProjectGenerator._validate_javascript_syntax(
         {"index.html": "<h1>Product</h1>", "style.css": "h1 { color: red; }"}
     )
+
+
+
+def test_inline_javascript_in_html_is_checked(monkeypatch) -> None:
+    checked_sources: list[str] = []
+    monkeypatch.setattr("src.company.project_generator.shutil.which", lambda _: "/usr/bin/node")
+
+    def fake_run(command, **kwargs):
+        from pathlib import Path
+
+        checked_sources.append(Path(command[-1]).read_text(encoding="utf-8"))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr("src.company.project_generator.subprocess.run", fake_run)
+
+    OllamaProjectGenerator._validate_javascript_syntax(
+        {
+            "index.html": "<html><script>const total = 2;</script></html>",
+            "app.js": "const appReady = true;",
+        }
+    )
+
+    assert len(checked_sources) == 2
+    assert any("const total = 2" in source for source in checked_sources)
+    assert any("const appReady = true" in source for source in checked_sources)
+
+
+def test_inline_javascript_syntax_error_names_html_file(monkeypatch) -> None:
+    monkeypatch.setattr("src.company.project_generator.shutil.which", lambda _: "/usr/bin/node")
+
+    def fake_run(command, **kwargs):
+        from pathlib import Path
+
+        source = Path(command[-1]).read_text(encoding="utf-8")
+        if "const = ;" in source:
+            return subprocess.CompletedProcess(command, 1, "", "SyntaxError: Unexpected token")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr("src.company.project_generator.subprocess.run", fake_run)
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"syntax error in 'index.html:inline-script-1'.*Unexpected token",
+    ):
+        OllamaProjectGenerator._validate_javascript_syntax(
+            {"index.html": "<html><script>const = ;</script></html>"}
+        )
