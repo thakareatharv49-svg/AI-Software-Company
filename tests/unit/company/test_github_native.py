@@ -1,8 +1,10 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from src.company.github_native import GitHubNativeService
+from src.github.models.contracts import GitHubRepository
 
 
 class FakeGitHub:
@@ -19,11 +21,6 @@ async def test_github_native_writes_only_inside_workspace(tmp_path: Path):
 
     with pytest.raises(ValueError):
         await service.write_files(tmp_path, {"../escape.py": "bad"})
-
-
-from types import SimpleNamespace
-
-from src.github.models.contracts import GitHubRepository
 
 
 class FakePublishingClient:
