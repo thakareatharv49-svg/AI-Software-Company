@@ -219,7 +219,7 @@ Rules:
             "task manager", "task list", "build an app", "build a app",
             "build app", "create an app", "create app", "application",
             "responsive app", "responsive application", "software product",
-            "build a platform", "create a platform",
+            "build a platform", "create a platform", "platform",
         )
         return any(term in text for term in browser_terms)
 
