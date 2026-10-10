@@ -135,3 +135,13 @@ async def completed_products() -> JSONResponse:
             "url": f"/product/{root.name}",
         })
     return JSONResponse(products, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/owner", include_in_schema=False)
+async def owner_app() -> FileResponse:
+    """Serve the private owner console; the web router is owner-authorized in src.main."""
+    return FileResponse(
+        STATIC_DIR / "owner-app.html",
+        media_type="text/html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+    )
