@@ -76,6 +76,7 @@ def test_parsed_browser_product_gets_automated_smoke_test() -> None:
     )
 
     assert "tests/test_generated_project.py" in project.files
-    assert "test_browser_entrypoint_and_local_assets_exist" in project.files[
-        "tests/test_generated_project.py"
-    ]
+    smoke_test = project.files["tests/test_generated_project.py"]
+    assert "test_browser_entrypoint_and_local_assets_exist" in smoke_test
+    assert "root.rglob('*.css')" in smoke_test
+    assert "Missing CSS asset" in smoke_test

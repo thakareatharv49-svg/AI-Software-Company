@@ -1257,6 +1257,15 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
                     "        local = reference.split('?', 1)[0].split('#', 1)[0].lstrip('/')",
                     "        if local:",
                     "            assert (root / local).is_file(), f'Missing browser asset: {reference}'",
+                    "    for stylesheet in root.rglob('*.css'):",
+                    "        css = stylesheet.read_text(encoding='utf-8')",
+                    "        for reference in re.findall(r\"url\\(\\s*['\\\"]?([^'\\\")]+)\", css, flags=re.IGNORECASE):",
+                    "            reference = reference.strip()",
+                    "            if not reference or reference.startswith(('#', '//', 'data:', 'http:', 'https:')):",
+                    "                continue",
+                    "            local = reference.split('?', 1)[0].split('#', 1)[0]",
+                    "            if local:",
+                    "                assert (stylesheet.parent / local).is_file(), f'Missing CSS asset: {reference} in {stylesheet.relative_to(root)}'",
                     "",
                 ]
             else:
