@@ -5,7 +5,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.company.customer_entitlements import PLAN_LIMITS, can_consume_run, resolve_limits
+from src.company.customer_entitlements import DEFAULT_CUSTOMER_PLAN, PLAN_LIMITS, can_consume_run, resolve_limits
 from src.company.customer_project_routes import router as customer_project_router
 from src.db.models.entitlement import WorkspaceEntitlementModel, WorkspaceUsageModel
 from src.db.session import get_db
@@ -17,7 +17,7 @@ async def _entitlement(db: AsyncSession, workspace_id: str) -> WorkspaceEntitlem
     result = await db.execute(select(WorkspaceEntitlementModel).where(WorkspaceEntitlementModel.workspace_id == workspace_id))
     entitlement = result.scalar_one_or_none()
     if entitlement is None:
-        entitlement = WorkspaceEntitlementModel(workspace_id=workspace_id, plan="demo", status="active", monthly_run_limit=PLAN_LIMITS["demo"].monthly_runs, project_limit=PLAN_LIMITS["demo"].projects, updated_at=datetime.now(UTC))
+        entitlement = WorkspaceEntitlementModel(workspace_id=workspace_id, plan=DEFAULT_CUSTOMER_PLAN, status="active", monthly_run_limit=PLAN_LIMITS[DEFAULT_CUSTOMER_PLAN].monthly_runs, project_limit=PLAN_LIMITS[DEFAULT_CUSTOMER_PLAN].projects, updated_at=datetime.now(UTC))
         db.add(entitlement)
         await db.flush()
     return entitlement
