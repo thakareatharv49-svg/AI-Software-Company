@@ -18,3 +18,5 @@
 .mission-composer .message{margin-bottom:0}
 @media(max-width:900px){.mission-form{grid-template-columns:1fr}.mission-form textarea{min-height:170px}.composer-footer{align-items:stretch;flex-direction:column}.launch-button{width:100%}}
 @media(max-width:520px){.mission-composer{padding:20px}.mission-composer-heading{gap:10px}.composer-mark{flex-basis:42px;height:42px;border-radius:13px;font-size:21px}.mission-composer-heading h2{font-size:23px}}
+
+.factory-grid{grid-template-columns:1fr}
