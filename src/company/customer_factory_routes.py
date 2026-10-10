@@ -90,12 +90,20 @@ async def launch_customer_project(
         raise HTTPException(status_code=404, detail="Project not found")
     if project.mission_id:
         job = center.mission_job(project.mission_id)
+        if job is None or job.workspace_id != workspace.id:
+            raise HTTPException(status_code=409, detail="Linked mission is unavailable")
+        if job.status == MissionJobStatus.QUEUED and not center.factory_running():
+            try:
+                center.enqueue_factory_mission(job.id)
+                await center.run_factory(max_projects=1, max_retries=2, mission_id=job.id)
+            except (RuntimeError, ValueError, KeyError) as exc:
+                raise HTTPException(status_code=409, detail=f"Mission remains queued: {exc}") from exc
         return {
             "accepted": True,
             "already_launched": True,
             "project_id": project.id,
             "mission_id": project.mission_id,
-            "status": job.status.value if job else project.status,
+            "status": job.status.value,
         }
     if project.status != "planned":
         raise HTTPException(
@@ -142,7 +150,7 @@ async def launch_customer_project(
         )
 
     objective_parts = [project.objective.strip(), project.description.strip()]
-    objective = "\\n\\n".join(part for part in objective_parts if part)
+    objective = "\n\n".join(part for part in objective_parts if part)
     if not objective:
         objective = f"Build a working software product named {project.name}."
     submission = MissionSubmission(name=project.name, objective=objective)
