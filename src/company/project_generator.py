@@ -199,6 +199,31 @@ Rules:
         raise RuntimeError("Small mission generation exhausted its recovery attempts")
 
     @staticmethod
+    def _is_browser_mission(mission_text: str) -> bool:
+        """Identify browser-first app requests while preserving explicit CLI/API tasks."""
+        text = mission_text.casefold()
+        non_browser_terms = (
+            "command-line", "command line", " cli ", "cli tool", "terminal utility",
+            "api-only", "api only", "backend-only", "backend only", "python library",
+            "javascript library", "native mobile app", "desktop app",
+        )
+        if any(term in f" {text} " for term in non_browser_terms):
+            return False
+        browser_terms = (
+            "web app", "web application", "website", "web site", "browser",
+            "dashboard", "tracker", "planner", "storefront", "e-commerce",
+            " ecommerce", "portfolio", "landing page", "management system",
+            "booking system", "learning app", "educational app", "budget app",
+            "expense app", "expense tracker", "productivity app", "calculator",
+            "tic tac toe", "tictactoe", "tic-tac-toe", "todo", "to-do",
+            "task manager", "task list", "build an app", "build a app",
+            "build app", "create an app", "create app", "application",
+            "responsive app", "responsive application", "software product",
+            "build a platform", "create a platform",
+        )
+        return any(term in text for term in browser_terms)
+
+    @staticmethod
     def _is_large_mission(name: str, objective: str) -> bool:
         """Route broad, multi-feature missions through bounded file generation."""
         text = f"{name} {objective}".casefold()
@@ -333,17 +358,7 @@ Rules:
         # generated product has the root entry point expected by the preview
         # and at least one test file expected by the QA stage.
         mission_text = f"{name} {objective}".casefold()
-        browser_terms = (
-            "web app", "web application", "website", "web site", "browser",
-            "dashboard", "tracker", "planner", "storefront", "e-commerce",
-            " ecommerce", "portfolio", "landing page", "management system",
-            "booking system", "learning app", "educational app", "budget app",
-            "expense app", "expense tracker", "productivity app", "calculator",
-            "tic tac toe", "tictactoe", "tic-tac-toe", "todo", "to-do",
-            "task manager", "task list", "build an app", "build a app",
-            "build app", "create an app", "create app",
-        )
-        is_browser_mission = any(term in mission_text for term in browser_terms)
+        is_browser_mission = self._is_browser_mission(mission_text)
         if is_browser_mission:
             required_browser_files = (
                 ("index.html", "Root browser entry point required by product preview"),
@@ -537,17 +552,7 @@ Requirements:
             )
 
         mission = f"{name} {objective}".casefold()
-        browser_terms = (
-            "web app", "web application", "website", "web site", "browser",
-            "dashboard", "tracker", "planner", "storefront", "e-commerce",
-            " ecommerce", "portfolio", "landing page", "management system",
-            "booking system", "learning app", "educational app", "budget app",
-            "expense app", "expense tracker", "productivity app", "calculator",
-            "tic tac toe", "tictactoe", "tic-tac-toe", "todo", "to-do",
-            "task manager", "task list", "build an app", "build a app",
-            "build app", "create an app", "create app",
-        )
-        if not any(term in mission for term in browser_terms):
+        if not OllamaProjectGenerator._is_browser_mission(mission):
             return
 
         index_html = project.files.get("index.html")
