@@ -293,3 +293,36 @@ async def test_large_mission_rejects_manifest_that_exceeds_limit_after_required_
             "Browser Dashboard",
             "Build a browser dashboard with search, filters, settings, and responsive layout.",
         )
+
+
+def test_generic_application_missions_require_browser_assets_by_default() -> None:
+    assert OllamaProjectGenerator._is_browser_mission(
+        "Build a responsive habit application with streak tracking and reminders."
+    )
+    assert OllamaProjectGenerator._is_browser_mission(
+        "Create a project management platform for a small team."
+    )
+
+
+def test_explicit_cli_and_api_missions_are_not_assumed_to_be_browser_apps() -> None:
+    assert not OllamaProjectGenerator._is_browser_mission(
+        "Build a Python CLI application that renames local files."
+    )
+    assert not OllamaProjectGenerator._is_browser_mission(
+        "Create an API-only backend service for inventory."
+    )
+
+
+def test_generic_application_without_entry_point_fails_preview_validation() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    with pytest.raises(RuntimeError, match="missing root index.html"):
+        OllamaProjectGenerator._validate_mission_output(
+            "Habit Application",
+            "Build a responsive habit application with streak tracking.",
+            GeneratedProject(
+                files={"main.py": "def main():\n    return 1\n"},
+                test_command=["python", "-m", "pytest", "-q"],
+            ),
+        )
+
