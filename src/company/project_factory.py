@@ -169,6 +169,20 @@ class ProjectFactory:
     def has_queued_mission(self, mission_id: str) -> bool:
         return any(item.mission.id == mission_id for item in self.queue)
 
+    def remove_missions(self, mission_ids: set[str]) -> None:
+        """Remove explicitly selected non-running missions from the queue and store."""
+        if not mission_ids:
+            return
+        if any(
+            item.mission.id in mission_ids and item.status == "running"
+            for item in self.queue
+        ):
+            raise ValueError("Cannot delete a mission that is currently running")
+        self.queue = [item for item in self.queue if item.mission.id not in mission_ids]
+        delete_many = getattr(self.store, "delete_many", None)
+        if callable(delete_many):
+            delete_many(mission_ids)
+
     def prioritize_mission(self, mission_id: str) -> None:
         """Run an explicitly requested mission before older restored queue entries."""
         index = next(
