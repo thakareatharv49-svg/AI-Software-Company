@@ -209,7 +209,11 @@ Rules:
             "confirmation", "empty state", "validation", "notifications",
         )
         marker_count = sum(1 for marker in feature_markers if marker in text)
-        return len(objective) >= 280 or marker_count >= 5
+        # Three explicit capabilities are already enough to make a mission
+        # multi-feature. Keep the length fallback for detailed briefs that use
+        # different wording, but don't force a broad app into one-shot generation
+        # just because its requirements use fewer of our known marker phrases.
+        return len(objective) >= 280 or marker_count >= 3
 
     async def _generate_large_mission(
         self,
