@@ -145,7 +145,9 @@ class CompanyControlCenter:
                 reverse=True,
             )
 
-    def submit_mission(self, submission: MissionSubmission) -> MissionRecord:
+    def submit_mission(
+        self, submission: MissionSubmission, *, workspace_id: str | None = "00000000-0000-4000-8000-000000000001"
+    ) -> MissionRecord:
         with self._lock:
             if self._orchestrator.state.status.value == "running":
                 raise RuntimeError("Company is already running a mission")
@@ -175,6 +177,7 @@ class CompanyControlCenter:
                 plan=plan,
                 status=MissionJobStatus.QUEUED,
                 message=message,
+                workspace_id=workspace_id,
             )
             self._jobs[mission.id] = job
             try:

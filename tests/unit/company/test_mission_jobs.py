@@ -74,3 +74,12 @@ def test_audit_entry_defaults_are_valid() -> None:
 
     assert entry.status is None
     assert entry.metadata == {}
+
+
+
+def test_mission_job_keeps_workspace_ownership_through_transitions() -> None:
+    job = make_job()
+    owned = job.model_copy(update={"workspace_id": "customer-workspace-123"})
+    running = transition_job(owned, MissionJobStatus.RUNNING, "started")
+
+    assert running.workspace_id == "customer-workspace-123"
