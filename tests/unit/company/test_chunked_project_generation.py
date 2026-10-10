@@ -174,6 +174,8 @@ async def test_large_mission_retries_transient_manifest_request_failure(monkeypa
         RuntimeError("Could not reach Ollama"),
         manifest,
         json.dumps({"content": "<!doctype html><title>Recovered</title>"}),
+        json.dumps({"content": "body { font-family: sans-serif; }"}),
+        json.dumps({"content": "document.title = 'Recovered';"}),
         json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     prompts = []
