@@ -253,8 +253,55 @@ def test_dashboard_completed_product_preview_uses_defined_identifier() -> None:
     html = (static_dir / "index.html").read_text(encoding="utf-8")
     css = (static_dir / "styles.css").read_text(encoding="utf-8")
 
-    assert '/app/static/app.js?v=12' in html
-    assert '/app/static/styles.css?v=7' in html
+    assert '/app/static/app.js?v=13' in html
+    assert '/app/static/styles.css?v=8' in html
     assert 'href="#missions-section"' in html and 'id="missions-section"' in html
     assert 'href="#factory-section"' in html and 'id="factory-section"' in html
     assert ".nav a{" in css
+
+
+
+def test_cleanup_endpoint_deletes_only_queued_and_blocked_missions() -> None:
+    from src.company.mission_jobs import MissionJobStatus
+
+    center = CompanyControlCenter(CompanyOrchestrator())
+    app.dependency_overrides[get_control_center] = lambda: center
+    try:
+        client = TestClient(app)
+        queued = client.post("/api/missions", json={"name": "Queued cleanup", "objective": "Remove queued mission"}).json()
+        blocked = client.post("/api/missions", json={"name": "Blocked cleanup", "objective": "Remove blocked mission"}).json()
+        completed = client.post("/api/missions", json={"name": "Completed keep", "objective": "Keep completed mission"}).json()
+
+        blocked_id = blocked["mission"]["id"]
+        center._job_store.save(center.mission_job(blocked_id).model_copy(update={"status": MissionJobStatus.BLOCKED, "message": "blocked"}))
+        completed_id = completed["mission"]["id"]
+        center._job_store.save(center.mission_job(completed_id).model_copy(update={"status": MissionJobStatus.COMPLETED, "message": "completed"}))
+
+        result = client.post("/api/missions/cleanup")
+        assert result.status_code == 200
+        payload = result.json()
+        deleted_ids = set(payload["deleted_ids"])
+        # The test database may contain queued/blocked missions from earlier
+        # tests, and the cleanup action is intentionally global.
+        assert payload["deleted_count"] == len(deleted_ids)
+        assert {queued["mission"]["id"], blocked_id} <= deleted_ids
+        assert completed_id not in deleted_ids
+        assert center.mission_job(queued["mission"]["id"]) is None
+        assert center.mission_job(blocked_id) is None
+        assert center.mission_job(completed_id) is not None
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_cleanup_is_rejected_while_factory_is_running() -> None:
+    from types import SimpleNamespace
+
+    center = CompanyControlCenter(CompanyOrchestrator())
+    app.dependency_overrides[get_control_center] = lambda: center
+    center._factory_task = SimpleNamespace(done=lambda: False)
+    try:
+        response = TestClient(app).post("/api/missions/cleanup")
+        assert response.status_code == 409
+    finally:
+        center._factory_task = None
+        app.dependency_overrides.clear()

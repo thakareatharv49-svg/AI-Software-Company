@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Software Company — Control Center</title>
-<link rel="stylesheet" href="/app/static/styles.css?v=7">
+<link rel="stylesheet" href="/app/static/styles.css?v=8">
 </head>
 <body>
 <div class="shell">
@@ -52,12 +52,12 @@
 </section>
 </div>
 <div class="grid">
-<section class="card" id="missions-section"><h2>Missions <small id="mission-count" class="section-count"></small></h2><div id="missions" class="missions"><div class="empty">Loading…</div></div></section>
+<section class="card" id="missions-section"><div class="section-heading"><h2>Missions <small id="mission-count" class="section-count"></small></h2><button id="cleanup-missions" class="danger cleanup-button" type="button">Delete queued &amp; blocked</button></div><p class="muted">Removes queued and blocked mission records only. Completed products and generated files are kept.</p><div id="missions" class="missions"><div class="empty">Loading…</div></div></section>
 <section class="card" id="events-section"><h2>Live events</h2><div id="events"><div class="empty">Loading…</div></div></section>
 </div>
 <section class="card details"><h2 id="detail-title">Mission details</h2><div id="details" class="empty">Select a mission to inspect outputs and audit trail.</div></section>
 </main>
 </div>
-<script src="/app/static/app.js?v=12" defer></script>
+<script src="/app/static/app.js?v=13" defer></script>
 </body>
 </html>
