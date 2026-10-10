@@ -57,9 +57,11 @@ async def test_large_mission_resumes_completed_files_after_interruption(
         json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     prompts: list[str] = []
+    payloads: list[dict] = []
 
     async def fake_call(payload):
         prompts.append(payload["prompt"])
+        payloads.append(payload)
         return responses.pop(0)
 
     monkeypatch.setattr(generator, "_call", fake_call)
@@ -79,3 +81,9 @@ async def test_large_mission_resumes_completed_files_after_interruption(
     assert "tests/test_project.py" in resumed.files
     assert len(prompts) == 7
     assert "Plan a small, complete software product" not in prompts[5]
+    app_js_budgets = [
+        payload["options"]["num_predict"]
+        for payload in payloads
+        if "File to generate: app.js" in payload["prompt"]
+    ]
+    assert app_js_budgets == [3500, 5000, 6500, 3500]

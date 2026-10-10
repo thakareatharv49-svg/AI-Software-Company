@@ -419,19 +419,28 @@ Requirements:
             for attempt in range(1, 4):
                 attempt_payload = dict(file_payload)
                 attempt_payload["options"] = dict(file_payload["options"])
-                attempt_payload["options"]["num_predict"] = {
-                    1: 3500,
-                    2: 2400,
-                    3: 1600,
-                }[attempt]
+                # Invalid JSON commonly means the response was truncated, so
+                # retry with a larger output budget. Other generation errors are
+                # better served by a concise response to reduce model load.
+                if isinstance(last_error, json.JSONDecodeError):
+                    token_budget = {1: 3500, 2: 5000, 3: 6500}[attempt]
+                else:
+                    token_budget = {1: 3500, 2: 2400, 3: 1600}[attempt]
+                attempt_payload["options"]["num_predict"] = token_budget
                 if last_error is not None:
+                    recovery_guidance = (
+                        "Return complete valid JSON and do not truncate the file."
+                        if isinstance(last_error, json.JSONDecodeError)
+                        else "Keep this file concise and implement the essential behavior completely. "
+                        "Avoid long comments and unnecessary abstraction."
+                    )
                     attempt_payload["prompt"] = (
                         file_prompt
                         + "\n\nAdaptive recovery attempt "
                         + str(attempt)
-                        + ": keep this file concise and implement the essential behavior "
-                        "completely. Avoid long comments and unnecessary abstraction. "
-                        "Return corrected valid JSON with a non-empty content string."
+                        + ": "
+                        + recovery_guidance
+                        + " Return corrected valid JSON with a non-empty content string."
                         + "\nPrevious attempt failed with this error: "
                         + str(last_error)[:600]
                     )

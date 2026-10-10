@@ -126,7 +126,7 @@ async def test_large_mission_adapts_file_token_budget_after_invalid_json(monkeyp
     assert [payload["options"]["num_predict"] for payload in payloads[:3]] == [
         1800,
         3500,
-        2400,
+        5000,
     ]
     assert len(payloads) == 4
     assert "tests/test_project.py" in project.files
