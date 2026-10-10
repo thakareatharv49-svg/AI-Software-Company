@@ -53,14 +53,9 @@ def test_readiness_api_is_exposed() -> None:
     from fastapi.testclient import TestClient
 
     from src.main import app
-    from src.security.authorization import require_company_owner
 
-    app.dependency_overrides[require_company_owner] = lambda: None
-    try:
-        response = TestClient(app).get("/api/company/readiness")
-        assert response.status_code == 200
-        payload = response.json()
-        assert "ready" in payload
-        assert "checks" in payload
-    finally:
-        app.dependency_overrides.pop(require_company_owner, None)
+    response = TestClient(app).get("/api/company/readiness")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "ready" in payload
+    assert "checks" in payload
