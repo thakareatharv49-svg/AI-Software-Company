@@ -54,6 +54,7 @@ async def test_large_mission_resumes_completed_files_after_interruption(
         "invalid JSON",
         "invalid JSON",
         json.dumps({"content": "function addNote(text) { return { text }; }"}),
+        json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     prompts: list[str] = []
 
@@ -75,5 +76,6 @@ async def test_large_mission_resumes_completed_files_after_interruption(
 
     assert resumed.files["index.html"] == "<!doctype html><title>Notes</title>"
     assert resumed.files["app.js"] == "function addNote(text) { return { text }; }"
-    assert len(prompts) == 6
+    assert "tests/test_project.py" in resumed.files
+    assert len(prompts) == 7
     assert "Plan a small, complete software product" not in prompts[5]
