@@ -18,7 +18,12 @@ def test_non_demo_mission_uses_mission_specific_preview_ready_prompt() -> None:
                     "index.html": "<!doctype html><html><head><title>Expense Tracker</title></head><body><h1>Expense Tracker</h1><script src='app.js'></script></body></html>",
                     "app.js": "document.querySelector('h1').textContent = 'Expense Tracker';",
                     "style.css": "body { font-family: sans-serif; }",
-                    "tests/test_app.py": "def test_expense_tracker_title():\n    assert 'Expense Tracker' in 'Expense Tracker'\n",
+                    "tests/test_app.py": (
+                        "def test_expense_totals_include_each_expense():\\n"
+                        "    expenses = [{\\"amount\\": 12}, {\\"amount\\": 8}]\\n"
+                        "    total = sum(item[\\"amount\\"] for item in expenses)\\n"
+                        "    assert total == 20\\n"
+                    ),
                 },
                 "test_command": ["python", "-m", "pytest", "-q"],
             }
