@@ -342,6 +342,26 @@ $("details").addEventListener("click",e => {
   if(b.dataset.action==="retry") (async()=>{try{await api("/api/missions/"+encodeURIComponent(id)+"/retry",{method:"POST"}); await runFactory(id);}catch(x){message("Retry failed: "+x.message,true);}})();
   if(b.dataset.action==="cancel") (async()=>{try{await api("/api/missions/"+encodeURIComponent(id)+"/cancel",{method:"POST"}); await showMission(id); await refresh();}catch(x){message("Cancel failed: "+x.message,true);}})();
 });
+$("cleanup-missions")?.addEventListener("click", async () => {
+  const button = $("cleanup-missions");
+  if (!confirm("Delete ALL queued and blocked missions? Completed products and generated files will be kept. This cannot be undone.")) return;
+  if (button) button.disabled = true;
+  try {
+    const result = await api("/api/missions/cleanup", {method: "POST"});
+    if (selectedMissionId && (result.deleted_ids || []).includes(selectedMissionId)) {
+      selectedMissionId = null;
+      $("detail-title").textContent = "Mission details";
+      $("details").textContent = "Select a mission to inspect outputs and audit trail.";
+    }
+    message("Deleted " + result.deleted_count + " queued/blocked mission(s). Completed products and files were kept.");
+    await refresh();
+  } catch (e) {
+    message("Cleanup failed: " + e.message, true);
+  } finally {
+    if (button) button.disabled = false;
+  }
+});
+
 $("stop").addEventListener("click",async()=>{try{await api("/api/company/stop",{method:"POST"});message("Company stopped.");await refresh();}catch(e){message("Stop failed: "+e.message,true);}});
 
 async function refresh() {
