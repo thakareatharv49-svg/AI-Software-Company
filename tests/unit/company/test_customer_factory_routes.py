@@ -19,7 +19,13 @@ def _job(mission_id: str, workspace_id: str):
         attempts=0,
         created_at=now,
         updated_at=now,
-        plan=SimpleNamespace(model_dump=lambda mode="json": {"steps": []}),
+        plan=SimpleNamespace(
+            steps=[
+                SimpleNamespace(stage="research", status="completed", detail="Research done"),
+                SimpleNamespace(stage="execution", status="running", detail="Generating files"),
+            ],
+            model_dump=lambda mode="json": {"steps": []},
+        ),
     )
 
 
@@ -54,6 +60,10 @@ def test_customer_mission_list_is_workspace_scoped():
         assert response.status_code == 200
         items = response.json()["items"]
         assert [item["id"] for item in items] == ["owned-mission"]
+        assert items[0]["stages"] == [
+            {"name": "research", "status": "completed", "detail": "Research done"},
+            {"name": "execution", "status": "running", "detail": "Generating files"},
+        ]
     finally:
         app.dependency_overrides.clear()
 
