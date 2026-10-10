@@ -8,6 +8,7 @@ from config.settings import settings
 from dashboard.routes.routes import router as dashboard_router
 from observability.logging import configure_logging
 from src.company.control_center.routes import router as control_router
+from src.security.routes.oauth_routes import router as oauth_router
 from src.security.routes.routes import router as security_router
 from src.web.routes import router as web_router
 
@@ -19,6 +20,7 @@ app = FastAPI(
     description="Autonomous AI software company and continuous software factory",
 )
 
+
 @app.middleware("http")
 async def security_headers_middleware(request, call_next):
     response = await call_next(request)
@@ -28,9 +30,11 @@ async def security_headers_middleware(request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     return response
 
+
 app.include_router(health_router)
 app.include_router(dashboard_router)
 app.include_router(security_router)
+app.include_router(oauth_router)
 app.include_router(control_router)
 app.include_router(web_router)
 
@@ -39,6 +43,7 @@ app.mount(
     StaticFiles(directory=Path(__file__).resolve().parent / "web" / "static"),
     name="app-static",
 )
+
 
 @app.get("/")
 async def root() -> dict[str, str]:
