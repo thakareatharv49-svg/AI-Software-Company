@@ -253,8 +253,8 @@ def test_dashboard_completed_product_preview_uses_defined_identifier() -> None:
     html = (static_dir / "index.html").read_text(encoding="utf-8")
     css = (static_dir / "styles.css").read_text(encoding="utf-8")
 
-    assert '/app/static/app.js?v=12' in html
-    assert '/app/static/styles.css?v=7' in html
+    assert '/app/static/app.js?v=13' in html
+    assert '/app/static/styles.css?v=8' in html
     assert 'href="#missions-section"' in html and 'id="missions-section"' in html
     assert 'href="#factory-section"' in html and 'id="factory-section"' in html
     assert ".nav a{" in css
@@ -280,8 +280,12 @@ def test_cleanup_endpoint_deletes_only_queued_and_blocked_missions() -> None:
         result = client.post("/api/missions/cleanup")
         assert result.status_code == 200
         payload = result.json()
-        assert payload["deleted_count"] == 2
-        assert set(payload["deleted_ids"]) == {queued["mission"]["id"], blocked_id}
+        deleted_ids = set(payload["deleted_ids"])
+        # The test database may contain queued/blocked missions from earlier
+        # tests, and the cleanup action is intentionally global.
+        assert payload["deleted_count"] == len(deleted_ids)
+        assert {queued["mission"]["id"], blocked_id} <= deleted_ids
+        assert completed_id not in deleted_ids
         assert center.mission_job(queued["mission"]["id"]) is None
         assert center.mission_job(blocked_id) is None
         assert center.mission_job(completed_id) is not None
