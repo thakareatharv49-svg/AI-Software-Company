@@ -6,6 +6,8 @@ class PlanLimits:
     monthly_runs: int
     projects: int
 
+DEFAULT_CUSTOMER_PLAN = "demo"
+
 PLAN_LIMITS: dict[str, PlanLimits] = {
     "demo": PlanLimits(monthly_runs=3, projects=1),
     "free": PlanLimits(monthly_runs=10, projects=3),
