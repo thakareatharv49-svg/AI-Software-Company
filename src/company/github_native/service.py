@@ -69,6 +69,15 @@ class GitHubNativeService:
         branch instead of creating a pull request.
         """
         try:
+            # Never create or report a successful delivery for an empty product.
+            # Previously this path could leave a newly-created, empty repository
+            # looking like a successful build when generation returned no files.
+            if not files:
+                return GitOperationResult(
+                    False,
+                    "Refusing to publish an empty generated project; no files were delivered.",
+                )
+
             try:
                 repository = await self.github.client.get_repository(
                     repository.owner,
@@ -86,7 +95,17 @@ class GitHubNativeService:
                     ),
                 )
 
-            branch_head = await self.github.client.get_branch(repository, branch)
+            # Repository creation uses GitHub's actual default branch. A stale
+            # local setting (for example, "master" while new repos use "main")
+            # must not strand a repository after creation. Try the requested
+            # branch first, then publish to the repository's verified default.
+            try:
+                branch_head = await self.github.client.get_branch(repository, branch)
+            except RuntimeError as exc:
+                if "GitHub API 404" not in str(exc) or branch == repository.default_branch:
+                    raise
+                branch = repository.default_branch
+                branch_head = await self.github.client.get_branch(repository, branch)
 
             # Use inline tree content instead of one POST /git/blobs request
             # per generated file. This dramatically reduces GitHub secondary
