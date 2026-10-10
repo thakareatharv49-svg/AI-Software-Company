@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     github_default_branch: str = "main"
     github_branch_prefix: str = "factory"
 
+    # Customer sign-in. Keep these credentials server-side in environment variables.
+    public_base_url: str = "http://localhost:8000"
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    github_oauth_client_id: str = ""
+    github_oauth_client_secret: str = ""
+    owner_email: str = ""
+    session_cookie_secure: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
