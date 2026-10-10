@@ -1,6 +1,7 @@
 """Customer workspace UI and ownership-checked product previews."""
 from pathlib import Path
 import re
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
@@ -62,8 +63,8 @@ async def _owned_product_root(mission_id: str, context: tuple, center: CompanyCo
 @router.get("/customer/products/{mission_id}", include_in_schema=False)
 async def customer_product(
     mission_id: str,
-    context=Depends(require_customer_workspace),
-    center: CompanyControlCenter = Depends(get_control_center),
+    context: Annotated[tuple, Depends(require_customer_workspace)],
+    center: Annotated[CompanyControlCenter, Depends(get_control_center)],
 ) -> HTMLResponse:
     root, index = await _owned_product_root(mission_id, context, center)
     html = index.read_text(encoding="utf-8")
