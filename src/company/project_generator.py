@@ -343,13 +343,16 @@ Rules:
             "task manager", "task list", "build an app", "build a app",
             "build app", "create an app", "create app",
         )
-        if (
-            any(term in mission_text for term in browser_terms)
-            and not any(path == "index.html" for path, _ in manifest_items)
-        ):
-            manifest_items.append(
-                ("index.html", "Root browser entry point required by product preview")
+        is_browser_mission = any(term in mission_text for term in browser_terms)
+        if is_browser_mission:
+            required_browser_files = (
+                ("index.html", "Root browser entry point required by product preview"),
+                ("style.css", "Responsive visual design and accessible interface styling"),
+                ("app.js", "Interactive mission-specific browser application behavior"),
             )
+            for required_path, purpose in required_browser_files:
+                if not any(path == required_path for path, _ in manifest_items):
+                    manifest_items.append((required_path, purpose))
 
         has_tests = any(
             path.lower().startswith("tests/")
