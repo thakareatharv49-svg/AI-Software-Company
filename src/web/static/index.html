@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Software Company — Control Center</title>
 <link rel="stylesheet" href="/app/static/styles.css?v=8">
+<link rel="stylesheet" href="/app/static/mission-composer.css?v=1">
 </head>
 <body>
 <div class="shell">
@@ -36,15 +37,15 @@
 <div class="section-heading"><div><h2>Completed Products</h2><p class="muted">Open finished browser products directly from the factory.</p></div><small id="product-count" class="section-count"></small></div>
 <div id="products" class="products"><div class="empty">Checking generated products…</div></div>
 </section>
-<div class="grid">
-<section class="card">
-<h2>New mission</h2><p class="muted">Describe the product, not the implementation.</p>
-<form id="mission-form" class="stack">
-<label>MISSION NAME<input id="name" maxlength="200" required placeholder="Python Calculator"></label>
-<label>OBJECTIVE<textarea id="objective" maxlength="5000" required placeholder="Create a Python calculator with automated tests."></textarea></label>
-<button id="launch" class="primary" type="submit">Launch factory</button>
-</form><div id="message" class="message"></div>
+<section class="card mission-composer" id="new-mission-section">
+<div class="mission-composer-heading"><div><div class="eyebrow">Start building</div><h2>New mission</h2><p class="muted">Describe what you want the factory to build. It will plan the work, generate files, run checks and prepare the product.</p></div><div class="composer-mark" aria-hidden="true">✦</div></div>
+<form id="mission-form" class="stack mission-form">
+<label for="name">MISSION NAME<input id="name" maxlength="200" required placeholder="e.g. Personal expense tracker"></label>
+<label for="objective">WHAT SHOULD IT DO?<textarea id="objective" maxlength="5000" required placeholder="Build a responsive expense tracker with income and expense entries, category filters, monthly summaries, local storage, and clear empty states. Include tests or a verification checklist."></textarea><small class="field-hint">Tip: mention the main features, who it is for, and how you will know it works.</small></label>
+<div class="composer-footer"><span class="composer-note">Be specific about features and expected behavior for stronger results.</span><button id="launch" class="primary launch-button" type="submit"><span aria-hidden="true">✦</span> Launch factory</button></div>
+</form><div id="message" class="message" role="status" aria-live="polite"></div>
 </section>
+<div class="grid factory-grid">
 <section class="card" id="factory-section">
 <h2>Factory pipeline</h2><p class="muted">Run one mission or process the queued backlog in order.</p>
 <div id="pipeline" class="pipeline"><div class="pipeline-step active"><b>01</b><span>Waiting</span><small>Select a mission</small></div></div>
