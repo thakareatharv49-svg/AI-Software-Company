@@ -19,9 +19,9 @@ from src.web.customer_routes import router as customer_web_router
 configure_logging()
 
 app = FastAPI(
-    title="AI Software Company",
+    title="AI Software Developer",
     version="0.1.0",
-    description="Autonomous AI software company and continuous software factory",
+    description="AI Software Developer: autonomous project engineering and software factory",
 )
 
 
