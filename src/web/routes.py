@@ -118,9 +118,15 @@ async def completed_product_asset(mission_id: str, file_path: str) -> FileRespon
 
 @router.get("/api/products", dependencies=[Depends(require_company_owner)])
 async def completed_products() -> JSONResponse:
-    """List generated browser products that actually have an index.html."""
+    """List the company platform and generated products with browser previews."""
     PRODUCTS_DIR.mkdir(parents=True, exist_ok=True)
-    products = []
+    products = [{
+        "id": "ai-software-company",
+        "name": "AI Software Company",
+        "kind": "platform",
+        "status": "core platform",
+        "url": "/app",
+    }]
     roots = list(PRODUCTS_DIR.iterdir())
     if LEGACY_PRODUCTS_DIR.is_dir():
         roots.extend(LEGACY_PRODUCTS_DIR.iterdir())
@@ -132,7 +138,11 @@ async def completed_products() -> JSONResponse:
             continue
         seen.add(root.name)
         products.append({
+            "id": root.name,
             "mission_id": root.name,
+            "name": root.name.replace("-", " ").replace("_", " ").title(),
+            "kind": "generated",
+            "status": "preview available",
             "url": f"/product/{root.name}",
         })
     return JSONResponse(products, headers={"Cache-Control": "no-store"})
