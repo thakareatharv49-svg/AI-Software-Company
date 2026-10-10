@@ -81,6 +81,7 @@ async def test_large_mission_retries_only_the_failed_file(monkeypatch, tmp_path)
         json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
         "not valid JSON",
         json.dumps({"content": "<!doctype html><title>Recovered</title>"}),
+        json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     prompts = []
 
@@ -95,7 +96,8 @@ async def test_large_mission_retries_only_the_failed_file(monkeypatch, tmp_path)
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Recovered</title>"
-    assert len(prompts) == 3
+    assert len(prompts) == 4
+    assert "tests/test_project.py" in project.files
     assert "Previous attempt failed with this error" in prompts[2]
 
 
@@ -106,6 +108,7 @@ async def test_large_mission_adapts_file_token_budget_after_invalid_json(monkeyp
         json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
         "not valid JSON",
         json.dumps({"content": "<!doctype html><title>Recovered compact file</title>"}),
+        json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     payloads = []
 
@@ -120,11 +123,13 @@ async def test_large_mission_adapts_file_token_budget_after_invalid_json(monkeyp
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Recovered compact file</title>"
-    assert [payload["options"]["num_predict"] for payload in payloads] == [
+    assert [payload["options"]["num_predict"] for payload in payloads[:3]] == [
         1800,
         3500,
         2400,
     ]
+    assert len(payloads) == 4
+    assert "tests/test_project.py" in project.files
     assert "Adaptive recovery attempt 2" in payloads[-1]["prompt"]
 
 
@@ -135,6 +140,7 @@ async def test_large_mission_retries_invalid_file_manifest(monkeypatch, tmp_path
         "not valid JSON",
         json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
         json.dumps({"content": "<!doctype html><title>Manifest recovered</title>"}),
+        json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     payloads = []
 
@@ -149,7 +155,8 @@ async def test_large_mission_retries_invalid_file_manifest(monkeypatch, tmp_path
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Manifest recovered</title>"
-    assert len(payloads) == 3
+    assert len(payloads) == 4
+    assert "tests/test_project.py" in project.files
     assert "Corrective retry" in payloads[1]["prompt"]
 
 
@@ -163,6 +170,7 @@ async def test_large_mission_retries_transient_manifest_request_failure(monkeypa
         RuntimeError("Could not reach Ollama"),
         manifest,
         json.dumps({"content": "<!doctype html><title>Recovered</title>"}),
+        json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     prompts = []
 
@@ -180,7 +188,8 @@ async def test_large_mission_retries_transient_manifest_request_failure(monkeypa
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Recovered</title>"
-    assert len(prompts) == 3
+    assert len(prompts) == 4
+    assert "tests/test_project.py" in project.files
     assert "Recovery retry" in prompts[1]
     assert "Could not reach Ollama" not in prompts[1]
 
@@ -232,6 +241,7 @@ async def test_later_file_prompt_includes_actual_previously_generated_source(
                 'document.querySelector("#add-note")?.addEventListener("click", () => {});'
             )
         }),
+        json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     payloads = []
 
