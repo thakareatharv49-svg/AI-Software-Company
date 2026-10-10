@@ -363,6 +363,28 @@ class CompanyControlCenter:
             self._sync_mission_from_job(job)
         return jobs
 
+    def delete_queued_and_blocked_missions(self) -> dict[str, object]:
+        """Delete queued/blocked mission records without touching products or output files."""
+        if self.factory_running():
+            raise RuntimeError("Stop the factory before deleting queued or blocked missions")
+
+        jobs = self._job_store.list_all()
+        mission_ids = {
+            job.id for job in jobs
+            if job.status in {MissionJobStatus.QUEUED, MissionJobStatus.BLOCKED}
+        }
+        if not mission_ids:
+            return {"deleted_count": 0, "deleted_ids": []}
+
+        self._factory.remove_missions(mission_ids)
+        self._job_store.delete_many(mission_ids)
+        with self._lock:
+            for mission_id in mission_ids:
+                self._jobs.pop(mission_id, None)
+                self._missions.pop(mission_id, None)
+
+        return {"deleted_count": len(mission_ids), "deleted_ids": sorted(mission_ids)}
+
     async def execute_next_stage(self, mission_id: str) -> AgentResult:
         record = self._get_mission(mission_id)
         result = await self._execution_pipeline.execute_next(record.mission, record.plan)
