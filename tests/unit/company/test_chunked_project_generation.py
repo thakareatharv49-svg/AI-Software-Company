@@ -81,6 +81,8 @@ async def test_large_mission_retries_only_the_failed_file(monkeypatch, tmp_path)
         json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
         "not valid JSON",
         json.dumps({"content": "<!doctype html><title>Recovered</title>"}),
+        json.dumps({"content": "body { font-family: sans-serif; }"}),
+        json.dumps({"content": "document.title = 'Recovered';"}),
         json.dumps({"content": "def test_generated_project_has_smoke_check():\n    assert True\n"}),
     ]
     prompts = []
@@ -96,7 +98,9 @@ async def test_large_mission_retries_only_the_failed_file(monkeypatch, tmp_path)
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Recovered</title>"
-    assert len(prompts) == 4
+    assert len(prompts) == 6
+    assert "style.css" in project.files
+    assert "app.js" in project.files
     assert "tests/test_project.py" in project.files
     assert "Previous attempt failed with this error" in prompts[2]
 
