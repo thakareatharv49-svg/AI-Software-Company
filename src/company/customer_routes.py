@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.company.customer_entitlements import DEFAULT_CUSTOMER_PLAN, PLAN_LIMITS, can_consume_run, resolve_limits
 from src.company.customer_project_routes import router as customer_project_router
+from src.company.customer_factory_routes import router as customer_factory_router
 from src.db.models.entitlement import WorkspaceEntitlementModel, WorkspaceUsageModel
 from src.db.session import get_db
 from src.security.customer_authorization import require_customer_workspace
@@ -61,3 +62,4 @@ async def consume_customer_run(context: Annotated[tuple, Depends(require_custome
 
 
 router.include_router(customer_project_router)
+router.include_router(customer_factory_router)
