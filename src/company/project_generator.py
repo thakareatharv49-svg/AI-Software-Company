@@ -510,7 +510,15 @@ Requirements:
                     break
                 except (RuntimeError, json.JSONDecodeError) as exc:
                     last_error = exc
-                    if attempt == 3:
+                    # Invalid JSON can be a truncated response and benefits from
+                    # the larger adaptive output budgets above. Repeating other
+                    # failures three times is usually just three slow Ollama waits
+                    # (for example, when the model is overloaded or unreachable).
+                    # Allow one recovery retry for those failures, then fail fast;
+                    # completed files remain checkpointed and can be resumed.
+                    if attempt == 3 or (
+                        attempt >= 2 and not isinstance(exc, json.JSONDecodeError)
+                    ):
                         raise RuntimeError(
                             f"Failed to generate '{path}' after {attempt} attempts: {exc}"
                         ) from exc
