@@ -358,3 +358,39 @@ def test_simple_mission_stays_on_single_pass_generation() -> None:
         "Text Normalizer",
         "Create a small text normalization utility.",
     )
+
+
+
+def test_repair_prompt_preserves_browser_product_context() -> None:
+    generator = OllamaProjectGenerator()
+    captured: dict = {}
+
+    async def fake_call(payload: dict) -> str:
+        captured.update(payload)
+        return json.dumps({
+            "files": {
+                "index.html": "<!doctype html><html><head><title>Study Planner</title></head><body><h1>Study Planner</h1><script src='app.js'></script></body></html>",
+                "app.js": "document.title = 'Study Planner';",
+                "tests/test_project.py": (
+                    "def test_study_planner_default_state():\\n"
+                    "    sessions = []\\n"
+                    "    assert len(sessions) == 0\\n"
+                ),
+            },
+            "test_command": ["python", "-m", "pytest", "-q"],
+        })
+
+    generator._call = fake_call  # type: ignore[method-assign]
+    repaired = asyncio.run(generator.repair(
+        {
+            "index.html": "<html><script src='app.js'></script></html>",
+            "app.js": "document.title = 'Study Planner';",
+        },
+        "Project name: Study Planner\\nMission objective: Build a browser study planner.\\nPreview validation failure: missing style.css",
+    ))
+
+    prompt = captured["prompt"]
+    assert "generated software product" in prompt
+    assert "browser/web app" in prompt
+    assert "Study Planner" in prompt
+    assert "index.html" in repaired.files
