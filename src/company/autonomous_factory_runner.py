@@ -70,12 +70,8 @@ class FactoryAutonomousRunner:
                 f"{type(exc).__name__}: {exc}",
             )
             raise
-        record_progress(
-            "product_generation", "completed", "Mission-specific project files generated."
-        )
-        workspace = self.workspace_service.create_workspace(mission.id)
-
         try:
+            workspace = self.workspace_service.create_workspace(mission.id)
             for path, content in request.files.items():
                 workspace.write_file(path, content)
 
@@ -88,10 +84,20 @@ class FactoryAutonomousRunner:
                         }
                     ),
                 )
-            request = replace(
-                request,
-                stage_callback=record_progress,
+        except Exception as exc:
+            record_progress(
+                "product_generation",
+                "failed",
+                f"Workspace preparation failed: {type(exc).__name__}: {exc}",
             )
+            raise
+
+        record_progress(
+            "product_generation", "completed", "Mission-specific project files generated."
+        )
+        request = replace(request, stage_callback=record_progress)
+
+        try:
             result = await self.runner.run(request)
             report = AutonomousCompanyAcceptance().evaluate(result)
             if not report.passed:
