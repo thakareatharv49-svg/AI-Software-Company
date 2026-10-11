@@ -107,28 +107,20 @@ def test_deterministic_fallback_rejects_missing_automated_tests(
         )
 
 
-def test_deterministic_fallback_accepts_behavior_test_module(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_deterministic_fallback_accepts_behavior_test_module() -> None:
     project = GeneratedProject(
         files={
             "index.html": "<!doctype html><html><body><h1>Inventory</h1></body></html>",
             "app.js": "function addItem(items, item) { return [...items, item]; }",
             "tests/test_inventory.py": (
-                "def test_add_item():\\n"
-                "    items = []\\n"
-                "    result = [*items, 'keyboard']\\n"
-                "    assert result == ['keyboard']\\n"
+                "def test_add_item():\n"
+                "    items = []\n"
+                "    result = [*items, 'keyboard']\n"
+                "    assert result == ['keyboard']\n"
             ),
         },
         test_command=["python", "-m", "pytest", "-q"],
     )
-    monkeypatch.setattr(
-        OllamaProjectGenerator,
-        "_validate_mission_output",
-        staticmethod(lambda name, objective, candidate: None),
-    )
-
     assert OllamaProjectGenerator._validated_fallback(
         "Inventory",
         "Build an inventory app",
