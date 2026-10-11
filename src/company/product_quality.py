@@ -53,13 +53,6 @@ _SMOKE_ONLY_TEST_NAMES = {
     "test_generated_source_files_exist",
 }
 
-_WEAK_TEST_ASSERTIONS = (
-    r"assert\s+True\b",
-    r"assert\s+1\s*==\s*1\b",
-    r"assert\s+0\s*==\s*0\b",
-)
-
-
 def _has_literal_only_assertion(content: str) -> bool:
     """Detect asserts that compare constants instead of exercising product behavior."""
     try:
@@ -108,8 +101,6 @@ def _test_function_has_assertion(
 
 def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
     """Reject tautologies, no-op test functions, and smoke-only generated suites."""
-    import re
-
     issues: list[str] = []
     for path, content in files.items():
         normalized = path.replace("\\", "/").casefold()
@@ -121,10 +112,6 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
         )
         if not in_tests or not name.endswith(".py"):
             continue
-        has_regex_tautology = any(
-            re.search(marker, content, flags=re.IGNORECASE)
-            for marker in _WEAK_TEST_ASSERTIONS
-        )
         try:
             tree = ast.parse(content)
         except SyntaxError:
@@ -190,7 +177,7 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
                 f"Generated tests '{path}' contain only generated smoke checks; "
                 "add mission-specific behavioral tests and at least one edge case."
             )
-        elif has_regex_tautology or _has_literal_only_assertion(content):
+        elif _has_literal_only_assertion(content):
             issues.append(
                 f"Generated tests '{path}' contain a tautological assertion; "
                 "test an actual product behavior and an edge case."
