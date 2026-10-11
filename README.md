@@ -2,6 +2,10 @@
 
 The AI Software Developer venture runs an autonomous software factory with a browser control center. The GitHub repository name remains `AI-Software-Company` to preserve existing links and integrations.
 
+## Company structure
+
+Nexora HQ is the parent-company dashboard for tracking ventures, company-level activity, and integration health. AI Software Developer owns software mission execution, generated applications, previews, and its internal factory workflows. Nexora HQ does not replace the factory and its read-only live-status adapter is a separate integration task.
+
 ## Web app
 
 The control center is served by the same FastAPI application:
@@ -20,7 +24,11 @@ From the AI Software Developer control center you can:
 
 The browser UI is intentionally part of the main application, so there is no separate frontend server to configure.
 
-The private owner console is available at **http://127.0.0.1:8000/owner**. Its sign-in page loads before authentication; the company APIs and factory controls remain owner-protected. To sign in, configure `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `OWNER_EMAIL` in `.env` (or configure the equivalent GitHub OAuth credentials). Set `PUBLIC_BASE_URL` to the exact local app origin, and register the matching callback URL with the provider, for example `http://127.0.0.1:8000/auth/google/callback`. Without provider credentials, the OAuth start endpoint intentionally returns HTTP 503; without a valid owner session, protected APIs return HTTP 401/403.
+### Local access without a separate owner login
+
+For a single-user development instance, set `LOCAL_ACCESS_ENABLED=true` in your local `.env`. The bypass only applies when `ENVIRONMENT=development` and the request comes from a loopback address (127.0.0.1 or ::1). This lets you use the local factory dashboard without configuring Google/GitHub OAuth or a separate company-owner account. Keep this setting false for shared, hosted, or production environments. Production/shared access continues to require the authenticated session and owner membership.
+
+The legacy owner console remains at **http://127.0.0.1:8000/owner** for deployments that use the sign-in flow.
 
 ## What AI Software Developer does
 
@@ -47,7 +55,7 @@ Create `.env` from `.env.example`, start PostgreSQL, then:
     alembic upgrade head
     uvicorn src.main:app --reload
 
-Open http://127.0.0.1:8000/app.
+Open http://127.0.0.1:8000/app. To avoid the separate owner sign-in for your local instance, add `LOCAL_ACCESS_ENABLED=true` to `.env` and restart the server.
 
 The default model is `llama3.2`. Start Ollama and make sure the model is available:
 
