@@ -46,13 +46,25 @@ class MissionJob(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+def recover_running_plan(plan: MissionPlan) -> MissionPlan:
+    """Make interrupted in-flight stages safe to retry after a process restart."""
+    recovered = plan.model_copy(deep=True)
+    for step in recovered.steps:
+        if str(getattr(step.status, "value", step.status)).strip().casefold() == "running":
+            step.status = "planned"
+            step.detail = None
+    return recovered
+
+
 def recover_running_job(job: MissionJob) -> MissionJob:
     if job.status != MissionJobStatus.RUNNING:
         return job
+    recovered_plan = recover_running_plan(job.plan)
+    recovered = job.model_copy(update={"plan": recovered_plan})
     return transition_job(
-        job,
+        recovered,
         MissionJobStatus.QUEUED,
-        "Recovered after process restart; awaiting explicit factory execution.",
+        "Recovered after process restart; interrupted stage will be retried.",
     )
 
 
