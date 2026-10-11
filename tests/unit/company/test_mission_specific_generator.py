@@ -413,7 +413,6 @@ def test_repair_prompt_preserves_browser_product_context() -> None:
 
 
 def test_failed_large_mission_repair_clears_stale_checkpoint(tmp_path) -> None:
-    from src.company.generation_checkpoints import GenerationCheckpointStore
     from src.company.project_generator import GeneratedProject
 
     name = "Study Planner"
@@ -422,7 +421,7 @@ def test_failed_large_mission_repair_clears_stale_checkpoint(tmp_path) -> None:
         "and responsive layout."
     )
     generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
-    checkpoint = GenerationCheckpointStore(tmp_path, key=f"{name}\\0{objective}")
+    checkpoint = generator._checkpoint(name, objective)
     manifest = [
         {"path": "index.html", "purpose": "Browser entry point"},
         {"path": "style.css", "purpose": "Responsive styling"},
