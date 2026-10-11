@@ -320,6 +320,7 @@ def test_cleanup_is_rejected_while_factory_is_running() -> None:
 @pytest.mark.asyncio
 async def test_continuous_factory_processes_projects_one_at_a_time_and_can_stop() -> None:
     center = CompanyControlCenter(CompanyOrchestrator())
+    center._factory.queue.clear()
     first = center.submit_mission(
         MissionSubmission(name="Continuous first", objective="Build the first project")
     )
