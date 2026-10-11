@@ -736,34 +736,79 @@ Requirements:
                 "the product preview cannot open it. Regenerate with a root HTML entry point."
             )
 
+        OllamaProjectGenerator._validate_local_browser_assets(project.files)
+        OllamaProjectGenerator._validate_javascript_syntax(project.files)
+
+    @staticmethod
+    def _validate_local_browser_assets(files: dict[str, str]) -> None:
+        """Validate local dependencies referenced by HTML, CSS, and JS modules."""
         import re
-        references = re.findall(
-            r"""(?:src|href)\s*=\s*["']([^"'#]+)["']""",
-            index_html,
-            flags=re.IGNORECASE,
-        )
-        for reference in references:
+
+        def local_reference(reference: str, source_path: str) -> str | None:
             reference = reference.strip()
             if (
                 not reference
-                or reference.startswith(("#", "//", "data:", "http:", "https:", "mailto:", "tel:", "javascript:"))
+                or reference.startswith((
+                    "#", "//", "data:", "http:", "https:", "mailto:", "tel:",
+                    "javascript:", "blob:",
+                ))
             ):
-                continue
-            local_path = reference.split("?", 1)[0].split("#", 1)[0]
-            if not local_path:
-                continue
-            if local_path.startswith("/"):
-                local_path = local_path.lstrip("/")
-            # HTML commonly uses ./app.js; normalize safe relative URL paths
-            # before comparing them with the generated file map.
-            local_path = PurePosixPath(local_path).as_posix()
-            if local_path not in project.files:
+                return None
+            reference = reference.split("?", 1)[0].split("#", 1)[0]
+            if not reference:
+                return None
+            if reference.startswith("/"):
+                candidate = PurePosixPath(reference.lstrip("/"))
+            else:
+                candidate = PurePosixPath(source_path).parent / reference
+            normalized = PurePosixPath(candidate.as_posix())
+            if normalized.is_absolute() or ".." in normalized.parts:
                 raise RuntimeError(
-                    f"Generated browser product references missing local asset '{reference}'. "
-                    "Include every referenced local script, stylesheet, and asset in the output."
+                    f"Generated browser product references unsafe local asset "
+                    f"'{reference}' from '{source_path}'."
                 )
+            return normalized.as_posix()
 
-        OllamaProjectGenerator._validate_javascript_syntax(project.files)
+        references_by_file: dict[str, list[str]] = {}
+        for path, content in files.items():
+            lowered_path = path.casefold()
+            references: list[str] = []
+            if lowered_path.endswith((".html", ".htm")):
+                references.extend(re.findall(
+                    r"""(?:src|href)\s*=\s*["']([^"']+)["']""",
+                    content,
+                    flags=re.IGNORECASE,
+                ))
+            elif lowered_path.endswith(".css"):
+                references.extend(re.findall(
+                    r"""url\(\s*["']?([^"')]+)""",
+                    content,
+                    flags=re.IGNORECASE,
+                ))
+                references.extend(re.findall(
+                    r"""@import\s+(?:url\(\s*)?["']([^"']+)["']""",
+                    content,
+                    flags=re.IGNORECASE,
+                ))
+            elif lowered_path.endswith((".js", ".mjs")):
+                # Only relative/rooted module specifiers are local dependencies;
+                # bare package names are intentionally left to the no-build policy.
+                references.extend(re.findall(
+                    r"""(?:from\s*|import\s*\()\s*["']((?:\.{1,2}/|/)[^"']+)["']""",
+                    content,
+                ))
+
+            references_by_file[path] = references
+
+        for source_path, references in references_by_file.items():
+            for reference in references:
+                target = local_reference(reference, source_path)
+                if target is not None and target not in files:
+                    raise RuntimeError(
+                        f"Generated browser product references missing local asset "
+                        f"'{reference}' from '{source_path}'. Include every referenced "
+                        "local script, stylesheet, module, and asset in the output."
+                    )
 
     @staticmethod
     def _validate_javascript_syntax(files: dict[str, str]) -> None:
