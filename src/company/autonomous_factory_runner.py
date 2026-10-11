@@ -11,6 +11,7 @@ from src.company.autonomous_project import (
     AutonomousProjectRunner,
 )
 from src.company.acceptance import AutonomousCompanyAcceptance
+from src.company.generated_task_planning import build_generated_task_plan
 from src.company.mission_controller.models import MissionPlan
 from src.company.models.contracts import CompanyMission
 from src.company.workspace import ProjectExecutionService
@@ -72,6 +73,24 @@ class FactoryAutonomousRunner:
             raise
         try:
             self._validate_generated_files(request.files)
+            # Generated files are the most concrete architecture artifact available
+            # at this point. When the request builder supplies only a single broad
+            # task, derive work packages from the actual output so frontend, backend,
+            # and quality work are visible to the execution pipeline. Preserve an
+            # explicitly decomposed task plan supplied by the caller.
+            if len(request.tasks) <= 1:
+                generated_plan = build_generated_task_plan(
+                    request.project_request.name,
+                    request.project_request.objective or mission.objective,
+                    request.files,
+                )
+                implementation_packages = sum(
+                    1 for task in generated_plan
+                    if not task.title.startswith("Validate ")
+                )
+                current_is_broad = len(request.tasks) == 1 and implementation_packages > 1
+                if current_is_broad or not request.tasks:
+                    request = replace(request, tasks=generated_plan)
             workspace = self.workspace_service.create_workspace(mission.id)
             for path, content in request.files.items():
                 workspace.write_file(path, content)
