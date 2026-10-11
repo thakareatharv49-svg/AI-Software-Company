@@ -12,6 +12,7 @@ from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentResult
 from src.agents.registry.registry import AgentRegistry
 from src.company.audit import MissionAuditEntry
+from src.company.events.events import CompanyEvent
 from src.company.autonomous_factory_runner import FactoryAutonomousRunner
 from src.company.autonomous_project import AutonomousProjectRequest, AutonomousProjectRunner
 from src.company.ceo.models import Mission as CEOMission
@@ -292,23 +293,35 @@ class CompanyControlCenter:
         async def continuous_runner() -> None:
             try:
                 while self._continuous_mode:
-                    # Durable jobs are the source of truth. Polling also picks up
-                    # missions submitted while the factory is idle.
-                    for job in self.mission_jobs():
-                        if (
-                            job.status == MissionJobStatus.QUEUED
-                            and not self._factory.has_queued_mission(job.id)
-                        ):
-                            self._factory.enqueue(job.mission)
+                    try:
+                        # Durable jobs are the source of truth. Polling also picks up
+                        # missions submitted while the factory is idle.
+                        for job in self.mission_jobs():
+                            if (
+                                job.status == MissionJobStatus.QUEUED
+                                and not self._factory.has_queued_mission(job.id)
+                            ):
+                                self._factory.enqueue(job.mission)
 
-                    if self._factory.queue:
-                        await self._factory.run(max_projects=1, max_retries=max_retries)
-                        # Check the stop flag between projects; never cancel active generation.
-                        await asyncio.sleep(0)
-                    else:
+                        if self._factory.queue:
+                            await self._factory.run(max_projects=1, max_retries=max_retries)
+                            # Check the stop flag between projects; never cancel active generation.
+                            await asyncio.sleep(0)
+                        else:
+                            await asyncio.sleep(1)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as exc:
+                        self._orchestrator.events.publish(
+                            CompanyEvent(
+                                event_type="FACTORY_CONTINUOUS_LOOP_ERROR",
+                                message=(
+                                    "Continuous factory loop recovered from "
+                                    f"{type(exc).__name__}: {exc}"
+                                ),
+                            )
+                        )
                         await asyncio.sleep(1)
-            except asyncio.CancelledError:
-                raise
             finally:
                 self._continuous_mode = False
 
