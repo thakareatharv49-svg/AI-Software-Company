@@ -331,7 +331,7 @@ Rules:
         browser_mission = self._is_browser_mission(f"{name} {objective}".casefold())
         def required_file_count(items: list[object]) -> int:
             planned_paths = {
-                str(item.get("path", "")).strip().replace("\\\\", "/")
+                str(item.get("path", "")).strip().replace("\\", "/")
                 for item in items
                 if isinstance(item, dict)
             }
