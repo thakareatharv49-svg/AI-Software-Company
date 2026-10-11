@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import shutil
 import subprocess
@@ -377,595 +378,34 @@ Rules:
                     manifest_payload["prompt"] += recovery_prompt
 
         mission_request_text = f"{name} {objective}".casefold()
-        explicit_backend_request = any(
-            marker in mission_request_text
-            for marker in (
-                "backend", "server-side", "rest api", "api endpoint",
-                "database", "authentication server",
-            )
-        ) and not any(
-            marker in mission_request_text
-            for marker in ("no backend", "without a backend", "frontend only", "front-end only")
-        )
-
-        def manifest_validation_issue(candidate: object) -> str | None:
-            if not isinstance(candidate, dict):
-                return "Ollama returned a project file plan that is not a JSON object"
-            items = candidate.get("files")
-            if not isinstance(items, list) or not items:
-                return "Ollama returned an empty or invalid project file plan"
-            # File-count limits are enforced after the compact-plan retry below.
-            # Rejecting an oversized but structurally valid plan here would route
-            # it into structural recovery and consume the retry intended to compact it.
-            seen_paths: set[str] = set()
-            normalized_paths: list[str] = []
-            normalized_dependencies: dict[str, list[str]] = {}
-            for item in items:
-                if not isinstance(item, dict):
-                    return "Project file plan contains an invalid entry"
-                raw_path = str(item.get("path", "")).strip().replace("\\", "/")
-                path = PurePosixPath(raw_path)
-                if (
-                    not raw_path
-                    or path.is_absolute()
-                    or ".." in path.parts
-                    or ":" in raw_path
-                    or "\n" in raw_path
-                ):
-                    return f"Unsafe path in project file plan: {raw_path!r}"
-                normalized = path.as_posix()
-                path_key = normalized.casefold()
-                if path_key in seen_paths:
-                    return (
-                        f"Duplicate path in project file plan (case-insensitive): "
-                        f"{normalized}"
-                    )
-                seen_paths.add(path_key)
-                normalized_paths.append(normalized)
-                if not str(item.get("purpose", "")).strip():
-                    return f"Project file plan has no purpose for {normalized}"
-                dependencies = item.get("depends_on", [])
-                if not isinstance(dependencies, list) or any(
-                    not isinstance(dependency, str) or not dependency.strip()
-                    for dependency in dependencies
-                ):
-                    return f"Project file plan has invalid dependencies for {normalized}"
-                normalized_dependency_paths = [
-                    PurePosixPath(dependency.replace("\\", "/")).as_posix()
-                    for dependency in dependencies
-                ]
-                dependency_keys = [dependency.casefold() for dependency in normalized_dependency_paths]
-                if path_key in dependency_keys:
-                    return f"Project file {normalized} cannot depend on itself"
-                if len(set(dependency_keys)) != len(dependency_keys):
-                    return f"Project file plan repeats a dependency for {normalized}"
-                item["depends_on"] = normalized_dependency_paths
-                normalized_dependencies[normalized] = normalized_dependency_paths
-            planned_paths = {
-                path.casefold(): path for path in normalized_paths
-            }
-            if explicit_backend_request:
-                backend_markers = {"backend", "server", "api"}
-                backend_files = [
-                    path for path in normalized_paths
-                    if not (
-                        path.casefold().startswith(("tests/", "docs/"))
-                        or path.casefold().rsplit("/", 1)[-1].startswith("test_")
-                    )
-                    and (
-                        bool(backend_markers.intersection(
-                            part.casefold() for part in PurePosixPath(path).parts[:-1]
-                        ))
-                        or PurePosixPath(path).name.casefold() in {
-                            "server.py", "server.js", "server.ts",
-                            "api.py", "api.js", "api.ts",
-                            "main.py", "app.py",
-                        }
-                    )
-                ]
-                if not backend_files:
-                    return (
-                        "Mission explicitly requests backend/server/API/database "
-                        "capabilities, but the file plan has no backend implementation "
-                        "file. Add a server/API module (for example backend/main.py, "
-                        "server.js, or api.py) and include its tests."
-                    )
-            for normalized, dependencies in normalized_dependencies.items():
-                missing = [
-                    dependency for dependency in dependencies
-                    if dependency.casefold() not in planned_paths
-                ]
-                if missing:
-                    return (
-                        f"Project file {normalized} depends on unknown path(s): "
-                        f"{', '.join(missing)}"
-                    )
-                normalized_dependencies[normalized] = [
-                    planned_paths[dependency.casefold()] for dependency in dependencies
-                ]
-            try:
-                order_manifest_paths(
-                    normalized_paths,
-                    normalized_dependencies,
-                )
-            except ValueError as exc:
-                return str(exc)
-            return None
-
-        # Some local models ignore the planning schema and return a complete
-        # {"files": {"path": "contents"}} project instead of a manifest array.
-        # Treat that as a generated project, not as an empty plan. The caller still
-        # runs the same preview/product validation and bounded repair flow, so this
-        # compatibility path cannot turn invalid output into a successful mission.
-        candidate_files = manifest.get("files") if isinstance(manifest, dict) else None
-        if (
-            isinstance(candidate_files, dict)
-            and candidate_files
-            and all(
-                isinstance(path, str)
-                and isinstance(contents, str)
-                for path, contents in candidate_files.items()
-            )
-        ):
-            return self._parse(json.dumps(manifest))
-
-        raw_manifest = manifest.get("files") if isinstance(manifest, dict) else None
-        manifest_issue = manifest_validation_issue(manifest)
-        if manifest_issue:
-            # Valid JSON can still be an unusable plan (empty list, malformed
-            # entries, duplicate paths or unsafe paths). Give the model one
-            # schema-aware recovery attempt before blocking the whole mission.
-            recovery_payload = dict(manifest_payload)
-            recovery_payload["prompt"] = (
-                str(recovery_payload.get("prompt", ""))
-                + "\n\nStructural recovery retry: the previous JSON was parseable "
-                "but its file plan was invalid. Fix this issue: "
-                + manifest_issue
-                + ". Return a non-empty files array containing objects with unique, "
-                "safe relative path values and non-empty purpose strings. Do not use "
-                "absolute paths, parent-directory segments, or markdown fences."
-            )
-            try:
-                manifest = json.loads(await self._call(recovery_payload))
-            except (json.JSONDecodeError, RuntimeError) as exc:
-                raise RuntimeError(
-                    f"Invalid project file plan after one structural recovery retry: "
-                    f"{manifest_issue}; recovery failed: {exc}"
-                ) from exc
-            raw_manifest = manifest.get("files") if isinstance(manifest, dict) else None
-            manifest_issue = manifest_validation_issue(manifest)
-            if manifest_issue:
-                raise RuntimeError(
-                    f"Invalid project file plan after one structural recovery retry: "
-                    f"{manifest_issue}"
-                )
-
-        # A small local model may over-plan a browser app before accounting for
-        # the required preview assets and test file. Ask it once for a compact
-        # plan instead of immediately blocking an otherwise valid mission.
-        browser_mission = self._is_browser_mission(f"{name} {objective}".casefold())
-
-        def required_file_count(items: list[object]) -> int:
-            planned_paths = {
-                str(item.get("path", "")).strip().replace("\\", "/")
-                for item in items
-                if isinstance(item, dict)
-            }
-            required = 0
-            if browser_mission:
-                required += sum(
-                    path not in planned_paths
-                    for path in ("index.html", "style.css", "app.js")
-                )
-            has_test_file = any(
-                path.lower().startswith("tests/")
-                or path.lower().startswith("test_")
-                or path.lower().endswith("_test.py")
-                for path in planned_paths
-            )
-            if not has_test_file:
-                required += 1
-            return required
-
-        if (
-            len(raw_manifest) > self.max_generated_project_files
-            or len(raw_manifest) + required_file_count(raw_manifest)
-            > self.max_generated_project_files
-        ):
-            compact_payload = dict(manifest_payload)
-            compact_payload["prompt"] = (
-                manifest_prompt
-                + "\n\nCorrective retry: the previous plan exceeded the safe "
-                f"{self.max_generated_project_files}-file limit once mandatory browser assets and tests are included. Return a "
-                "compact revised plan with no more than 32 planned files, include "
-                "index.html, style.css, app.js, and tests/test_project.py for browser "
-                "apps, and combine related implementation into fewer files. Preserve "
-                "all mission-critical workflows; do not split features into tiny modules."
-            )
-            try:
-                compact_manifest = json.loads(await self._call(compact_payload))
-                compact_items = compact_manifest.get("files")
-                compact_issue = manifest_validation_issue(compact_manifest)
-                if (
-                    isinstance(compact_items, list)
-                    and compact_items
-                    and compact_issue is None
-                    and len(compact_items) <= self.max_generated_project_files
-                    and len(compact_items) + required_file_count(compact_items)
-                    <= self.max_generated_project_files
-                ):
-                    raw_manifest = compact_items
-                # Do not trust a compact-plan retry merely because its JSON parses.
-                # It must satisfy the same path/dependency checks and leave room for
-                # required browser assets and tests before it can replace the plan.
-            except (json.JSONDecodeError, RuntimeError):
-                # Keep the original response so the existing explicit safe-limit
-                # error below reports the failure rather than masking it.
-                pass
-
-        if len(raw_manifest) > self.max_generated_project_files:
-            raise RuntimeError(
-                f"Project file plan contains {len(raw_manifest)} files after one compact-plan retry; "
-                f"the safe limit is {self.max_generated_project_files}. "
-                "Reduce the mission scope or split it into separate missions."
-            )
-
-        manifest_items: list[tuple[str, str]] = []
-        manifest_dependencies: dict[str, list[str]] = {}
-        seen: set[str] = set()
-        for item in raw_manifest:
-            if not isinstance(item, dict):
-                raise RuntimeError("Project file plan contains an invalid entry")
-            raw_path = str(item.get("path", "")).strip().replace("\\", "/")
-            path = PurePosixPath(raw_path)
-            if (
-                not raw_path
-                or path.is_absolute()
-                or ".." in path.parts
-                or ":" in raw_path
-                or "\n" in raw_path
-            ):
-                raise RuntimeError(f"Unsafe path in project file plan: {raw_path!r}")
-            normalized = path.as_posix()
-            path_key = normalized.casefold()
-            if path_key in seen:
-                raise RuntimeError(
-                    "Duplicate path in project file plan (case-insensitive): "
-                    f"{normalized}"
-                )
-            seen.add(path_key)
-            purpose = str(item.get("purpose", "")).strip()
-            if not purpose:
-                raise RuntimeError(f"Project file plan has no purpose for {normalized}")
-            dependencies = item.get("depends_on", [])
-            if not isinstance(dependencies, list) or any(
-                not isinstance(dependency, str) for dependency in dependencies
-            ):
-                raise RuntimeError(f"Project file plan has invalid dependencies for {normalized}")
-            manifest_dependencies[normalized] = list(dependencies)
-            manifest_items.append((normalized, purpose))
-
-        # A large-model manifest is only a plan, not a guarantee. Ensure the
-        # generated product has the root entry point expected by the preview
-        # and at least one test file expected by the QA stage.
-        mission_text = f"{name} {objective}".casefold()
-        is_browser_mission = self._is_browser_mission(mission_text)
-        if is_browser_mission:
-            required_browser_files = (
-                ("index.html", "Root browser entry point required by product preview"),
-                ("style.css", "Responsive visual design and accessible interface styling"),
-                ("app.js", "Interactive mission-specific browser application behavior"),
-            )
-            for required_path, purpose in required_browser_files:
-                if not any(path == required_path for path, _ in manifest_items):
-                    manifest_items.append((required_path, purpose))
-
-        has_tests = any(
-            path.lower().startswith("tests/")
-            or path.lower().startswith("test_")
-            or path.lower().endswith("_test.py")
-            for path, _ in manifest_items
-        )
-        if not has_tests:
-            manifest_items.append(
-                ("tests/test_project.py", "Automated tests for mission-specific behavior")
-            )
-
-        if len(manifest_items) > self.max_generated_project_files:
-            raise RuntimeError(
-                f"Project file plan exceeds the safe {self.max_generated_project_files}-file limit after required "
-                "browser entry point and test files were added "
-                f"({len(manifest_items)} files). Reduce the mission scope or split "
-                "it into smaller missions."
-            )
-
-        # Generate implementation before tests so the model can see the real
-        # interfaces and behavior it needs to verify. For browser products, make
-        # the entry point and local assets available as early shared context.
-        def generation_priority(item: tuple[str, str]) -> tuple[int, int, str]:
-            path = item[0].casefold()
-            basename = path.rsplit("/", 1)[-1]
-            is_test = (
-                path.startswith("tests/")
-                or basename.startswith("test_")
-                or basename.endswith("_test.py")
-            )
-            if is_test:
-                return (2, 0, path)
-            # Keep conventional browser assets ordered when present, even if a
-            # mission explicitly asks for a CLI but its file plan includes them.
-            browser_order = {"index.html": 0, "style.css": 1, "app.js": 2}
-            if path in browser_order:
-                return (0, browser_order[path], path)
-            return (1, 0, path)
-
-        manifest_items.sort(key=generation_priority)
-        try:
-            ordered_paths = order_manifest_paths(
-                [path for path, _ in manifest_items], manifest_dependencies
-            )
-        except ValueError as exc:
-            raise RuntimeError(f"Invalid project file dependencies: {exc}") from exc
-        purpose_by_path = dict(manifest_items)
-        manifest_items = [(path, purpose_by_path[path]) for path in ordered_paths]
-
-        normalized_manifest = [
-            {
-                "path": path,
-                "purpose": purpose,
-                "depends_on": manifest_dependencies.get(path, []),
-            }
-            for path, purpose in manifest_items
-        ]
-        cached_files = checkpoint.compatible_files(normalized_manifest)
-        files: dict[str, str] = {
-            path: content
-            for path, content in cached_files.items()
-            if isinstance(content, str)
-            and content.strip()
-            and len(content.encode("utf-8")) <= 2_000_000
-        }
-        checkpoint.save(manifest=normalized_manifest, files=files)
-        test_command = ["python", "-m", "pytest", "-q"]
-        for path, purpose in manifest_items:
-            if path in files:
-                continue
-            previous_files = "\\n".join(
-                f"- {existing_path}: {manifest_purpose}"
-                for existing_path, manifest_purpose in manifest_items
-            )
-            # Give the model the actual interfaces and markup already generated,
-            # not just filenames and character counts. A bounded excerpt helps keep
-            # later files consistent without allowing a large source file to exhaust
-            # the model context window.
-            existing_context_parts: list[str] = []
-            remaining_context_chars = 6_000
-            context_files = list(files.items())
-            current_basename = path.casefold().rsplit("/", 1)[-1]
-            generating_tests = (
-                path.casefold().startswith("tests/")
-                or current_basename.startswith("test_")
-                or current_basename.endswith("_test.py")
-            )
-            if generating_tests:
-                def context_priority(item: tuple[str, str]) -> tuple[int, str]:
-                    existing_path = item[0].casefold()
-                    basename = existing_path.rsplit("/", 1)[-1]
-                    is_test = (
-                        existing_path.startswith("tests/")
-                        or basename.startswith("test_")
-                        or basename.endswith("_test.py")
-                    )
-                    if is_test:
-                        return (3, existing_path)
-                    if existing_path.endswith((".py", ".js", ".mjs", ".cjs")):
-                        return (0, existing_path)
-                    if existing_path.endswith((".html", ".htm")):
-                        return (1, existing_path)
-                    if existing_path.endswith(".css"):
-                        return (2, existing_path)
-                    return (2, existing_path)
-                context_files.sort(key=context_priority)
-            for existing_path, existing_content in context_files:
-                header = f"FILE: {existing_path}\n"
-                if remaining_context_chars <= len(header) + 80:
-                    break
-                available = min(2_200, remaining_context_chars - len(header) - 80)
-                excerpt = existing_content[:available]
-                truncated = len(excerpt) < len(existing_content)
-                block = header + excerpt
-                if truncated:
-                    block += "\n[Earlier file excerpt truncated to fit the shared context budget.]"
-                existing_context_parts.append(block)
-                remaining_context_chars -= len(block) + 2
-            existing_summary = "\n\n".join(existing_context_parts) or "(none yet)"
-            file_prompt = f"""Implement exactly one file for a runnable software product.
-Project name: {name}
-Mission objective: {objective}
-
-Full file plan:
-{previous_files}
-
-File to generate: {path}
-Purpose: {purpose}
-
-Already generated files:
-{existing_summary}
-
-Return only JSON: {{"content":"complete file contents for {path}"}}
-
-Requirements:
-- Implement the mission's actual features and coherent polished responsive UI where relevant.
-- Follow the declared dependency order and implement the interfaces promised by dependency files before integrating consumers.
-- Keep interfaces and identifiers consistent with the file plan and previously generated files.
-- Do not return markdown fences, explanations, or another file.
-- No placeholders for required behavior, remote dependencies, CDNs, secrets, or network calls.
-- For tests, verify meaningful mission-specific behavior and edge cases; do not test only file existence or copied strings.
-- Keep this file complete and runnable with the other planned files.
-- Never return "coming soon", "lorem ipsum", "TODO: implement", or stub behavior for required functionality.
-- Keep the visual design and interactions consistent across all files; use real accessible controls and useful empty states.
-"""
-            file_payload = {
-                "model": settings.ollama_model,
-                "prompt": file_prompt,
-                "stream": False,
-                "format": {
-                    "type": "object",
-                    "properties": {"content": {"type": "string"}},
-                    "required": ["content"],
-                },
-                "keep_alive": "10m",
-                "options": {"temperature": 0.1, "num_predict": 3500},
-            }
-            last_error: Exception | None = None
-            file_content: str | None = None
-            # Retry only the current file. Earlier generated files stay in memory,
-            # so a transient model/JSON failure does not force regeneration of them.
-            for attempt in range(1, 4):
-                attempt_payload = dict(file_payload)
-                attempt_payload["options"] = dict(file_payload["options"])
-                # Invalid JSON commonly means the response was truncated, so
-                # retry with a larger output budget. Other generation errors are
-                # better served by a concise response to reduce model load.
-                if isinstance(last_error, json.JSONDecodeError):
-                    token_budget = {1: 3500, 2: 5000, 3: 6500}[attempt]
-                else:
-                    token_budget = {1: 3500, 2: 2400, 3: 1600}[attempt]
-                attempt_payload["options"]["num_predict"] = token_budget
-                if last_error is not None:
-                    recovery_guidance = (
-                        "Return complete valid JSON and do not truncate the file."
-                        if isinstance(last_error, json.JSONDecodeError)
-                        else "Keep this file concise and implement the essential behavior completely. "
-                        "Avoid long comments and unnecessary abstraction."
-                    )
-                    attempt_payload["prompt"] = (
-                        file_prompt
-                        + "\n\nAdaptive recovery attempt "
-                        + str(attempt)
-                        + ": "
-                        + recovery_guidance
-                        + " Return corrected valid JSON with a non-empty content string."
-                        + "\nPrevious attempt failed with this error: "
-                        + str(last_error)[:600]
-                    )
-                try:
-                    parsed = json.loads(await self._call(attempt_payload))
-                    candidate = parsed.get("content")
-                    if not isinstance(candidate, str) or not candidate.strip():
-                        raise RuntimeError(f"Ollama returned empty content for '{path}'")
-                    if len(candidate.encode("utf-8")) > 2_000_000:
-                        raise RuntimeError(f"Generated file '{path}' exceeds the 2 MB safety limit")
-                    file_content = candidate
-                    break
-                except (RuntimeError, json.JSONDecodeError) as exc:
-                    last_error = exc
-                    # Invalid JSON can be a truncated response and benefits from
-                    # the larger adaptive output budgets above. Repeating other
-                    # failures three times is usually just three slow Ollama waits
-                    # (for example, when the model is overloaded or unreachable).
-                    # Allow one recovery retry for those failures, then fail fast;
-                    # completed files remain checkpointed and can be resumed.
-                    if attempt == 3 or (
-                        attempt >= 2 and not isinstance(exc, json.JSONDecodeError)
-                    ):
-                        raise RuntimeError(
-                            f"Failed to generate '{path}' after {attempt} attempts: {exc}"
-                        ) from exc
-            if file_content is None:
-                raise RuntimeError(f"Failed to generate '{path}' after 3 attempts")
-            files[path] = file_content
-            checkpoint.save(manifest=normalized_manifest, files=files)
-
-        return GeneratedProject(files=files, test_command=test_command)
-
-    @staticmethod
-    def _validated_fallback(
-        name: str,
-        objective: str,
-        project: GeneratedProject,
-    ) -> GeneratedProject:
-        """Apply the shared output checks to deterministic products as well."""
-        OllamaProjectGenerator._validate_mission_output(name, objective, project)
-        # Deterministic fallbacks bypass the model-generation path, so enforce
-        # the same minimum automated-test requirement before returning them.
-        OllamaProjectGenerator._validate_required_product_tests(project.files)
-        return project
-
-    @staticmethod
-    def _validate_required_product_tests(files: dict[str, str]) -> None:
-        """Keep broad, multi-feature missions from shipping without test modules."""
-        from src.company.product_quality import find_missing_product_tests
-
-        issues = find_missing_product_tests(files)
-        if issues:
-            raise RuntimeError(
-                "Generated product failed cross-product quality checks: "
-                + " ".join(issues)
-            )
-
-    @staticmethod
-    def _validate_repaired_output(
-        name: str,
-        objective: str,
-        project: GeneratedProject,
-    ) -> None:
-        """Reapply every applicable delivery gate after a QA repair."""
-        OllamaProjectGenerator._validate_mission_output(name, objective, project)
-        if OllamaProjectGenerator._is_large_mission(name, objective):
-            OllamaProjectGenerator._validate_required_product_tests(project.files)
-
-    @staticmethod
-    def _validate_mission_output(
-        name: str,
-        objective: str,
-        project: GeneratedProject,
-    ) -> None:
-        """Reject browser-app output that cannot be opened in the product preview."""
-        from src.company.product_quality import (
-            find_unfinished_product_content,
-            find_weak_product_tests,
-        )
-
-        quality_issues = find_unfinished_product_content(project.files)
-        quality_issues.extend(find_weak_product_tests(project.files))
-        if quality_issues:
-            raise RuntimeError(
-                "Generated product failed cross-product quality checks: "
-                + " ".join(quality_issues)
-            )
-
-        mission = f"{name} {objective}".casefold()
-        explicit_backend_request = any(
-            marker in mission
-            for marker in (
-                "backend", "server-side", "rest api", "api endpoint",
-                "database", "authentication server",
-            )
-        ) and not any(
-            marker in mission
-            for marker in ("no backend", "without a backend", "frontend only", "front-end only")
-        )
+        explicit_backend_request = OllamaProjectGenerator._mission_requires_backend(mission)
         if explicit_backend_request:
-            backend_markers = {"backend", "server", "api"}
-            backend_files = [
-                path for path in project.files
-                if not (
-                    path.replace("\\", "/").casefold().startswith(("tests/", "docs/"))
-                    or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].startswith("test_")
-                )
-                and (
-                    bool(backend_markers.intersection(
-                        part.casefold()
-                        for part in PurePosixPath(path.replace("\\", "/")).parts[:-1]
+            backend_directory_markers = {
+                "backend", "server", "api", "routes", "controllers",
+                "database", "db", "auth",
+            }
+            backend_filenames = {
+                "server.py", "server.js", "server.ts",
+                "api.py", "api.js", "api.ts",
+                "routes.py", "routes.js", "routes.ts",
+                "database.py", "database.js", "database.ts",
+                "db.py", "db.js", "db.ts",
+                "auth.py", "auth.js", "auth.ts",
+                "wsgi.py", "asgi.py", "main.py", "app.py",
+            }
+            backend_files = []
+            for path in project.files:
+                normalized = path.replace("\\\\", "/").casefold()
+                pure_path = PurePosixPath(normalized)
+                if normalized.startswith(("tests/", "docs/")) or pure_path.name.startswith("test_"):
+                    continue
+                if (
+                    bool(backend_directory_markers.intersection(
+                        part.casefold() for part in pure_path.parts[:-1]
                     ))
-                    or PurePosixPath(path.replace("\\", "/")).name.casefold() in {
-                        "server.py", "server.js", "server.ts",
-                        "api.py", "api.js", "api.ts",
-                        "main.py", "app.py",
-                    }
-                )
-            ]
+                    or pure_path.name in backend_filenames
+                ):
+                    backend_files.append(path)
             if not backend_files:
                 raise RuntimeError(
                     "Mission explicitly requests backend/server/API/database "
@@ -973,6 +413,8 @@ Requirements:
                     "file. Add a server/API module and its tests instead of shipping "
                     "a frontend-only substitute."
                 )
+
+        OllamaProjectGenerator._validate_python_syntax(project.files)
         if not OllamaProjectGenerator._is_browser_mission(mission):
             return
 
@@ -985,6 +427,53 @@ Requirements:
 
         OllamaProjectGenerator._validate_local_browser_assets(project.files)
         OllamaProjectGenerator._validate_javascript_syntax(project.files)
+
+    @staticmethod
+    def _mission_requires_backend(mission: str) -> bool:
+        """Recognize explicit backend requests without treating exclusions as requirements."""
+        text = f" {mission.casefold()} "
+        frontend_only = (
+            " no backend ", " without a backend ", " without backend ",
+            " frontend only ", " front-end only ", " frontend-only ",
+            " front-end-only ",
+        )
+        if any(phrase in text for phrase in frontend_only):
+            return False
+
+        backend_markers = (
+            "backend", "server-side", "rest api", "api endpoint",
+            "authentication server",
+        )
+        api_is_excluded = any(
+            phrase in text
+            for phrase in (" no api ", " without an api ", " without api ",
+                           " no rest api ", " without a rest api ")
+        )
+        database_is_excluded = any(
+            phrase in text
+            for phrase in (" no database ", " without a database ",
+                           " without database ", " database-free ")
+        )
+        return (
+            any(marker in text for marker in backend_markers)
+            or ("api" in text and not api_is_excluded and "api-only" not in text)
+            or ("database" in text and not database_is_excluded)
+        )
+
+    @staticmethod
+    def _validate_python_syntax(files: dict[str, str]) -> None:
+        """Reject malformed Python before spending time on runtime QA or repair."""
+        for path, content in files.items():
+            if not path.casefold().endswith(".py"):
+                continue
+            try:
+                ast.parse(content, filename=path)
+            except SyntaxError as exc:
+                location = f"{path}:{exc.lineno or 1}:{exc.offset or 1}"
+                detail = exc.msg or "invalid Python syntax"
+                raise RuntimeError(
+                    f"Generated Python syntax check failed at {location}: {detail}."
+                ) from exc
 
     @staticmethod
     def _validate_local_browser_assets(files: dict[str, str]) -> None:
