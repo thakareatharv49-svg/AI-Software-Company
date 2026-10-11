@@ -63,6 +63,29 @@ class InvalidReviewTransition(ValueError):
 def _updated(review: ProductReview, **changes) -> ProductReview:
     return review.model_copy(update={**changes, 'updated_at': datetime.now(UTC)}, deep=True)
 
+def _merge_requirements(existing: list[Requirement], incoming: list[Requirement]) -> list[Requirement]:
+    """Keep prior acceptance criteria across revisions and reset them for regression verification."""
+    old_by_description = {item.description.casefold(): item for item in existing}
+    merged = []
+    seen = set()
+    for item in incoming:
+        key = item.description.casefold()
+        prior = old_by_description.get(key)
+        if prior is not None:
+            merged.append(prior.model_copy(update={
+                'verification': item.verification or prior.verification,
+                'status': RequirementStatus.PENDING,
+                'evidence': None,
+            }))
+        else:
+            merged.append(item.model_copy(update={'status': RequirementStatus.PENDING, 'evidence': None}, deep=True))
+        seen.add(key)
+    for prior in existing:
+        key = prior.description.casefold()
+        if key not in seen:
+            merged.append(prior.model_copy(update={'status': RequirementStatus.PENDING, 'evidence': None}))
+    return merged
+
 def prepare_review(review: ProductReview, requirements: list[Requirement], *, qa_passed: bool, security_passed: bool) -> ProductReview:
     if review.status not in {ReviewStatus.DRAFT, ReviewStatus.CHANGES_REQUESTED}:
         raise InvalidReviewTransition(f'Cannot submit for review from {review.status.value}')
@@ -70,7 +93,8 @@ def prepare_review(review: ProductReview, requirements: list[Requirement], *, qa
         raise InvalidReviewTransition('At least one acceptance requirement is required')
     if not qa_passed or not security_passed:
         raise InvalidReviewTransition('Automated QA and security checks must pass before human review')
-    return _updated(review, status=ReviewStatus.IN_REVIEW, requirements=[item.model_copy(deep=True) for item in requirements], qa_passed=True, security_passed=True, approved_at=None, published_at=None, repository_url=None)
+    merged = _merge_requirements(review.requirements, requirements) if review.status == ReviewStatus.CHANGES_REQUESTED else [item.model_copy(update={'status': RequirementStatus.PENDING, 'evidence': None}, deep=True) for item in requirements]
+    return _updated(review, status=ReviewStatus.IN_REVIEW, requirements=merged, qa_passed=True, security_passed=True, approved_at=None, published_at=None, repository_url=None)
 
 def update_requirement(review: ProductReview, requirement_id: str, *, status: RequirementStatus, evidence: str | None = None) -> ProductReview:
     if review.status != ReviewStatus.IN_REVIEW:
