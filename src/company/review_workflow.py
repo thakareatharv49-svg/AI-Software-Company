@@ -1,7 +1,7 @@
-from enum import StrEnum
 from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import uuid4
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 class ReviewStatus(StrEnum):
     DRAFT = 'draft'
@@ -22,11 +22,27 @@ class Requirement(BaseModel):
     status: RequirementStatus = RequirementStatus.PENDING
     evidence: str | None = None
 
+    @field_validator('description')
+    @classmethod
+    def nonblank_description(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError('Requirement description cannot be blank')
+        return value
+
 class Feedback(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     message: str = Field(min_length=1, max_length=10000)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     addressed_in_revision: int | None = None
+
+    @field_validator('message')
+    @classmethod
+    def nonblank_message(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError('Feedback cannot be blank')
+        return value
 
 class ProductReview(BaseModel):
     mission_id: str
@@ -54,7 +70,7 @@ def prepare_review(review: ProductReview, requirements: list[Requirement], *, qa
         raise InvalidReviewTransition('At least one acceptance requirement is required')
     if not qa_passed or not security_passed:
         raise InvalidReviewTransition('Automated QA and security checks must pass before human review')
-    return _updated(review, status=ReviewStatus.IN_REVIEW, requirements=requirements, qa_passed=True, security_passed=True, approved_at=None, published_at=None, repository_url=None)
+    return _updated(review, status=ReviewStatus.IN_REVIEW, requirements=[item.model_copy(deep=True) for item in requirements], qa_passed=True, security_passed=True, approved_at=None, published_at=None, repository_url=None)
 
 def update_requirement(review: ProductReview, requirement_id: str, *, status: RequirementStatus, evidence: str | None = None) -> ProductReview:
     if review.status != ReviewStatus.IN_REVIEW:
