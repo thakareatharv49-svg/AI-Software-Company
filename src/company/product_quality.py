@@ -234,19 +234,19 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
 
 # Objective keywords are mapped to common implementation/test vocabulary. This is a
 # traceability guard, not a substitute for executing tests or reviewing behavior.
-_MISSION_FEATURES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
-    ("create", (r"\bcreate\w*\b", r"\badd\w*\b", r"\binsert\w*\b", r"\bcrud\b"), (r"\bcreate\w*\b", r"\badd\w*\b", r"\binsert\w*\b", r"\bcrud\b")),
-    ("edit/update", (r"\bedit\w*\b", r"\bupdate\w*\b", r"\bmodify\w*\b", r"\bcrud\b"), (r"\bedit\w*\b", r"\bupdate\w*\b", r"\bmodify\w*\b", r"\bcrud\b")),
-    ("delete/remove", (r"\bdelete\w*\b", r"\bremove\w*\b", r"\bdestroy\w*\b", r"\bcrud\b"), (r"\bdelete\w*\b", r"\bremove\w*\b", r"\bdestroy\w*\b", r"\bcrud\b")),
-    ("search", (r"\bsearch\w*\b", r"\bfind\w*\b", r"\bquery\w*\b"), (r"\bsearch\w*\b", r"\bfind\w*\b", r"\bquery\w*\b")),
-    ("filter", (r"\bfilter\w*\b",), (r"\bfilter\w*\b")),
-    ("pin/favorite", (r"\bpin\w*\b", r"\bfavorit\w*\b", r"\bstar\w*\b"), (r"\bpin\w*\b", r"\bfavorit\w*\b", r"\bstar\w*\b")),
-    ("persistence", (r"\bpersist\w*\b", r"\blocalstorage\b", r"\bstorage\b", r"\bsave\w*\b", r"\bload\w*\b", r"\bdatabase\b"), (r"\bpersist\w*\b", r"\blocalstorage\b", r"\bstorage\b", r"\bsave\w*\b", r"\bload\w*\b", r"\bdatabase\b")),
-    ("authentication", (r"\bauthentication\b", r"\bauth\b", r"\blogin\b", r"\bsign.?in\b"), (r"\bauthentication\b", r"\bauth\b", r"\blogin\b", r"\bsign.?in\b")),
-    ("export", (r"\bexport\w*\b", r"\bdownload\w*\b"), (r"\bexport\w*\b", r"\bdownload\w*\b")),
-    ("import", (r"\bimport\w*\b", r"\bupload\w*\b"), (r"\bimport\w*\b", r"\bupload\w*\b")),
-    ("budget", (r"\bbudget\w*\b",), (r"\bbudget\w*\b")),
-    ("validation", (r"\bvalidat\w*\b", r"\binvalid\w*\b", r"\breject\w*\b"), (r"\bvalidat\w*\b", r"\binvalid\w*\b", r"\breject\w*\b")),
+_MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
+    ("create", {"create", "add", "insert", "crud"}, {"create", "add", "insert", "crud"}),
+    ("edit/update", {"edit", "update", "modify", "crud"}, {"edit", "update", "modify", "crud"}),
+    ("delete/remove", {"delete", "remove", "destroy", "crud"}, {"delete", "remove", "destroy", "crud"}),
+    ("search", {"search", "find", "query"}, {"search", "find", "query"}),
+    ("filter", {"filter"}, {"filter"}),
+    ("pin/favorite", {"pin", "favorite", "favourite", "star"}, {"pin", "favorite", "favourite", "star"}),
+    ("persistence", {"persist", "persistent", "localstorage", "storage", "save", "load", "database"}, {"persist", "persistent", "localstorage", "storage", "save", "load", "database"}),
+    ("authentication", {"authentication", "auth", "login", "signin"}, {"authentication", "auth", "login", "signin"}),
+    ("export", {"export", "download"}, {"export", "download"}),
+    ("import", {"import", "upload"}, {"import", "upload"}),
+    ("budget", {"budget"}, {"budget"}),
+    ("validation", {"validation", "validate", "validates", "invalid", "reject", "validation"}, {"validation", "validate", "validates", "invalid", "reject"}),
 )
 
 
@@ -259,8 +259,12 @@ def find_uncovered_mission_features(
     The check intentionally limits itself to concrete workflow features. It does
     not claim that a keyword proves behavior; generated tests still run separately.
     """
-    test_content = "\\n".join(
-        content.casefold()
+    def words(text: str) -> set[str]:
+        return set(re.findall(r"[a-z]+", text.casefold()))
+
+    objective_words = words(objective)
+    test_content = " ".join(
+        content
         for path, content in files.items()
         if (
             path.replace("\\\\", "/").casefold().startswith("tests/")
@@ -272,12 +276,12 @@ def find_uncovered_mission_features(
     if not test_content:
         return []  # Missing-test policy reports this separately.
 
-    objective_text = objective.casefold()
+    test_words = words(test_content)
     issues: list[str] = []
-    for feature, objective_patterns, test_patterns in _MISSION_FEATURES:
-        if not any(re.search(pattern, objective_text) for pattern in objective_patterns):
+    for feature, objective_aliases, test_aliases in _MISSION_FEATURES:
+        if not objective_words.intersection(objective_aliases):
             continue
-        if not any(re.search(pattern, test_content) for pattern in test_patterns):
+        if not test_words.intersection(test_aliases):
             issues.append(
                 f"Mission explicitly requests '{feature}', but generated tests contain "
                 "no corresponding feature reference. Add a behavioral test for this workflow."
