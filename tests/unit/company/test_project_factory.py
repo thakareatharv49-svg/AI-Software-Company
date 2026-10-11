@@ -699,3 +699,53 @@ async def test_autonomous_startup_failure_is_attributed_to_execution() -> None:
     assert execution.status == "failed"
     assert "orchestrator startup unavailable" in execution.detail
     assert research.status == "planned"
+
+def test_manual_retry_resets_failed_plan_stages_and_persists_reset() -> None:
+    from src.company.mission_jobs import MissionJob, MissionJobStatus
+
+    class JobStore:
+        def __init__(self):
+            self.jobs = {}
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, job):
+            self.jobs[job.id] = job
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    mission = CompanyMission(name="Retry stale plan", objective="Build a working notes app")
+    plan = build_mission_plan(mission)
+    failed_step = plan.steps[0]
+    failed_step.status = "failed"
+    failed_step.detail = "Previous attempt failed"
+    store = JobStore()
+    store.jobs[mission.id] = MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=plan,
+        status=MissionJobStatus.BLOCKED,
+        message="Previous attempt blocked",
+        attempts=1,
+    )
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        job_store=store,
+    )
+
+    factory.retry(mission.id)
+
+    queued_project = factory.queue[0]
+    persisted_job = store.jobs[mission.id]
+    assert queued_project.plan.steps[0].status == "planned"
+    assert queued_project.plan.steps[0].detail is None
+    assert persisted_job.plan.steps[0].status == "planned"
+    assert persisted_job.plan.steps[0].detail is None
