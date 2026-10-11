@@ -21,7 +21,7 @@ class GeneratedProject:
     test_command: list[str]
 
 
-self.max_generated_project_files = 40
+MAX_GENERATED_PROJECT_FILES = 40
 
 
 class OllamaProjectGenerator:
