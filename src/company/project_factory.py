@@ -234,6 +234,61 @@ class ProjectFactory:
         self._audit(mission_id, "MISSION_REQUEUED", queued.message, queued.status.value)
         return queued
 
+    def revise(self, mission_id: str, feedback: str) -> MissionJob:
+        """Queue a new build revision while preserving the mission identity and history."""
+        if self._running:
+            raise RuntimeError("Wait for the active factory run to finish before revising a product")
+        job = self._load_job(mission_id)
+        if job is None:
+            raise KeyError(mission_id)
+        if job.status != MissionJobStatus.COMPLETED:
+            raise ValueError(f"Mission '{mission_id}' cannot be revised from '{job.status.value}'")
+        feedback = feedback.strip()
+        if not feedback:
+            raise ValueError("Revision feedback cannot be blank")
+        if len(feedback) > 10000:
+            raise ValueError("Revision feedback exceeds 10000 characters")
+
+        revised_mission = job.mission.model_copy(update={
+            "objective": (
+                f"{job.mission.objective.rstrip()}\n\n"
+                "OWNER-REQUESTED REVISION FEEDBACK:\n"
+                f"{feedback}"
+            ),
+        })
+        plan = build_mission_plan(revised_mission)
+        now = datetime.now(UTC)
+        queued_job = job.model_copy(update={
+            "mission": revised_mission,
+            "plan": plan,
+            "status": MissionJobStatus.QUEUED,
+            "message": f"Revision queued: {revised_mission.name}",
+            "attempts": 0,
+            "updated_at": now,
+        })
+        self.queue = [item for item in self.queue if item.mission.id != mission_id]
+        project = FactoryProject(mission=revised_mission, plan=plan)
+        self._save_job(queued_job)
+        self._save(project)
+        self.queue.append(project)
+        self._last_autonomous_result = None
+        self.orchestrator.stop()
+        self._audit(
+            mission_id,
+            "MISSION_REVISION_REQUESTED",
+            f"Owner requested a new product revision: {revised_mission.name}",
+            MissionJobStatus.QUEUED.value,
+            {"feedback": feedback},
+        )
+        self.orchestrator.events.publish(
+            CompanyEvent(
+                event_type="MISSION_REVISION_REQUESTED",
+                message=f"Revision queued: {revised_mission.name}",
+                project_id=f"project:{mission_id}",
+            )
+        )
+        return queued_job
+
     def _reset_for_retry(
         self,
         project: FactoryProject,
