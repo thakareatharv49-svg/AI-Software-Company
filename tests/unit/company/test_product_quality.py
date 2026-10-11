@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.company.product_quality import (
+    find_exposed_secrets,
     find_missing_product_tests,
     find_unfinished_product_content,
     find_weak_product_tests,
@@ -303,6 +304,40 @@ def test_accepts_project_with_a_test_module() -> None:
             "def test_add_item():\n"
             "    assert add_item([], 'x') == ['x']\n"
         ),
+    })
+
+    assert issues == []
+
+
+
+def test_detects_high_confidence_credentials_in_shipped_source() -> None:
+    issues = find_exposed_secrets({
+        "app.py": "GITHUB_TOKEN = 'ghp_abcdefghijklmnopqrstuvwxyz1234567890'",
+        "infra/config.py": "AWS_ACCESS_KEY_ID = 'AKIAIOSFODNN7EXAMPLE'",
+        "src/client.js": "const apiKey = 'sk-proj-abcdefghijklmnopqrstuvwxyz1234567890ABCDE';",
+    })
+
+    assert len(issues) == 3
+    assert any("GitHub personal access token" in issue for issue in issues)
+    assert any("AWS access key ID" in issue for issue in issues)
+    assert any("OpenAI-style API key" in issue for issue in issues)
+
+
+def test_detects_private_key_material_in_shipped_source() -> None:
+    issues = find_exposed_secrets({
+        "config/server.pem": "-----BEGIN PRIVATE KEY-----\\nexample\\n-----END PRIVATE KEY-----",
+    })
+
+    assert len(issues) == 1
+    assert "private key material" in issues[0]
+
+
+def test_ignores_documentation_and_test_fixtures_for_secret_scan() -> None:
+    issues = find_exposed_secrets({
+        "docs/security.md": "Example token: ghp_abcdefghijklmnopqrstuvwxyz1234567890",
+        "tests/test_security.py": "assert 'AKIAIOSFODNN7EXAMPLE' in sample",
+        ".env.example": "OPENAI_API_KEY=replace-with-environment-secret",
+        "src/settings.py": "API_KEY = os.environ.get('OPENAI_API_KEY', '')",
     })
 
     assert issues == []
