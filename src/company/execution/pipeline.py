@@ -9,7 +9,7 @@ from src.agents.models.contracts import AgentRequest, AgentResult
 from src.company.gates.quality import ProductionQualityGate
 from src.company.github_native.publish_queue import GitHubPublishQueue
 from src.company.github_native.service import GitHubNativeService
-from src.company.project_generator import GeneratedProject, OllamaProjectGenerator
+from src.company.project_generator import GeneratedProject, OllamaProjectGenerator, OllamaProjectGenerator
 from src.config.settings import settings
 from src.company.intelligence import (
     CrossProjectMemory,
@@ -650,7 +650,7 @@ class CompanyExecutionPipeline:
     ) -> Callable | None:
         def validate_repaired_files() -> bool:
             try:
-                self.project_generator._validate_repaired_output(
+                OllamaProjectGenerator._validate_repaired_output(
                     project_name,
                     objective,
                     GeneratedProject(
