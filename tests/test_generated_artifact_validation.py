@@ -10,7 +10,7 @@ from src.company.autonomous_factory_runner import FactoryAutonomousRunner
     [
         {},
         {"index.html": ""},
-        {"index.html": "  ", "app.js": "\\n"},
+        {"index.html": "  ", "app.js": "\n"},
     ],
 )
 def test_generated_artifacts_reject_empty_file_sets(files: dict[str, str]) -> None:
