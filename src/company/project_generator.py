@@ -935,6 +935,43 @@ Requirements:
             )
 
         mission = f"{name} {objective}".casefold()
+        explicit_backend_request = any(
+            marker in mission
+            for marker in (
+                "backend", "server-side", "rest api", "api endpoint",
+                "database", "authentication server",
+            )
+        ) and not any(
+            marker in mission
+            for marker in ("no backend", "without a backend", "frontend only", "front-end only")
+        )
+        if explicit_backend_request:
+            backend_markers = {"backend", "server", "api"}
+            backend_files = [
+                path for path in project.files
+                if not (
+                    path.replace("\\", "/").casefold().startswith(("tests/", "docs/"))
+                    or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].startswith("test_")
+                )
+                and (
+                    bool(backend_markers.intersection(
+                        part.casefold()
+                        for part in PurePosixPath(path.replace("\\", "/")).parts[:-1]
+                    ))
+                    or PurePosixPath(path.replace("\\", "/")).name.casefold() in {
+                        "server.py", "server.js", "server.ts",
+                        "api.py", "api.js", "api.ts",
+                        "main.py", "app.py",
+                    }
+                )
+            ]
+            if not backend_files:
+                raise RuntimeError(
+                    "Mission explicitly requests backend/server/API/database "
+                    "capabilities, but generated output has no backend implementation "
+                    "file. Add a server/API module and its tests instead of shipping "
+                    "a frontend-only substitute."
+                )
         if not OllamaProjectGenerator._is_browser_mission(mission):
             return
 
