@@ -139,7 +139,7 @@ class FactoryAutonomousRunner:
                 raise ValueError(f"Generated file {raw_path!r} has non-text content")
 
             # Normalize Windows separators too, even when the factory runs on POSIX.
-            normalized = raw_path.replace("\\\\", "/")
+            normalized = raw_path.replace("\\", "/")
             path = PurePosixPath(normalized)
             if (
                 path.is_absolute()
