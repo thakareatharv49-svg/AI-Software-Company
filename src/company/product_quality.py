@@ -99,6 +99,42 @@ def _test_function_has_assertion(
     return False
 
 
+
+
+def _is_file_presence_only_test(
+    function: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> bool:
+    """Detect tests whose assertions only prove that generated files exist."""
+    assertions = [
+        node for node in ast.walk(function) if isinstance(node, ast.Assert)
+    ]
+    if not assertions:
+        return False
+
+    for assertion in assertions:
+        calls = [
+            node for node in ast.walk(assertion.test) if isinstance(node, ast.Call)
+        ]
+        if not calls or not any(
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr in {"exists", "is_file", "is_dir"}
+            for call in calls
+        ):
+            return False
+
+    # Do not classify a test as a file-presence smoke check if it also calls
+    # product code, computes a result, or exercises an exception path.
+    for call in (node for node in ast.walk(function) if isinstance(node, ast.Call)):
+        if isinstance(call.func, ast.Name) and call.func.id == "Path":
+            continue
+        if (
+            isinstance(call.func, ast.Attribute)
+            and call.func.attr in {"exists", "is_file", "is_dir"}
+        ):
+            continue
+        return False
+    return True
+
 def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
     """Reject tautologies, no-op test functions, and smoke-only generated suites."""
     issues: list[str] = []
@@ -165,9 +201,15 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
         # while older/single-pass generation used test_generated_project.py.
         # Apply the smoke-only rule to every generated test module so changing the
         # filename cannot bypass the behavioral-test requirement.
-        generated_smoke_only = (
-            bool(test_names)
-            and test_names.issubset(_SMOKE_ONLY_TEST_NAMES)
+        generated_smoke_only = bool(test_names) and (
+            test_names.issubset(_SMOKE_ONLY_TEST_NAMES)
+            or (
+                bool(test_functions)
+                and all(
+                    _is_file_presence_only_test(function)
+                    for function in test_functions
+                )
+            )
         )
         if no_op_tests:
             issues.append(
