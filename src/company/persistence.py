@@ -8,7 +8,12 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from src.company.audit import MissionAuditEntry
 from src.company.mission_controller.models import MissionPlan
-from src.company.mission_jobs import MissionJob, MissionJobStatus, recover_running_job
+from src.company.mission_jobs import (
+    MissionJob,
+    MissionJobStatus,
+    recover_running_job,
+    recover_running_plan,
+)
 from src.company.models.contracts import CompanyMission
 from src.company.project_outputs import ProjectOutputManifest
 from src.config.settings import settings
@@ -140,6 +145,7 @@ class MissionJobStore:
                 )
                 job = recover_running_job(job)
                 row.status = job.status.value
+                row.plan = job.plan.model_dump(mode="json")
                 row.message = job.message
                 row.updated_at = job.updated_at
                 recovered.append(job)
@@ -334,7 +340,11 @@ class ProjectStore:
             return [
                 {
                     "mission": CompanyMission.model_validate(row.mission),
-                    "plan": MissionPlan.model_validate(row.plan),
+                    "plan": (
+                        recover_running_plan(MissionPlan.model_validate(row.plan))
+                        if row.status == "running"
+                        else MissionPlan.model_validate(row.plan)
+                    ),
                     "status": "queued" if row.status == "running" else row.status,
                     "stages_executed": row.stages_executed,
                     "attempts": row.attempts,

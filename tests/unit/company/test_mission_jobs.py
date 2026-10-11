@@ -83,3 +83,41 @@ def test_mission_job_keeps_workspace_ownership_through_transitions() -> None:
     running = transition_job(owned, MissionJobStatus.RUNNING, "started")
 
     assert running.workspace_id == "customer-workspace-123"
+
+
+
+def test_running_stage_recovers_to_planned_and_completed_stages_are_preserved() -> None:
+    from src.company.mission_jobs import recover_running_job
+
+    job = make_job(MissionJobStatus.RUNNING)
+    job.plan.steps[0].status = "completed"
+    job.plan.steps[0].detail = "finished before restart"
+    job.plan.steps[1].status = "running"
+    job.plan.steps[1].detail = "interrupted during execution"
+
+    recovered = recover_running_job(job)
+
+    assert recovered.status == MissionJobStatus.QUEUED
+    assert recovered.plan.steps[0].status == "completed"
+    assert recovered.plan.steps[0].detail == "finished before restart"
+    assert recovered.plan.steps[1].status == "planned"
+    assert recovered.plan.steps[1].detail is None
+    assert "interrupted stage" in recovered.message.lower()
+
+
+def test_recover_running_plan_only_resets_in_flight_steps() -> None:
+    from src.company.mission_jobs import recover_running_plan
+
+    plan = build_mission_plan(CompanyMission(name="Resume", objective="Recover safely"))
+    plan.steps[0].status = "completed"
+    plan.steps[1].status = "failed"
+    plan.steps[1].detail = "prior failure"
+    plan.steps[2].status = "running"
+
+    recovered = recover_running_plan(plan)
+
+    assert recovered.steps[0].status == "completed"
+    assert recovered.steps[1].status == "failed"
+    assert recovered.steps[1].detail == "prior failure"
+    assert recovered.steps[2].status == "planned"
+    assert recovered.steps[2].detail is None
