@@ -25,6 +25,7 @@ def _accepted_result(
     *,
     objective: str = "Build a Notes App browser application",
     browser_preview: bool = True,
+    project_name: str = "Notes App",
 ):
     names = stage_names or AutonomousCompanyAcceptance.REQUIRED_STAGES
     return SimpleNamespace(
@@ -40,7 +41,7 @@ def _accepted_result(
             for name in names
         ],
         pipeline=SimpleNamespace(
-            project=SimpleNamespace(id="project-1", name="Notes App"),
+            project=SimpleNamespace(id="project-1", name=project_name),
             qa_result=SimpleNamespace(status=SimpleNamespace(value="passed")),
             review_result=SimpleNamespace(status=SimpleNamespace(value="approved")),
             browser_preview=browser_preview,
@@ -96,3 +97,18 @@ def test_acceptance_does_not_require_preview_for_cli_missions() -> None:
     assert "browser_preview_available" not in {
         check.name for check in report.checks
     }
+
+
+
+def test_acceptance_uses_project_name_when_objective_is_vague() -> None:
+    result = _accepted_result(
+        objective="Build this product",
+        browser_preview=False,
+        project_name="Notes App",
+    )
+
+    report = AutonomousCompanyAcceptance().evaluate(result)
+
+    assert not report.passed
+    failed = {check.name for check in report.checks if not check.passed}
+    assert "browser_preview_available" in failed
