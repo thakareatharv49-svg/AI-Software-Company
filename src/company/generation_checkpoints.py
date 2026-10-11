@@ -95,7 +95,10 @@ class GenerationCheckpointStore:
                 if normalized_path not in compatible:
                     continue
                 dependencies = current_contract[2]
-                if any(dependency not in compatible for dependency in dependencies):
+                if any(
+                    dependency in current_by_path and dependency not in compatible
+                    for dependency in dependencies
+                ):
                     compatible.remove(normalized_path)
                     changed = True
 
