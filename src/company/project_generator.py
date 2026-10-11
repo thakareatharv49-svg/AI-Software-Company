@@ -804,6 +804,9 @@ Requirements:
     ) -> GeneratedProject:
         """Apply the shared output checks to deterministic products as well."""
         OllamaProjectGenerator._validate_mission_output(name, objective, project)
+        # Deterministic fallbacks bypass the model-generation path, so enforce
+        # the same minimum automated-test requirement before returning them.
+        OllamaProjectGenerator._validate_required_product_tests(project.files)
         return project
 
     @staticmethod
