@@ -94,6 +94,12 @@ def _workspace_files(mission_id: str) -> tuple[Path, dict[str, str]]:
         relative = target.relative_to(root)
         if any(part in ignored for part in relative.parts):
             continue
+        if (
+            target.name in {'.env', '.env.local', '.env.production', 'id_rsa', 'id_ed25519'}
+            or (target.name.startswith('.env.') and target.name not in {'.env.example', '.env.sample'})
+            or target.suffix.casefold() in {'.pem', '.key', '.p12', '.pfx'}
+        ):
+            continue
         try:
             resolved = target.resolve()
             resolved.relative_to(root)
