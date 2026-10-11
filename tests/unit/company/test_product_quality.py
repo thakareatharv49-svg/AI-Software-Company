@@ -258,3 +258,26 @@ def test_accepts_file_smoke_check_alongside_behavior_test() -> None:
     })
 
     assert issues == []
+
+
+
+def test_rejects_project_with_no_automated_test_files() -> None:
+    issues = find_weak_product_tests({
+        "index.html": "<main>Inventory</main>",
+        "app.js": "function addItem(items, item) { return [...items, item]; }",
+    })
+
+    assert len(issues) == 1
+    assert "no automated test files" in issues[0]
+    assert "behavioral tests" in issues[0]
+
+
+def test_rejects_project_with_only_documentation_not_tests() -> None:
+    issues = find_weak_product_tests({
+        "README.md": "# Product",
+        "docs/QA.md": "Tests should cover create, update, and delete.",
+        "src/app.py": "def add_item(items, item):\n    return [*items, item]\n",
+    })
+
+    assert len(issues) == 1
+    assert "no automated test files" in issues[0]
