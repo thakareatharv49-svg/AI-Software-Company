@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import ast
+import re
 
 # These phrases are strong signals that the model returned an unfinished product.
 # Deliberately avoid generic words such as "placeholder" or "todo", which can be
@@ -246,3 +247,30 @@ def find_missing_product_tests(files: Mapping[str, str]) -> list[str]:
         "Generated project contains no automated test files. Add mission-specific "
         "behavioral tests and at least one edge case before delivery."
     ]
+
+
+
+_SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("GitHub personal access token", re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{30,}\b")),
+    ("AWS access key ID", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("OpenAI-style API key", re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{32,}\b")),
+    ("private key material", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
+)
+
+
+def find_exposed_secrets(files: Mapping[str, str]) -> list[str]:
+    """Detect high-confidence credential material in shipped generated source."""
+    issues: list[str] = []
+    for path, content in files.items():
+        normalized = path.replace("\\", "/").casefold()
+        if normalized.startswith(("tests/", "docs/")):
+            continue
+        if normalized.endswith((".md", ".txt", ".rst", ".lock")):
+            continue
+        for label, pattern in _SECRET_PATTERNS:
+            if pattern.search(content):
+                issues.append(
+                    f"Generated source '{path}' appears to contain {label}. "
+                    "Remove the credential and load secrets from environment/configuration."
+                )
+    return issues
