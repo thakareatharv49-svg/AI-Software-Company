@@ -1,6 +1,29 @@
+import asyncio
+
+import pytest
+from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 
+from src.config.settings import settings
 from src.main import app
+from src.security.authorization import require_company_owner
+
+
+def _request_with_client(host: str) -> Request:
+    return Request(
+        {
+            "type": "http",
+            "http_version": "1.1",
+            "method": "GET",
+            "scheme": "http",
+            "path": "/app",
+            "raw_path": b"/app",
+            "query_string": b"",
+            "headers": [],
+            "client": (host, 50000),
+            "server": ("127.0.0.1", 8010),
+        }
+    )
 
 
 def test_private_company_routes_reject_anonymous_requests() -> None:
@@ -36,6 +59,35 @@ def test_private_company_mutations_reject_anonymous_requests() -> None:
         assert response.status_code == 401, (path, response.status_code, response.text)
 
 
+def test_local_access_allows_loopback_without_an_owner_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "local_access_enabled", True)
+    monkeypatch.setattr(settings, "environment", "development")
+
+    result = asyncio.run(require_company_owner(_request_with_client("127.0.0.1"), db=None))
+
+    assert result is None
+
+
+def test_local_access_does_not_allow_remote_clients(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "local_access_enabled", True)
+    monkeypatch.setattr(settings, "environment", "development")
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(require_company_owner(_request_with_client("192.0.2.10"), db=None))
+
+    assert error.value.status_code == 401
+
+
+def test_local_access_does_not_allow_production_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "local_access_enabled", True)
+    monkeypatch.setattr(settings, "environment", "production")
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(require_company_owner(_request_with_client("127.0.0.1"), db=None))
+
+    assert error.value.status_code == 401
+
+
 def test_authentication_endpoints_remain_reachable_without_a_session() -> None:
     client = TestClient(app)
     response = client.get("/auth/me")
@@ -55,4 +107,3 @@ def test_owner_console_shell_loads_before_authentication() -> None:
     assert "Owner Console" in response.text
     assert "/auth/google/start" in response.text
     assert "/auth/github/start" in response.text
-
