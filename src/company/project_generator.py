@@ -924,7 +924,9 @@ Requirements:
 
         quality_issues = find_unfinished_product_content(project.files)
         quality_issues.extend(find_weak_product_tests(project.files))
-        # Feature traceability is diagnostic-only because lexical matches can\n        # reject valid suites that use domain-specific names.\n        quality_issues.extend(find_exposed_secrets(project.files))
+        # Feature traceability is diagnostic-only because lexical matches can
+        # reject valid suites that use domain-specific names.
+        quality_issues.extend(find_exposed_secrets(project.files))
         if quality_issues:
             raise RuntimeError(
                 "Generated product failed cross-product quality checks: "
