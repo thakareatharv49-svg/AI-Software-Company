@@ -742,6 +742,7 @@ Requirements:
     @staticmethod
     def _validate_local_browser_assets(files: dict[str, str]) -> None:
         """Validate local dependencies referenced by HTML, CSS, and JS modules."""
+        import posixpath
         import re
 
         def local_reference(reference: str, source_path: str) -> str | None:
@@ -761,13 +762,13 @@ Requirements:
                 candidate = PurePosixPath(reference.lstrip("/"))
             else:
                 candidate = PurePosixPath(source_path).parent / reference
-            normalized = PurePosixPath(candidate.as_posix())
-            if normalized.is_absolute() or ".." in normalized.parts:
+            normalized = posixpath.normpath(candidate.as_posix())
+            if normalized == ".." or normalized.startswith("../"):
                 raise RuntimeError(
                     f"Generated browser product references unsafe local asset "
                     f"'{reference}' from '{source_path}'."
                 )
-            return normalized.as_posix()
+            return normalized
 
         references_by_file: dict[str, list[str]] = {}
         for path, content in files.items():
