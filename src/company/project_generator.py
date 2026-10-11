@@ -455,6 +455,23 @@ Rules:
                 return str(exc)
             return None
 
+        # Some local models ignore the planning schema and return a complete
+        # {"files": {"path": "contents"}} project instead of a manifest array.
+        # Treat that as a generated project, not as an empty plan. The caller still
+        # runs the same preview/product validation and bounded repair flow, so this
+        # compatibility path cannot turn invalid output into a successful mission.
+        candidate_files = manifest.get("files") if isinstance(manifest, dict) else None
+        if (
+            isinstance(candidate_files, dict)
+            and candidate_files
+            and all(
+                isinstance(path, str)
+                and isinstance(contents, str)
+                for path, contents in candidate_files.items()
+            )
+        ):
+            return self._parse(json.dumps(manifest))
+
         raw_manifest = manifest.get("files") if isinstance(manifest, dict) else None
         manifest_issue = manifest_validation_issue(manifest)
         if manifest_issue:
