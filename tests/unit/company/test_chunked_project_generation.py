@@ -390,7 +390,7 @@ async def test_large_mission_replans_manifest_that_would_exceed_limit(
         json.dumps({"content": "<!doctype html><html><head><title>Planner</title><link rel=\"stylesheet\" href=\"style.css\"></head><body><script src=\"app.js\"></script></body></html>"}),
         json.dumps({"content": "body { font-family: sans-serif; }"}),
         json.dumps({"content": "function addTask(title) { return { title, completed: false }; }"}),
-        json.dumps({"content": "def test_add_task_preserves_title():\n    task = {\\\"title\\\": \\\"Plan\\\", \\\"completed\\\": False}\n    assert task[\\\"title\\\"] == \\\"Plan\\\"\n"}),
+        json.dumps({"content": "def test_add_task_preserves_title():\n    task = {\'title\': \'Plan\', \'completed\': False}\n    assert task[\'title\'] == \'Plan\'\n"}),
     ]
     prompts = []
 
