@@ -117,7 +117,7 @@ async def test_large_manifest_enforces_file_limit_and_recovers(tmp_path) -> None
     )
 
     assert len(generated.files) == 4
-    assert "configured limit of 4 files" in prompts[1]
+    assert "exceeded the safe 4-file limit" in prompts[1]
 
 
 @pytest.mark.asyncio
