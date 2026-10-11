@@ -81,14 +81,20 @@ def _has_literal_only_assertion(content: str) -> bool:
     return False
 
 
-def _test_function_has_assertion(function: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
-    """Return whether a test function makes an explicit, observable assertion."""
+def _test_function_has_assertion(
+    function: ast.FunctionDef | ast.AsyncFunctionDef,
+    assertion_helpers: set[str] | None = None,
+) -> bool:
+    """Return whether a test function makes or delegates an explicit assertion."""
+    assertion_helpers = assertion_helpers or set()
     for node in ast.walk(function):
         if isinstance(node, ast.Assert):
             return True
         if not isinstance(node, ast.Call):
             continue
         called = node.func
+        if isinstance(called, ast.Name) and called.id in assertion_helpers:
+            return True
         # Support pytest exception assertions and unittest-style assertion methods.
         if isinstance(called, ast.Attribute):
             if called.attr == "raises" and isinstance(called.value, ast.Name):
@@ -143,10 +149,20 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
             if tree is not None
             else []
         )
+        # Generated tests often keep reusable domain checks in helpers such as
+        # assert_valid_note(note). Treat a call to a helper that itself asserts
+        # as a real check, while still rejecting helpers that merely return values.
+        assertion_helpers = {
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name.startswith("assert_")
+            and _test_function_has_assertion(node)
+        } if tree is not None else set()
         no_op_tests = [
             function.name
             for function in test_functions
-            if not _test_function_has_assertion(function)
+            if not _test_function_has_assertion(function, assertion_helpers)
         ]
         generated_smoke_only = (
             name == "test_generated_project.py"
