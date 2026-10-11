@@ -13,7 +13,8 @@ from src.company.project_generator import OllamaProjectGenerator
 def test_notes_fallback_contains_complete_offline_product() -> None:
     files = notes_fallback_files()
 
-    assert set(files) == {"index.html", "style.css", "app.js"}
+    assert {"index.html", "style.css", "app.js", "tests/test_project.py"} <= set(files)
+    assert "def test_notes_app_implements_create_edit_delete_pin_and_search" in files["tests/test_project.py"]
     assert 'id="notes-grid"' in files["index.html"]
     assert 'id="note-dialog"' in files["index.html"]
     assert 'href="style.css"' in files["index.html"]
@@ -44,7 +45,8 @@ async def test_notes_app_mission_uses_deterministic_product_without_model(
         "Create, edit, delete, search and pin notes using browser local storage.",
     )
 
-    assert set(project.files) == {"index.html", "style.css", "app.js"}
+    assert {"index.html", "style.css", "app.js", "tests/test_project.py"} <= set(project.files)
+    assert "def test_notes_app_persists_notes_and_starts_without_fake_records" in project.files["tests/test_project.py"]
     assert "Paper — Notes for your mind" in project.files["index.html"]
     assert "localStorage" in project.files["app.js"]
 
