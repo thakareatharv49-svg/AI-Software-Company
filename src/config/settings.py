@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,10 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
     ollama_timeout: float = 600.0
+
+    # Hard cap protects local model context, disk usage, and generation time.
+    # Increase per deployment as model and hardware capacity allow.
+    factory_max_generated_project_files: int = Field(default=40, ge=4, le=200)
 
     github_token: str = ""
     github_api_base_url: str = "https://api.github.com"

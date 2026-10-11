@@ -27,8 +27,20 @@ MAX_GENERATED_PROJECT_FILES = 40
 class OllamaProjectGenerator:
     """Generate complete projects using bounded, resumable file-by-file generation."""
 
-    def __init__(self, checkpoint_dir: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        checkpoint_dir: str | Path | None = None,
+        max_generated_project_files: int | None = None,
+    ) -> None:
         self.checkpoint_dir = Path(checkpoint_dir or ".factory-checkpoints")
+        configured_limit = (
+            settings.factory_max_generated_project_files
+            if max_generated_project_files is None
+            else max_generated_project_files
+        )
+        if not 4 <= configured_limit <= 200:
+            raise ValueError("max_generated_project_files must be between 4 and 200")
+        self.max_generated_project_files = configured_limit
 
     def _checkpoint(self, name: str, objective: str) -> GenerationCheckpointStore:
         return GenerationCheckpointStore(
@@ -278,7 +290,7 @@ Rules:
 - Prefer a directly runnable browser app unless the mission explicitly requests another type.
 - For browser apps include index.html, style.css, app.js, and tests/test_project.py.
 - Include every local file referenced by another file.
-- Use no more than {MAX_GENERATED_PROJECT_FILES} files for this generation run. Use a modular structure appropriate to the product; do not collapse unrelated subsystems into giant files just to minimize file count. Avoid unnecessary build tools, CDNs, remote APIs, and external dependencies unless explicitly required.
+- Use no more than {self.max_generated_project_files} files for this generation run. Use a modular structure appropriate to the product; do not collapse unrelated subsystems into giant files just to minimize file count. Avoid unnecessary build tools, CDNs, remote APIs, and external dependencies unless explicitly required.
 - Every file must have a clear purpose and be necessary for the requested product.
 - Add optional depends_on arrays listing the exact planned paths that must exist before this file is implemented. Use dependencies to express real module/API contracts, not merely visual ordering. Keep dependencies acyclic and refer only to paths in the manifest.
 - Paths must be safe relative paths; never use absolute paths or parent-directory segments.
@@ -464,15 +476,15 @@ Rules:
             return required
 
         if (
-            len(raw_manifest) > MAX_GENERATED_PROJECT_FILES
+            len(raw_manifest) > self.max_generated_project_files
             or len(raw_manifest) + required_file_count(raw_manifest)
-            > MAX_GENERATED_PROJECT_FILES
+            > self.max_generated_project_files
         ):
             compact_payload = dict(manifest_payload)
             compact_payload["prompt"] = (
                 manifest_prompt
                 + "\n\nCorrective retry: the previous plan exceeded the safe "
-                f"{MAX_GENERATED_PROJECT_FILES}-file limit once mandatory browser assets and tests are included. Return a "
+                f"{self.max_generated_project_files}-file limit once mandatory browser assets and tests are included. Return a "
                 "compact revised plan with no more than 32 planned files, include "
                 "index.html, style.css, app.js, and tests/test_project.py for browser "
                 "apps, and combine related implementation into fewer files. Preserve "
@@ -488,10 +500,10 @@ Rules:
                 # error below reports the failure rather than masking it.
                 pass
 
-        if len(raw_manifest) > MAX_GENERATED_PROJECT_FILES:
+        if len(raw_manifest) > self.max_generated_project_files:
             raise RuntimeError(
                 f"Project file plan contains {len(raw_manifest)} files after one compact-plan retry; "
-                f"the safe limit is {MAX_GENERATED_PROJECT_FILES}. "
+                f"the safe limit is {self.max_generated_project_files}. "
                 "Reduce the mission scope or split it into separate missions."
             )
 
@@ -552,9 +564,9 @@ Rules:
                 ("tests/test_project.py", "Automated tests for mission-specific behavior")
             )
 
-        if len(manifest_items) > MAX_GENERATED_PROJECT_FILES:
+        if len(manifest_items) > self.max_generated_project_files:
             raise RuntimeError(
-                f"Project file plan exceeds the safe {MAX_GENERATED_PROJECT_FILES}-file limit after required "
+                f"Project file plan exceeds the safe {self.max_generated_project_files}-file limit after required "
                 "browser entry point and test files were added "
                 f"({len(manifest_items)} files). Reduce the mission scope or split "
                 "it into smaller missions."

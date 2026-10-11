@@ -59,6 +59,8 @@ Open http://127.0.0.1:8000/app. To avoid the separate owner sign-in for your loc
 
 The default model is `llama3.2`. Start Ollama and make sure the model is available:
 
+Project generation is bounded by `FACTORY_MAX_GENERATED_PROJECT_FILES` (default `40`, allowed range `4`–`200`). Raise it gradually for larger products after checking model quality, RAM, and runtime; a larger file budget increases capacity but does not guarantee that a model can correctly implement every file.
+
     ollama serve
     ollama pull llama3.2
 
