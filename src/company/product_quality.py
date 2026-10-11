@@ -232,6 +232,59 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
 
 
 
+# Objective keywords are mapped to common implementation/test vocabulary. This is a
+# traceability guard, not a substitute for executing tests or reviewing behavior.
+_MISSION_FEATURES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
+    ("create", (r"\\bcreate\\w*\\b", r"\\badd\\w*\\b", r"\\binsert\\w*\\b", r"\\bcrud\\b"), (r"\\bcreate\\w*\\b", r"\\badd\\w*\\b", r"\\binsert\\w*\\b", r"\\bcrud\\b")),
+    ("edit/update", (r"\\bedit\\w*\\b", r"\\bupdate\\w*\\b", r"\\bmodify\\w*\\b", r"\\bcrud\\b"), (r"\\bedit\\w*\\b", r"\\bupdate\\w*\\b", r"\\bmodify\\w*\\b", r"\\bcrud\\b")),
+    ("delete/remove", (r"\\bdelete\\w*\\b", r"\\bremove\\w*\\b", r"\\bdestroy\\w*\\b", r"\\bcrud\\b"), (r"\\bdelete\\w*\\b", r"\\bremove\\w*\\b", r"\\bdestroy\\w*\\b", r"\\bcrud\\b")),
+    ("search", (r"\\bsearch\\w*\\b", r"\\bfind\\w*\\b", r"\\bquery\\w*\\b"), (r"\\bsearch\\w*\\b", r"\\bfind\\w*\\b", r"\\bquery\\w*\\b")),
+    ("filter", (r"\\bfilter\\w*\\b",), (r"\\bfilter\\w*\\b")),
+    ("pin/favorite", (r"\\bpin\\w*\\b", r"\\bfavorit\\w*\\b", r"\\bstar\\w*\\b"), (r"\\bpin\\w*\\b", r"\\bfavorit\\w*\\b", r"\\bstar\\w*\\b")),
+    ("persistence", (r"\\bpersist\\w*\\b", r"\\blocalstorage\\b", r"\\bstorage\\b", r"\\bsave\\w*\\b", r"\\bload\\w*\\b", r"\\bdatabase\\b"), (r"\\bpersist\\w*\\b", r"\\blocalstorage\\b", r"\\bstorage\\b", r"\\bsave\\w*\\b", r"\\bload\\w*\\b", r"\\bdatabase\\b")),
+    ("authentication", (r"\\bauthentication\\b", r"\\bauth\\b", r"\\blogin\\b", r"\\bsign.?in\\b"), (r"\\bauthentication\\b", r"\\bauth\\b", r"\\blogin\\b", r"\\bsign.?in\\b")),
+    ("export", (r"\\bexport\\w*\\b", r"\\bdownload\\w*\\b"), (r"\\bexport\\w*\\b", r"\\bdownload\\w*\\b")),
+    ("import", (r"\\bimport\\w*\\b", r"\\bupload\\w*\\b"), (r"\\bimport\\w*\\b", r"\\bupload\\w*\\b")),
+    ("budget", (r"\\bbudget\\w*\\b",), (r"\\bbudget\\w*\\b")),
+    ("validation", (r"\\bvalidat\\w*\\b", r"\\binvalid\\w*\\b", r"\\breject\\w*\\b"), (r"\\bvalidat\\w*\\b", r"\\binvalid\\w*\\b", r"\\breject\\w*\\b")),
+)
+
+
+def find_uncovered_mission_features(
+    objective: str,
+    files: Mapping[str, str],
+) -> list[str]:
+    """Find explicit mission features with no lexical trace in generated tests.
+
+    The check intentionally limits itself to concrete workflow features. It does
+    not claim that a keyword proves behavior; generated tests still run separately.
+    """
+    test_content = "\\n".join(
+        content.casefold()
+        for path, content in files.items()
+        if (
+            path.replace("\\\\", "/").casefold().startswith("tests/")
+            or path.casefold().rsplit("/", 1)[-1].startswith("test_")
+            or path.casefold().endswith("_test.py")
+            or path.casefold().endswith((".test.js", ".spec.js", ".test.ts", ".spec.ts"))
+        )
+    )
+    if not test_content:
+        return []  # Missing-test policy reports this separately.
+
+    objective_text = objective.casefold()
+    issues: list[str] = []
+    for feature, objective_patterns, test_patterns in _MISSION_FEATURES:
+        if not any(re.search(pattern, objective_text) for pattern in objective_patterns):
+            continue
+        if not any(re.search(pattern, test_content) for pattern in test_patterns):
+            issues.append(
+                f"Mission explicitly requests '{feature}', but generated tests contain "
+                "no corresponding feature reference. Add a behavioral test for this workflow."
+            )
+    return issues
+
+
 def find_missing_product_tests(files: Mapping[str, str]) -> list[str]:
     """Require at least one conventional automated test module for broad projects."""
     test_modules = [
