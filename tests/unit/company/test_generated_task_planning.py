@@ -5,7 +5,7 @@ import pytest
 from src.company.generated_task_planning import build_generated_task_plan
 
 
-def test_generated_files_become_ordered_subsystem_work_packages() -> None:
+def test_generated_files_become_parallel_ready_subsystem_work_packages() -> None:
     tasks = build_generated_task_plan(
         "Inventory",
         "Build an inventory application with item management.",
@@ -24,9 +24,11 @@ def test_generated_files_become_ordered_subsystem_work_packages() -> None:
         "Integrate Inventory: src/models",
         "Validate Inventory quality and tests",
     ]
+    # Implementation packages are independent; schedulers may execute them concurrently.
     assert tasks[0].dependencies == ()
-    assert tasks[1].dependencies == (0,)
-    assert tasks[2].dependencies == (1,)
+    assert tasks[1].dependencies == ()
+    assert tasks[2].dependencies == ()
+    # QA cannot start until every implementation package is complete.
     assert tasks[3].dependencies == (0, 1, 2)
     assert "src/services/inventory.py" in tasks[1].description
     assert "tests/test_inventory.py" in tasks[3].description
@@ -41,6 +43,7 @@ def test_task_planning_groups_root_browser_assets_as_one_shell() -> None:
 
     assert len(tasks) == 1
     assert "application shell" in tasks[0].title
+    assert tasks[0].dependencies == ()
 
 
 def test_task_planning_rejects_empty_or_unsafe_file_maps() -> None:
