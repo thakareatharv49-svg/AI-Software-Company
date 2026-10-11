@@ -511,9 +511,9 @@ async def test_test_file_prompt_prioritizes_implementation_over_large_stylesheet
         json.dumps({"content": "function addNote(title) { return { title }; }"}),
         json.dumps({
             "content": (
-                "def test_note_title_is_preserved():\\n"
-                "    note = {'title': 'Plan'}\\n"
-                "    assert note['title'] == 'Plan'\\n"
+                "def test_note_title_is_preserved():\n"
+                "    note = {'title': 'Plan'}\n"
+                "    assert note['title'] == 'Plan'\n"
             )
         }),
     ]
