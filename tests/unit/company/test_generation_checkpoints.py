@@ -72,8 +72,8 @@ async def test_large_mission_resumes_completed_files_after_interruption(
         )
 
     resumed = await generator._generate_large_mission(
-        "Notes App",
-        "Create, edit, delete, pin and search notes with responsive local storage.",
+        "Notes CLI",
+        "Create, edit, delete, pin and search notes in a Python command-line utility.",
     )
 
     assert resumed.files["index.html"] == "<!doctype html><title>Notes</title>"
