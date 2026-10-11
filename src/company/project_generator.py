@@ -375,6 +375,18 @@ Rules:
                         )
                     manifest_payload["prompt"] += recovery_prompt
 
+        mission_request_text = f"{name} {objective}".casefold()
+        explicit_backend_request = any(
+            marker in mission_request_text
+            for marker in (
+                "backend", "server-side", "rest api", "api endpoint",
+                "database", "authentication server",
+            )
+        ) and not any(
+            marker in mission_request_text
+            for marker in ("no backend", "without a backend", "frontend only", "front-end only")
+        )
+
         def manifest_validation_issue(candidate: object) -> str | None:
             if not isinstance(candidate, dict):
                 return "Ollama returned a project file plan that is not a JSON object"
@@ -431,6 +443,32 @@ Rules:
             planned_paths = {
                 path.casefold(): path for path in normalized_paths
             }
+            if explicit_backend_request:
+                backend_markers = {"backend", "server", "api"}
+                backend_files = [
+                    path for path in normalized_paths
+                    if not (
+                        path.casefold().startswith(("tests/", "docs/"))
+                        or path.casefold().rsplit("/", 1)[-1].startswith("test_")
+                    )
+                    and (
+                        bool(backend_markers.intersection(
+                            part.casefold() for part in PurePosixPath(path).parts[:-1]
+                        ))
+                        or PurePosixPath(path).name.casefold() in {
+                            "server.py", "server.js", "server.ts",
+                            "api.py", "api.js", "api.ts",
+                            "main.py", "app.py",
+                        }
+                    )
+                ]
+                if not backend_files:
+                    return (
+                        "Mission explicitly requests backend/server/API/database "
+                        "capabilities, but the file plan has no backend implementation "
+                        "file. Add a server/API module (for example backend/main.py, "
+                        "server.js, or api.py) and include its tests."
+                    )
             for normalized, dependencies in normalized_dependencies.items():
                 missing = [
                     dependency for dependency in dependencies
