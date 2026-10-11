@@ -822,6 +822,17 @@ Requirements:
             )
 
     @staticmethod
+    def _validate_repaired_output(
+        name: str,
+        objective: str,
+        project: GeneratedProject,
+    ) -> None:
+        """Reapply every applicable delivery gate after a QA repair."""
+        OllamaProjectGenerator._validate_mission_output(name, objective, project)
+        if OllamaProjectGenerator._is_large_mission(name, objective):
+            OllamaProjectGenerator._validate_required_product_tests(project.files)
+
+    @staticmethod
     def _validate_mission_output(
         name: str,
         objective: str,

@@ -126,3 +126,36 @@ def test_deterministic_fallback_accepts_behavior_test_module() -> None:
         "Build an inventory app",
         project,
     ) is project
+
+
+def test_repaired_large_mission_cannot_remove_its_test_module() -> None:
+    project = GeneratedProject(
+        files={
+            "index.html": "<!doctype html><html><body><h1>Inventory</h1></body></html>",
+            "app.js": "function addItem(items, item) { return [...items, item]; }",
+        },
+        test_command=["python", "-m", "pytest", "-q"],
+    )
+
+    with pytest.raises(RuntimeError, match="no automated test files"):
+        OllamaProjectGenerator._validate_repaired_output(
+            "Inventory Management Platform",
+            "Build a responsive inventory web application with create, edit, delete, search, reporting, and user roles",
+            project,
+        )
+
+
+def test_repaired_small_mission_keeps_existing_validation_scope() -> None:
+    project = GeneratedProject(
+        files={
+            "index.html": "<!doctype html><html><body><h1>Simple landing page</h1></body></html>",
+            "app.js": "console.log('ready');",
+        },
+        test_command=["python", "-m", "pytest", "-q"],
+    )
+
+    OllamaProjectGenerator._validate_repaired_output(
+        "Simple landing page",
+        "Build a simple landing page",
+        project,
+    )

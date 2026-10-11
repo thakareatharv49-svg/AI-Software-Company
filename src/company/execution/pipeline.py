@@ -650,7 +650,7 @@ class CompanyExecutionPipeline:
     ) -> Callable | None:
         def validate_repaired_files() -> bool:
             try:
-                self.project_generator._validate_mission_output(
+                OllamaProjectGenerator._validate_repaired_output(
                     project_name,
                     objective,
                     GeneratedProject(
@@ -676,7 +676,7 @@ class CompanyExecutionPipeline:
                 # Validate repaired source before allowing another QA attempt to
                 # pass with broken assets, invalid syntax, or weakened tests.
                 try:
-                    self.project_generator._validate_mission_output(
+                    OllamaProjectGenerator._validate_repaired_output(
                         project_name, objective, repaired
                     )
                 except RuntimeError as exc:
