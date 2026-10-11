@@ -844,7 +844,14 @@ Requirements:
         with tempfile.TemporaryDirectory(prefix="factory-js-check-") as temp_dir:
             root = Path(temp_dir)
             for index, (path, content) in enumerate(scripts.items()):
-                check_path = root / f"generated-{index}.js"
+                source_path = path.split(":inline-script-", 1)[0]
+                suffix = PurePosixPath(source_path).suffix.lower()
+                if suffix not in {".mjs", ".cjs"}:
+                    suffix = ".js"
+                # Node selects module parsing from the extension. Preserve it so
+                # valid ESM syntax (for example top-level await in .mjs) is not
+                # incorrectly rejected as classic-script syntax.
+                check_path = root / f"generated-{index}{suffix}"
                 check_path.write_text(content, encoding="utf-8")
                 result = subprocess.run(
                     [node, "--check", str(check_path)],
