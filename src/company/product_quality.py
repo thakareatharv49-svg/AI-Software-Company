@@ -251,9 +251,9 @@ def find_missing_product_tests(files: Mapping[str, str]) -> list[str]:
 
 
 _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("GitHub personal access token", re.compile(r"\\bgh[pousr]_[A-Za-z0-9_]{30,}\\b")),
-    ("AWS access key ID", re.compile(r"\\bAKIA[0-9A-Z]{16}\\b")),
-    ("OpenAI-style API key", re.compile(r"\\bsk-(?:proj-)?[A-Za-z0-9_-]{32,}\\b")),
+    ("GitHub personal access token", re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{30,}\b")),
+    ("AWS access key ID", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("OpenAI-style API key", re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{32,}\b")),
     ("private key material", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
 )
 
@@ -262,7 +262,7 @@ def find_exposed_secrets(files: Mapping[str, str]) -> list[str]:
     """Detect high-confidence credential material in shipped generated source."""
     issues: list[str] = []
     for path, content in files.items():
-        normalized = path.replace("\\\\", "/").casefold()
+        normalized = path.replace("\\", "/").casefold()
         if normalized.startswith(("tests/", "docs/")):
             continue
         if normalized.endswith((".md", ".txt", ".rst", ".lock")):
