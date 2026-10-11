@@ -150,7 +150,10 @@ class CompanyControlCenter:
         self, submission: MissionSubmission, *, workspace_id: str | None = "00000000-0000-4000-8000-000000000001"
     ) -> MissionRecord:
         with self._lock:
-            if self._orchestrator.state.status.value == "running":
+            if (
+                self._orchestrator.state.status.value == "running"
+                and not self._continuous_mode
+            ):
                 raise RuntimeError("Company is already running a mission")
             mission = CompanyMission(
                 name=submission.name.strip(),
