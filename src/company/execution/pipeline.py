@@ -809,22 +809,14 @@ class CompanyExecutionPipeline:
 
     async def _execute_tasks(self, executor: Callable | None) -> None:
         while True:
-            decision = await self.manager.tick(executor=executor)
-
+            decision = await self.manager.tick_parallel(
+                executor=executor,
+                max_concurrency=settings.factory_max_parallel_tasks,
+            )
             if decision.decision.value == "complete_mission":
                 return
-
             if decision.decision.value == "wait":
-                if decision.task_id is None:
-                    raise RuntimeError(decision.reason)
-
-                task = self.manager.task_engine.get(decision.task_id)
-
-                if task.status.value == "failed":
-                    raise RuntimeError(decision.reason)
-
                 raise RuntimeError(decision.reason)
-
             if decision.task_id is None:
                 raise RuntimeError("Manager started a task without a task ID")
 
