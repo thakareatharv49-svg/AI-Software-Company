@@ -201,26 +201,36 @@ async def run_factory_queue(
     max_retries: int = Query(default=2, ge=0, le=5),
     center: CompanyControlCenter = ControlCenter,
 ) -> dict[str, object]:
-    """Start a sequential run for every queued mission, stopping on a blocked mission."""
+    """Enable continuous FIFO processing, including projects queued in the future."""
     try:
         queued = [
             job for job in center.mission_jobs()
             if job.status == MissionJobStatus.QUEUED
         ]
-        if not queued:
-            return {"status": "idle", "queued_projects": 0}
-
-        for job in queued:
-            center.enqueue_factory_mission(job.id)
-
-        await center.run_factory(max_projects=None, max_retries=max_retries)
-        return {"status": "started", "queued_projects": len(queued)}
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        await center.start_continuous_factory(max_retries=max_retries)
+        return {
+            "status": "continuous",
+            "continuous": True,
+            "queued_projects": len(queued),
+        }
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.post("/factory/continuous/stop")
+def stop_continuous_factory(
+    center: CompanyControlCenter = ControlCenter,
+) -> dict[str, object]:
+    was_enabled = center.stop_continuous_factory()
+    return {
+        "status": "stopping" if was_enabled else "stopped",
+        "continuous": False,
+        "message": (
+            "The current project will finish before the factory stops."
+            if was_enabled else "Continuous mode is already stopped."
+        ),
+    }
+
 @router.get("/factory/status")
 def factory_status(center: CompanyControlCenter = ControlCenter) -> dict[str, object]:
-    return {"running": center.factory_running(), "queued_projects": len(center._factory.queue)}
+    return {"running": center.factory_running(), "continuous": center.continuous_factory_enabled(), "queued_projects": len(center._factory.queue)}

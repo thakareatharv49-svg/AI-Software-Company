@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#090b14">
 <meta name="description" content="Operate your autonomous AI software company: launch missions, monitor factory runs, and open completed products.">
 <title>AI Software Company — Control Center</title>
-<link rel="stylesheet" href="/app/static/styles.css?v=9">
+<link rel="stylesheet" href="/app/static/styles.css?v=10">
 <link rel="stylesheet" href="/app/static/mission-composer.css?v=1">
 </head>
 <body>
@@ -49,9 +49,9 @@
 </section>
 <div class="grid factory-grid">
 <section class="card" id="factory-section">
-<h2>Factory pipeline</h2><p class="muted">Run one mission or process the queued backlog in order.</p>
+<h2>Factory pipeline</h2><p class="muted">Keep the factory running to build queued projects one by one, including missions added later.</p>
 <div id="pipeline" class="pipeline"><div class="pipeline-step active"><b>01</b><span>Waiting</span><small>Select a mission</small></div></div>
-<button id="run-queue" class="primary" type="button">Run queued projects</button>
+<div class="factory-mode-actions"><button id="run-queue" class="primary" type="button">Start continuous mode</button><button id="stop-queue" class="secondary" type="button">Stop after current project</button></div>
 <div id="queue-message" class="message" role="status" aria-live="polite"></div>
 <button id="stop" class="secondary" type="button">Stop company</button>
 </section>
@@ -63,8 +63,8 @@
 <section class="card details"><h2 id="detail-title">Mission details</h2><div id="details" class="empty">Select a mission to inspect outputs and audit trail.</div></section>
 </main>
 </div>
-<script src="/app/static/app.js?v=13" defer></script>
-<script src="/app/static/queue-run.js?v=1" defer></script>
+<script src="/app/static/app.js?v=14" defer></script>
+<script src="/app/static/queue-run.js?v=2" defer></script>
 <script src="/app/static/quick-nav.js?v=1" defer></script>
 </body>
 </html>

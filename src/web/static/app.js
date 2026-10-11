@@ -410,7 +410,7 @@ async function refresh() {
     (total, item) => total + (Array.isArray(item.plan?.steps) ? item.plan.steps.length : 0), 0
   );
   $("agents").textContent = summary.agents ?? "—";
-  $("factory").textContent = factory.running ? "running" : "idle";
+  $("factory").textContent = factory.running ? "building" : (factory.continuous ? "continuous" : "idle");
 
   renderMissions(missions);
   renderProducts(products.map(product => ({

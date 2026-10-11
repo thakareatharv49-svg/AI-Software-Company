@@ -71,7 +71,7 @@ async def launch_customer_project(
 ) -> dict[str, object]:
     """Launch one workspace-owned project and charge quota exactly once."""
     _, workspace = context
-    if center.factory_running():
+    if center.factory_running() and not center.continuous_factory_enabled():
         raise HTTPException(
             status_code=409,
             detail="The factory is busy; retry this launch when it is idle",
