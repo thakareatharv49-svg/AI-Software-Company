@@ -35,7 +35,6 @@ from src.company.project_outputs import ProjectOutputManifest
 from src.company.generated_task_planning import build_generated_task_plan
 from src.company.research.engine import StaticResearchProvider
 from src.config.settings import settings
-from src.github.models.contracts import GitHubRepository
 from src.manager.models.contracts import Mission as ManagerMission
 from src.projects.models.contracts import ProjectCreateRequest
 from src.qa.models.contracts import QATestRequest
@@ -506,29 +505,10 @@ class CompanyControlCenter:
     ) -> AutonomousProjectRequest:
         generated = await self._generator.generate(mission.name, mission.objective)
 
+        # Generated products stay in the local review workspace until the owner approves.
+        # The review/publish endpoint creates the GitHub repository only after approval.
         github_repository = None
         pull_request_head = None
-        repository_name = None
-        if (
-            settings.github_allow_writes
-            and settings.github_token
-            and settings.github_repository_owner
-        ):
-            slug = re.sub(r"[^a-zA-Z0-9._-]+", "-", mission.name.strip())
-            slug = re.sub(r"-{2,}", "-", slug).strip("-._") or "generated-project"
-            # Keep names stable and unique enough for repeated missions with
-            # the same human-readable project name.
-            repository_name_only = f"{slug}-{mission.id[:8]}"
-            github_repository = GitHubRepository(
-                owner=settings.github_repository_owner,
-                name=repository_name_only,
-                default_branch=settings.github_default_branch,
-            )
-            # Compatibility field: the factory now publishes directly to the default branch.
-            pull_request_head = settings.github_default_branch
-            repository_name = (
-                f"{settings.github_repository_owner}/{repository_name_only}"
-            )
 
         return AutonomousProjectRequest(
             mission=CEOMission(
@@ -541,7 +521,7 @@ class CompanyControlCenter:
                 name=mission.name,
                 description=mission.objective,
                 objective=mission.objective,
-                repository=repository_name,
+                repository=None,
             ),
             manager_mission=ManagerMission(
                 name=mission.name,
