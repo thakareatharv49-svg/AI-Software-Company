@@ -25,10 +25,10 @@ async def test_large_mission_generates_each_file_independently(monkeypatch) -> N
     responses = [
         json.dumps({
             "files": [
-                {"path": "index.html", "purpose": "Accessible app entry point"},
-                {"path": "style.css", "purpose": "Responsive visual design"},
-                {"path": "app.js", "purpose": "Notes CRUD and search behavior"},
                 {"path": "tests/test_project.py", "purpose": "Mission-specific tests"},
+                {"path": "app.js", "purpose": "Notes CRUD and search behavior"},
+                {"path": "style.css", "purpose": "Responsive visual design"},
+                {"path": "index.html", "purpose": "Accessible app entry point"},
             ]
         }),
         json.dumps({"content": "<!doctype html><html><head><title>Notes</title></head><body><script src=\"app.js\"></script><link rel=\"stylesheet\" href=\"style.css\"></body></html>"}),
@@ -59,6 +59,16 @@ async def test_large_mission_generates_each_file_independently(monkeypatch) -> N
     assert len(payloads) == 5
     assert project.test_command == ["python", "-m", "pytest", "-q"]
     assert all("num_predict" in payload["options"] for payload in payloads)
+    generated_paths = [
+        payload["prompt"].split("File to generate: ", 1)[1].splitlines()[0]
+        for payload in payloads[1:]
+    ]
+    assert generated_paths == [
+        "index.html",
+        "style.css",
+        "app.js",
+        "tests/test_project.py",
+    ]
 
 
 @pytest.mark.asyncio
