@@ -100,6 +100,18 @@ class FactoryAutonomousRunner:
 
         try:
             result = await self.runner.run(request)
+        except Exception as exc:
+            self._record_runner_failure(plan, exc)
+            if on_progress is not None:
+                # Preserve the failure diagnosis even when the runner exits
+                # before emitting its own stage-progress callback.
+                try:
+                    on_progress(plan)
+                except Exception:
+                    pass
+            raise
+
+        try:
             report = AutonomousCompanyAcceptance().evaluate(result)
             if not report.passed:
                 failed_checks = [check for check in report.checks if not check.passed]
@@ -152,6 +164,35 @@ class FactoryAutonomousRunner:
 
         if not has_content:
             raise ValueError("Generated project files are all empty")
+
+    @staticmethod
+    def _record_runner_failure(plan: MissionPlan, error: Exception) -> None:
+        """Ensure an unexpected runner exception is visible in the mission plan."""
+        steps = {step.stage.value: step for step in plan.steps}
+        if any(step.status == "failed" for step in plan.steps):
+            return
+
+        message = f"{type(error).__name__}: {error}"
+        stage_name = None
+        prefix = "Autonomous stage '"
+        if prefix in str(error):
+            stage_name = str(error).split(prefix, 1)[1].split("'", 1)[0]
+
+        stage_aliases = {
+            "ai_ceo": "product",
+            "research_handoff": "research",
+            "product_definition": "product",
+            "engineering_qa_security_github": "execution",
+        }
+        target = steps.get(stage_aliases.get(stage_name, stage_name or ""))
+        if target is None:
+            target = next(
+                (step for step in plan.steps if step.status == "running"),
+                steps.get("execution"),
+            )
+        if target is not None:
+            target.status = "failed"
+            target.detail = f"Autonomous runner failed: {message}"
 
     @staticmethod
     def _record_acceptance_failures(plan: MissionPlan, failed_checks) -> None:
