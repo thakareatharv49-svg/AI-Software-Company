@@ -485,3 +485,50 @@ async def test_large_mission_fails_clearly_after_invalid_manifest_recovery(
         )
 
     assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_test_file_prompt_prioritizes_implementation_over_large_stylesheet(
+    monkeypatch, tmp_path
+):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    responses = [
+        json.dumps({
+            "files": [
+                {"path": "index.html", "purpose": "App entry point"},
+                {"path": "style.css", "purpose": "Visual design"},
+                {"path": "app.js", "purpose": "Core behavior"},
+                {"path": "tests/test_project.py", "purpose": "Behavior tests"},
+            ]
+        }),
+        json.dumps({
+            "content": (
+                '<!doctype html><html><head><link rel="stylesheet" href="style.css">'
+                '</head><body><script src="app.js"></script></body></html>'
+            )
+        }),
+        json.dumps({"content": "/*" + ("x" * 5900) + "*/"}),
+        json.dumps({"content": "function addNote(title) { return { title }; }"}),
+        json.dumps({
+            "content": (
+                "def test_note_title_is_preserved():\\n"
+                "    note = {'title': 'Plan'}\\n"
+                "    assert note['title'] == 'Plan'\\n"
+            )
+        }),
+    ]
+    payloads = []
+
+    async def fake_call(payload):
+        payloads.append(payload)
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    await generator._generate_large_mission(
+        "Project Planner",
+        "Create and search project notes in a responsive browser app.",
+    )
+
+    test_prompt = payloads[-1]["prompt"]
+    assert "FILE: app.js" in test_prompt
+    assert "function addNote(title)" in test_prompt
