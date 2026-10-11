@@ -471,3 +471,47 @@ def test_failed_large_mission_repair_clears_stale_checkpoint(tmp_path) -> None:
         "A failed final repair must not leave invalid generated files cached "
         "for the next automatic mission retry."
     )
+
+
+def test_browser_validation_rejects_missing_asset_referenced_by_nested_css() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    try:
+        OllamaProjectGenerator._validate_mission_output(
+            "Study Planner",
+            "Build a browser app for planning study sessions.",
+            GeneratedProject(
+                files={
+                    "index.html": '<html><link rel="stylesheet" href="assets/style.css"></html>',
+                    "assets/style.css": "body { background-image: url('../images/pattern.svg'); }",
+                },
+                test_command=["python", "-m", "pytest", "-q"],
+            ),
+        )
+    except RuntimeError as exc:
+        assert "pattern.svg" in str(exc)
+        assert "assets/style.css" in str(exc)
+    else:
+        raise AssertionError("Missing nested CSS assets must be rejected")
+
+
+def test_browser_validation_rejects_missing_relative_javascript_module() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    try:
+        OllamaProjectGenerator._validate_mission_output(
+            "Study Planner",
+            "Build a browser app for planning study sessions.",
+            GeneratedProject(
+                files={
+                    "index.html": '<html><script type="module" src="app.js"></script></html>',
+                    "app.js": 'import { createPlanner } from "./planner.js";\\ncreatePlanner();',
+                },
+                test_command=["python", "-m", "pytest", "-q"],
+            ),
+        )
+    except RuntimeError as exc:
+        assert "planner.js" in str(exc)
+        assert "app.js" in str(exc)
+    else:
+        raise AssertionError("Missing local JavaScript modules must be rejected")
