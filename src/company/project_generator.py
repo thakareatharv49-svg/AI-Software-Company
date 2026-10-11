@@ -670,13 +670,11 @@ Rules:
         purpose_by_path = dict(manifest_items)
         manifest_items = [(path, purpose_by_path[path]) for path in ordered_paths]
 
-        allowed_paths = {path for path, _ in manifest_items}
-        cached_files = (saved_checkpoint or {}).get("files", {})
+        cached_files = checkpoint.compatible_files(normalized_manifest)
         files: dict[str, str] = {
             path: content
             for path, content in cached_files.items()
-            if path in allowed_paths
-            and isinstance(content, str)
+            if isinstance(content, str)
             and content.strip()
             and len(content.encode("utf-8")) <= 2_000_000
         }
