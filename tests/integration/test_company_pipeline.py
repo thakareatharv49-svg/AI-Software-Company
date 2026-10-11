@@ -90,6 +90,15 @@ async def test_company_pipeline_completes_project(tmp_path: Path):
         working_directory=str(tmp_path),
     )
 
+    generated_tests = tmp_path / "tests"
+    generated_tests.mkdir()
+    (generated_tests / "test_product.py").write_text(
+        "from pathlib import Path\\n"
+        "def test_product_suite_is_executed():\\n"
+        "    Path('product-test-ran.txt').write_text('passed', encoding='utf-8')\\n",
+        encoding="utf-8",
+    )
+
     result = await pipeline.run_end_to_end(
         project_request=project_request,
         mission=mission,
