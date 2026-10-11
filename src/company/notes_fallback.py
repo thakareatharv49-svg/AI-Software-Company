@@ -248,5 +248,44 @@ def notes_fallback_files() -> dict[str, str]:
     visibleNotes
   };
 })();
-"""
+""",
+        "tests/test_project.py": """from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_notes_app_has_a_direct_browser_entry_point_and_local_assets():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    assert "<title>Paper" in html
+    assert (ROOT / "style.css").is_file()
+    assert (ROOT / "app.js").is_file()
+    assert 'href="style.css"' in html
+    assert 'src="app.js"' in html
+
+
+def test_notes_app_implements_create_edit_delete_pin_and_search():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    for behavior in (
+        "function saveFromForm",
+        "function openEditor",
+        "function togglePin",
+        "function deleteNote",
+        "state.notes.filter",
+        "visibleNotes",
+        "window.confirm",
+        'data-action === "edit"',
+        'data-action === "delete"',
+        'data-action === "pin"',
+    ):
+        assert behavior in js
+
+
+def test_notes_app_persists_notes_and_starts_without_fake_records():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "localStorage.getItem" in js
+    assert "localStorage.setItem" in js
+    assert "state.notes = loadNotes()" in js
+    assert "const sampleNotes" not in js
+    assert "demoNotes" not in js
+""",
     }
