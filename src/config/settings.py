@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,6 +43,16 @@ class Settings(BaseSettings):
     github_oauth_client_secret: str = ""
     owner_email: str = ""
     session_cookie_secure: bool = False
+
+    # Dedicated read-only status endpoint for Nexora HQ; never grants mission access.
+    nexora_hq_status_token: str = ""
+
+    @field_validator("nexora_hq_status_token")
+    @classmethod
+    def validate_nexora_hq_status_token(cls, value: str) -> str:
+        if value and len(value) < 32:
+            raise ValueError("NEXORA_HQ_STATUS_TOKEN must contain at least 32 characters")
+        return value
 
     model_config = SettingsConfigDict(
         env_file=".env",

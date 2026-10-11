@@ -4,7 +4,7 @@ The AI Software Developer venture runs an autonomous software factory with a bro
 
 ## Company structure
 
-Nexora HQ is the parent-company dashboard for tracking ventures, company-level activity, and integration health. AI Software Developer owns software mission execution, generated applications, previews, and its internal factory workflows. Nexora HQ does not replace the factory and its read-only live-status adapter is a separate integration task.
+Nexora HQ is the parent-company dashboard for tracking ventures, company-level activity, and integration health. AI Software Developer owns software mission execution, generated applications, previews, and its internal factory workflows. The optional `/api/hq/status` endpoint exposes aggregate mission counts to Nexora HQ using a dedicated bearer token; it does not expose mission details or any execution controls.
 
 ## Web app
 
@@ -23,6 +23,12 @@ From the AI Software Developer control center you can:
 - Cancel missions or stop the company.
 
 The browser UI is intentionally part of the main application, so there is no separate frontend server to configure.
+
+### Nexora HQ read-only status integration
+
+To allow HQ to read aggregate factory status, set `NEXORA_HQ_STATUS_TOKEN` in the AI Software Developer server's `.env` to a randomly generated secret of at least 32 characters, then restart the server. The dedicated `GET /api/hq/status` endpoint requires `Authorization: Bearer <token>` and returns only explicit service status, active/queued/completed/blocked counts, and a UTC snapshot timestamp. It never exposes mission names, objectives, repository contents, credentials, or mutation endpoints.
+
+Configure Nexora HQ separately with `NEXORA_AI_SOFTWARE_DEVELOPER_URL` set to the AI Software Developer base URL and `NEXORA_AI_SOFTWARE_DEVELOPER_TOKEN` set to the same secret. Keep both values server-side. Use HTTPS outside local development; never put this token in browser code or commit a real token to Git.
 
 ### Local access without a separate owner login
 
