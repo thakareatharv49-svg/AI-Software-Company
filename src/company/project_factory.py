@@ -232,9 +232,12 @@ class ProjectFactory:
         return queued
 
     def _reset_for_retry(self, project: FactoryProject) -> None:
-        """Reset transient execution state before retrying a project."""
+        """Reset lifecycle progress before restarting the mission from its first stage."""
         for step in project.plan.steps:
-            if step.status in {"failed", "running"}:
+            # Automatic retries restart the entire autonomous lifecycle, just like
+            # manual retries. Keeping completed steps from a failed attempt makes
+            # the dashboard show stale progress while the new attempt is running.
+            if step.status != "planned" or step.detail is not None:
                 step.status = "planned"
                 step.detail = None
 
