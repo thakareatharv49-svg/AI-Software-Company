@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from inspect import signature
@@ -61,6 +62,7 @@ class ProjectFactory:
     audit_store: MissionAuditStoreProtocol | None = None
     output_store: ProjectOutputStoreProtocol | None = None
     autonomous_runner: FactoryAutonomousRunner | None = None
+    execution_timeout_seconds: float = 1800.0
     queue: list[FactoryProject] = field(default_factory=list)
     _running: bool = field(default=False, init=False, repr=False)
     _last_autonomous_result: object | None = field(default=None, init=False, repr=False)
@@ -318,16 +320,17 @@ class ProjectFactory:
                 except (TypeError, ValueError):
                     supports_progress = False
                 if supports_progress:
-                    autonomous_result = await runner(
+                    execution = runner(
                         project.mission,
                         project.plan,
                         on_progress=lambda _plan: self._persist_plan_progress(project),
                     )
                 else:
-                    autonomous_result = await runner(
-                        project.mission,
-                        project.plan,
-                    )
+                    execution = runner(project.mission, project.plan)
+                autonomous_result = await asyncio.wait_for(
+                    execution,
+                    timeout=self.execution_timeout_seconds,
+                )
                 # Capture the authoritative result immediately. Processing optional
                 # stage telemetry below must never erase a completed pipeline result.
                 self._last_autonomous_result = autonomous_result
@@ -371,13 +374,22 @@ class ProjectFactory:
                 # Ignore telemetry errors once the authoritative pipeline exists.
                 project.last_error = None
             else:
-                results = await self.pipeline.execute_mission(
-                    project.mission,
-                    project.plan,
-                    max_stages=max_stages,
+                results = await asyncio.wait_for(
+                    self.pipeline.execute_mission(
+                        project.mission,
+                        project.plan,
+                        max_stages=max_stages,
+                    ),
+                    timeout=self.execution_timeout_seconds,
                 )
         except Exception as exc:
-            project.last_error = f"{type(exc).__name__}: {exc}"
+            if isinstance(exc, TimeoutError):
+                project.last_error = (
+                    "TimeoutError: Factory execution exceeded "
+                    f"{self.execution_timeout_seconds:g} seconds"
+                )
+            else:
+                project.last_error = f"{type(exc).__name__}: {exc}"
             # Failures can occur before the autonomous runner emits its first
             # progress callback (for example, while preparing the request). Mark
             # a concrete stage and persist it so the customer dashboard does not

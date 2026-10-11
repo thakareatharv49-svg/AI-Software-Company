@@ -859,3 +859,48 @@ async def test_missing_autonomous_pipeline_does_not_mark_all_stages_completed() 
     assert "no pipeline result" in (project.last_error or "")
     assert sum(step.status == "completed" for step in project.plan.steps) == 0
     assert any(step.status == "failed" for step in project.plan.steps)
+
+
+@pytest.mark.asyncio
+async def test_timed_out_mission_is_blocked_and_factory_continues() -> None:
+    import asyncio
+
+    class TimeoutThenSuccessRunner:
+        def __init__(self):
+            self.calls = 0
+
+        async def run(self, mission, plan, on_progress=None):
+            self.calls += 1
+            if self.calls == 1:
+                await asyncio.sleep(10)
+            return SimpleNamespace(pipeline=object(), stages=[])
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    runner = TimeoutThenSuccessRunner()
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        autonomous_runner=runner,
+        execution_timeout_seconds=0.01,
+    )
+    timed_out = factory.enqueue(
+        CompanyMission(name="Stalled mission", objective="Wait forever")
+    )
+    later = factory.enqueue(
+        CompanyMission(name="Healthy mission", objective="Complete successfully")
+    )
+
+    results = await factory.run(max_projects=2, max_retries=0)
+
+    assert timed_out.status == "blocked"
+    assert "execution exceeded 0.01 seconds" in (timed_out.last_error or "")
+    assert later.status == "completed"
+    assert runner.calls == 2
+    assert len(results) == 2
