@@ -158,3 +158,26 @@ def test_rejects_test_that_calls_non_asserting_helper_only() -> None:
 
     assert len(issues) == 1
     assert "without an explicit assertion" in issues[0]
+
+
+def test_rejects_generated_test_module_without_test_functions() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_app.py": (
+            "def build_sample_note():\\n"
+            "    return {'title': 'Plan'}\\n"
+        )
+    })
+
+    assert len(issues) == 1
+    assert "contain no test functions" in issues[0]
+
+
+def test_accepts_non_test_helper_module_without_test_functions() -> None:
+    issues = find_weak_product_tests({
+        "tests/helpers.py": (
+            "def build_sample_note():\\n"
+            "    return {'title': 'Plan'}\\n"
+        )
+    })
+
+    assert issues == []
