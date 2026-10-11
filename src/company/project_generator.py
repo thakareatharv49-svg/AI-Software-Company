@@ -968,7 +968,7 @@ Requirements:
                 # Only relative/rooted module specifiers are local dependencies;
                 # bare package names are intentionally left to the no-build policy.
                 references.extend(re.findall(
-                    r"""(?:from\s*|import\s*\()\s*["']((?:\.{1,2}/|/)[^"']+)["']""",
+                    r"""(?:from\s*|import\s*\(|import\s*)["']((?:\.{1,2}/|/)[^"']+)["']""",
                     content,
                 ))
 
