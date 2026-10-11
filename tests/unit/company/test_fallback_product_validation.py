@@ -80,3 +80,57 @@ def test_parsed_browser_product_gets_automated_smoke_test() -> None:
     assert "test_browser_entrypoint_and_local_assets_exist" in smoke_test
     assert "root.rglob('*.css')" in smoke_test
     assert "Missing CSS asset" in smoke_test
+
+
+
+def test_deterministic_fallback_rejects_missing_automated_tests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = GeneratedProject(
+        files={
+            "index.html": "<!doctype html><html><body><h1>Inventory</h1></body></html>",
+            "app.js": "function addItem(items, item) { return [...items, item]; }",
+        },
+        test_command=["python", "-m", "pytest", "-q"],
+    )
+    monkeypatch.setattr(
+        OllamaProjectGenerator,
+        "_validate_mission_output",
+        staticmethod(lambda name, objective, candidate: None),
+    )
+
+    with pytest.raises(RuntimeError, match="no automated test files"):
+        OllamaProjectGenerator._validated_fallback(
+            "Inventory",
+            "Build an inventory app",
+            project,
+        )
+
+
+def test_deterministic_fallback_accepts_behavior_test_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = GeneratedProject(
+        files={
+            "index.html": "<!doctype html><html><body><h1>Inventory</h1></body></html>",
+            "app.js": "function addItem(items, item) { return [...items, item]; }",
+            "tests/test_inventory.py": (
+                "def test_add_item():\\n"
+                "    items = []\\n"
+                "    result = [*items, 'keyboard']\\n"
+                "    assert result == ['keyboard']\\n"
+            ),
+        },
+        test_command=["python", "-m", "pytest", "-q"],
+    )
+    monkeypatch.setattr(
+        OllamaProjectGenerator,
+        "_validate_mission_output",
+        staticmethod(lambda name, objective, candidate: None),
+    )
+
+    assert OllamaProjectGenerator._validated_fallback(
+        "Inventory",
+        "Build an inventory app",
+        project,
+    ) is project
