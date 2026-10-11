@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     factory_max_generated_project_files: int = Field(default=40, ge=4, le=200)
     # Bound parallel agent work to avoid overwhelming local models and services.
     factory_max_parallel_tasks: int = Field(default=2, ge=1, le=8)
+    # Retry transient agent failures, but always cap the number of attempts.
+    factory_task_max_attempts: int = Field(default=2, ge=1, le=5)
 
     github_token: str = ""
     github_api_base_url: str = "https://api.github.com"

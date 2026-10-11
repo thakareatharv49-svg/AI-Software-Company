@@ -97,11 +97,15 @@ async def test_manager_delegates_execution() -> None:
 
 
 @pytest.mark.asyncio
-async def test_manager_blocks_when_execution_fails() -> None:
+async def test_manager_blocks_after_bounded_execution_retries() -> None:
     registry = AgentRegistry()
     registry.register(make_agent())
+    calls = 0
 
     async def execute(request):
+        nonlocal calls
+        calls += 1
+
         class Result:
             success = False
             error = "Tests failed"
@@ -111,9 +115,38 @@ async def test_manager_blocks_when_execution_fails() -> None:
     manager.start_mission(make_mission())
     ids = manager.create_plan([TaskPlanItem(title="Test")])
     decision = await manager.tick()
+    task = manager.task_engine.get(ids[0])
     assert decision.decision == ManagerDecisionType.WAIT
-    assert manager.task_engine.get(ids[0]).status.value == "failed"
+    assert task.status.value == "failed"
+    assert task.retry_count == 1
+    assert calls == 2
     assert manager.status == ManagerStatus.IDLE
+
+
+@pytest.mark.asyncio
+async def test_manager_recovers_when_task_succeeds_on_retry() -> None:
+    registry = AgentRegistry()
+    registry.register(make_agent())
+    calls = 0
+
+    async def execute(request):
+        nonlocal calls
+        calls += 1
+
+        class Result:
+            success = calls > 1
+            error = "Temporary model timeout"
+        return Result()
+
+    manager = MasterManager(agent_registry=registry, agent_executor=execute)
+    manager.start_mission(make_mission())
+    ids = manager.create_plan([TaskPlanItem(title="Retry transient failure")])
+    decision = await manager.tick()
+    task = manager.task_engine.get(ids[0])
+    assert decision.decision == ManagerDecisionType.START_TASK
+    assert task.status.value == "completed"
+    assert task.retry_count == 1
+    assert calls == 2
 
 
 @pytest.mark.asyncio
