@@ -9,7 +9,7 @@ from src.agents.models.contracts import AgentRequest, AgentResult
 from src.company.gates.quality import ProductionQualityGate
 from src.company.github_native.publish_queue import GitHubPublishQueue
 from src.company.github_native.service import GitHubNativeService
-from src.company.project_generator import OllamaProjectGenerator
+from src.company.project_generator import GeneratedProject, OllamaProjectGenerator
 from src.config.settings import settings
 from src.company.intelligence import (
     CrossProjectMemory,
@@ -174,7 +174,10 @@ class CompanyExecutionPipeline:
         )
 
         repair_callback = self._build_repair_callback(
-            repair_agent_executor or agent_executor
+            repair_agent_executor or agent_executor,
+            project_name=project_request.name,
+            objective=project_request.objective,
+            project_id=project.id,
         )
 
         debug_result = await self.debugger.run(
