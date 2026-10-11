@@ -336,14 +336,14 @@ Rules:
             for item in items:
                 if not isinstance(item, dict):
                     return "Project file plan contains an invalid entry"
-                raw_path = str(item.get("path", "")).strip().replace("\\\\", "/")
+                raw_path = str(item.get("path", "")).strip().replace("\\", "/")
                 path = PurePosixPath(raw_path)
                 if (
                     not raw_path
                     or path.is_absolute()
                     or ".." in path.parts
                     or ":" in raw_path
-                    or "\\n" in raw_path
+                    or "\n" in raw_path
                 ):
                     return f"Unsafe path in project file plan: {raw_path!r}"
                 normalized = path.as_posix()
@@ -363,7 +363,7 @@ Rules:
             recovery_payload = dict(manifest_payload)
             recovery_payload["prompt"] = (
                 str(recovery_payload.get("prompt", ""))
-                + "\\n\\nStructural recovery retry: the previous JSON was parseable "
+                + "\n\nStructural recovery retry: the previous JSON was parseable "
                 "but its file plan was invalid. Fix this issue: "
                 + manifest_issue
                 + ". Return a non-empty files array containing objects with unique, "
