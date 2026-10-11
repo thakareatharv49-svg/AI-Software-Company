@@ -51,7 +51,7 @@ async def test_run_factory_queue_returns_idle_when_no_queued_missions():
         SimpleNamespace(id="blocked", status=MissionJobStatus.BLOCKED),
     ])
 
-    response = await run_factory_queue(center=center)
+    response = await run_factory_queue(max_retries=2, center=center)
 
     assert response == {"status": "continuous", "continuous": True, "queued_projects": 0}
     assert center.enqueued == []
