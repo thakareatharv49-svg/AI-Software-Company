@@ -123,7 +123,11 @@ class AutonomousCompanyAcceptance:
             )
         )
         objective = str(getattr(result.ceo.mission, "objective", ""))
-        if self._requires_browser_preview(objective):
+        # The approved objective is sometimes terse (for example, "build this")
+        # while the product name carries the app category. Use both signals so a
+        # vague objective cannot bypass the browser-preview delivery requirement.
+        mission_text = f"{project.name} {objective}"
+        if self._requires_browser_preview(mission_text):
             preview_available = bool(
                 getattr(result.pipeline, "browser_preview", False)
             )
