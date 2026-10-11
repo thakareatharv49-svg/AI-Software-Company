@@ -9,7 +9,7 @@ from src.agents.models.contracts import AgentRequest, AgentResult
 from src.company.gates.quality import ProductionQualityGate
 from src.company.github_native.publish_queue import GitHubPublishQueue
 from src.company.github_native.service import GitHubNativeService
-from src.company.project_generator import OllamaProjectGenerator
+from src.company.project_generator import GeneratedProject, OllamaProjectGenerator
 from src.config.settings import settings
 from src.company.intelligence import (
     CrossProjectMemory,
@@ -174,7 +174,10 @@ class CompanyExecutionPipeline:
         )
 
         repair_callback = self._build_repair_callback(
-            repair_agent_executor or agent_executor
+            repair_agent_executor or agent_executor,
+            project_name=project_request.name,
+            objective=project_request.objective,
+            project_id=project.id,
         )
 
         debug_result = await self.debugger.run(
@@ -640,20 +643,67 @@ class CompanyExecutionPipeline:
     def _build_repair_callback(
         self,
         executor: Callable | AgentExecutor | None,
+        *,
+        project_name: str,
+        objective: str,
+        project_id: str,
     ) -> Callable | None:
+        def validate_repaired_files() -> bool:
+            try:
+                self.project_generator._validate_mission_output(
+                    project_name,
+                    objective,
+                    GeneratedProject(
+                        files=dict(self._active_generated_files),
+                        test_command=["python", "-m", "pytest", "-q"],
+                    ),
+                )
+            except RuntimeError as exc:
+                self._publish_event(
+                    "qa.repair.rejected",
+                    project_id=project_id,
+                    payload={"reason": str(exc)[:2000], "project_name": project_name},
+                )
+                return False
+            return True
+
         if executor is None:
             async def generated_project_repair(request: QATestRequest, diagnosis) -> bool:
                 repaired = await self.project_generator.repair(
                     files=self._active_generated_files,
                     failure=diagnosis.error,
                 )
-                self._active_generated_files.clear()
-                self._active_generated_files.update(repaired.files)
-                root = Path(request.working_directory)
-                for path, content in repaired.files.items():
-                    target = root / path
+                # Validate repaired source before allowing another QA attempt to
+                # pass with broken assets, invalid syntax, or weakened tests.
+                try:
+                    self.project_generator._validate_mission_output(
+                        project_name, objective, repaired
+                    )
+                except RuntimeError as exc:
+                    self._publish_event(
+                        "qa.repair.rejected",
+                        project_id=project_id,
+                        payload={"reason": str(exc)[:2000], "project_name": project_name},
+                    )
+                    return False
+
+                root = Path(request.working_directory).resolve()
+                for relative_path, content in repaired.files.items():
+                    target = (root / relative_path).resolve()
+                    if target != root and root not in target.parents:
+                        self._publish_event(
+                            "qa.repair.rejected",
+                            project_id=project_id,
+                            payload={
+                                "reason": f"Repair returned unsafe path: {relative_path!r}",
+                                "project_name": project_name,
+                            },
+                        )
+                        return False
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_text(content, encoding="utf-8")
+                self._active_generated_files.clear()
+                self._active_generated_files.update(repaired.files)
                 return True
 
             return generated_project_repair
@@ -672,7 +722,8 @@ class CompanyExecutionPipeline:
                         "Repair the current QA failure autonomously. "
                         "Inspect the failure, locate the faulty code, "
                         "modify the workspace using permitted tools, and "
-                        "run the relevant test or command to verify the fix."
+                        "run the relevant test or command to verify the fix. "
+                        "Do not remove or weaken behavioral tests."
                     ),
                     context={
                         "qa_command": request.command,
@@ -685,12 +736,19 @@ class CompanyExecutionPipeline:
             )
 
             if isinstance(result, AgentResult):
-                return result.success
+                success = result.success
+            elif isinstance(result, bool):
+                success = result
+            else:
+                success = bool(getattr(result, "success", False))
 
-            if isinstance(result, bool):
-                return result
-
-            return bool(getattr(result, "success", False))
+            if not success:
+                return False
+            self._sync_generated_files_from_workspace(
+                request.working_directory,
+                self._active_generated_files,
+            )
+            return validate_repaired_files()
 
         return repair
 
