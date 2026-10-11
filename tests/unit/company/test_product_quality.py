@@ -129,3 +129,32 @@ def test_accepts_expected_exception_check_without_plain_assert() -> None:
     })
 
     assert issues == []
+
+
+def test_accepts_behavior_test_that_uses_assertion_helper() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_app.py": (
+            "def assert_valid_note(note):\n"
+            "    assert note['title'].strip()\n"
+            "    assert isinstance(note['body'], str)\n"
+            "def test_create_note():\n"
+            "    note = create_note('Plan', 'Study')\n"
+            "    assert_valid_note(note)\n"
+        )
+    })
+
+    assert issues == []
+
+
+def test_rejects_test_that_calls_non_asserting_helper_only() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_app.py": (
+            "def make_note():\n"
+            "    return {'title': 'Plan'}\n"
+            "def test_create_note():\n"
+            "    make_note()\n"
+        )
+    })
+
+    assert len(issues) == 1
+    assert "without an explicit assertion" in issues[0]
