@@ -904,3 +904,49 @@ async def test_timed_out_mission_is_blocked_and_factory_continues() -> None:
     assert later.status == "completed"
     assert runner.calls == 2
     assert len(results) == 2
+
+
+
+@pytest.mark.asyncio
+async def test_factory_contains_unexpected_worker_error_and_continues_queue() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+
+    class FailOnceStore:
+        failed_mission_id = None
+        should_fail = False
+
+        def load_pending(self):
+            return []
+
+        def save(self, project):
+            if self.should_fail and project.mission.id == self.failed_mission_id:
+                self.should_fail = False
+                raise RuntimeError("simulated persistence failure")
+
+    store = FailOnceStore()
+    factory = ProjectFactory(orchestrator, controller, pipeline, store=store)
+    failed = factory.enqueue(
+        CompanyMission(name="Worker error", objective="Fail safely outside execution")
+    )
+    later = factory.enqueue(
+        CompanyMission(name="Later project", objective="Continue after worker error")
+    )
+    store.failed_mission_id = failed.mission.id
+    store.should_fail = True
+
+    results = await factory.run(max_projects=2, max_retries=0)
+
+    assert failed.status == "blocked"
+    assert "simulated persistence failure" in (failed.last_error or "")
+    assert later.status == "completed"
+    assert [item.mission.id for item in results] == [
+        failed.mission.id,
+        later.mission.id,
+    ]
+    assert factory._active_project is None
