@@ -136,7 +136,7 @@ def _is_file_presence_only_test(
     return True
 
 def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
-    """Reject tautologies, no-op test functions, and smoke-only generated suites."""
+    """Reject missing, tautological, no-op, and smoke-only generated test suites."""
     issues: list[str] = []
     for path, content in files.items():
         normalized = path.replace("\\", "/").casefold()
@@ -228,3 +228,21 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
                 "test an actual product behavior and an edge case."
             )
     return issues
+
+
+
+def find_missing_product_tests(files: Mapping[str, str]) -> list[str]:
+    """Require at least one conventional automated test module for broad projects."""
+    test_modules = [
+        path for path in files
+        if (
+            path.replace("\\", "/").casefold().rsplit("/", 1)[-1].startswith("test_")
+            or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].endswith("_test.py")
+        ) and path.casefold().endswith(".py")
+    ]
+    if test_modules:
+        return []
+    return [
+        "Generated project contains no automated test files. Add mission-specific "
+        "behavioral tests and at least one edge case before delivery."
+    ]

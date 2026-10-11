@@ -554,3 +554,19 @@ def test_javascript_syntax_check_includes_inline_scripts() -> None:
         assert "syntax error" in str(exc)
     else:
         raise AssertionError("Invalid inline JavaScript must be rejected")
+
+
+
+
+def test_broad_product_without_tests_is_rejected() -> None:
+    from src.company.project_generator import OllamaProjectGenerator
+
+    try:
+        OllamaProjectGenerator._validate_required_product_tests({
+            "index.html": "<main>Inventory</main>",
+            "app.js": "function addItem(items, item) { return [...items, item]; }",
+        })
+    except RuntimeError as exc:
+        assert "no automated test files" in str(exc)
+    else:
+        raise AssertionError("Broad generated products without tests must be rejected")
