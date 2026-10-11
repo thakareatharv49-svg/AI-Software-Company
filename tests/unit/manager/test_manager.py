@@ -77,7 +77,7 @@ def test_manager_rejects_invalid_dependency_graph_before_creating_tasks(items) -
 
 
 @pytest.mark.asyncio
-def test_manager_delegates_execution() -> None:
+async def test_manager_delegates_execution() -> None:
     registry = AgentRegistry()
     registry.register(make_agent())
 
