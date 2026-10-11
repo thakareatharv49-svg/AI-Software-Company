@@ -4,6 +4,7 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from api.routes.health import router as health_router
+from api.routes.hq_status import router as hq_status_router
 from config.settings import settings
 from dashboard.routes.routes import router as dashboard_router
 from observability.logging import configure_logging
@@ -37,6 +38,7 @@ async def security_headers_middleware(request, call_next):
 
 
 app.include_router(health_router)
+app.include_router(hq_status_router)
 app.include_router(dashboard_router, dependencies=[Depends(require_company_owner)])
 app.include_router(security_router, dependencies=[Depends(require_company_owner)])
 app.include_router(oauth_router)
