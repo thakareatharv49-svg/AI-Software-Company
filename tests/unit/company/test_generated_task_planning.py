@@ -38,7 +38,11 @@ def test_task_planning_groups_root_browser_assets_as_one_shell() -> None:
     tasks = build_generated_task_plan(
         "Notes",
         "Build a notes app.",
-        {"index.html": "", "style.css": "", "app.js": ""},
+        {
+            "index.html": "<main>Notes</main>",
+            "style.css": "main { display: block; }",
+            "app.js": "const notes = [];",
+        },
     )
 
     assert len(tasks) == 1
@@ -51,3 +55,44 @@ def test_task_planning_rejects_empty_or_unsafe_file_maps() -> None:
         build_generated_task_plan("Empty", "Objective", {})
     with pytest.raises(ValueError, match="Unsafe generated file path"):
         build_generated_task_plan("Unsafe", "Objective", {"../escape.py": ""})
+
+
+
+def test_task_planning_rejects_parent_traversal_in_nested_paths() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="Unsafe generated file path"):
+        build_generated_task_plan(
+            "Unsafe",
+            "Objective",
+            {"src/../../outside.py": "print('unsafe')"},
+        )
+
+
+def test_task_planning_rejects_duplicate_paths_after_separator_normalization() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="Duplicate generated file path"):
+        build_generated_task_plan(
+            "Duplicate",
+            "Objective",
+            {"src/app.py": "print('first')", r"src\app.py": "print('second')"},
+        )
+
+
+def test_task_planning_rejects_all_empty_generated_files() -> None:
+    with pytest.raises(ValueError, match="entirely empty"):
+        build_generated_task_plan(
+            "Empty output",
+            "Build a working application",
+            {"index.html": "  \n", "app.js": ""},
+        )
+
+
+def test_task_planning_requires_implementation_not_only_tests() -> None:
+    with pytest.raises(ValueError, match="without generated implementation files"):
+        build_generated_task_plan(
+            "Test-only output",
+            "Build a working application",
+            {"tests/test_app.py": "def test_app():\n    assert True\n"},
+        )

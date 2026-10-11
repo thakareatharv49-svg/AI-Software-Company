@@ -39,20 +39,36 @@ def build_generated_task_plan(
         raise ValueError("Cannot build a task plan for a project with no generated files")
 
     groups: OrderedDict[str, list[str]] = OrderedDict()
+    seen_paths: set[str] = set()
     for raw_path in files:
         path = PurePosixPath(raw_path.replace("\\", "/")).as_posix()
+        parsed_path = PurePosixPath(path)
         if (
             path in {"", "."}
-            or path.startswith("../")
-            or PurePosixPath(path).is_absolute()
+            or parsed_path.is_absolute()
             or ":" in path
+            or ".." in parsed_path.parts
         ):
             raise ValueError(f"Unsafe generated file path in task plan: {raw_path!r}")
+        # Backslash and slash spellings must not create duplicate output paths.
+        normalized_path = path.casefold()
+        if normalized_path in seen_paths:
+            raise ValueError(
+                f"Duplicate generated file path after normalization: {raw_path!r}"
+            )
+        seen_paths.add(normalized_path)
         groups.setdefault(_subsystem_for_path(path), []).append(path)
+
+    if not any(content.strip() for content in files.values()):
+        raise ValueError("Cannot build a task plan from entirely empty generated files")
 
     implementation = [
         (name, paths) for name, paths in groups.items() if name != "quality and tests"
     ]
+    if not implementation:
+        raise ValueError(
+            "Cannot build a product task plan without generated implementation files"
+        )
     quality = [
         (name, paths) for name, paths in groups.items() if name == "quality and tests"
     ]
