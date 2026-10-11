@@ -234,3 +234,42 @@ async def test_progress_persistence_failure_does_not_abort_autonomous_run(tmp_pa
     )
 
     assert result.pipeline.project.id == "telemetry-ok"
+
+
+@pytest.mark.asyncio
+async def test_runner_exception_marks_named_stage_failed_and_persists_progress(tmp_path):
+    from company.ceo.models import Mission as CEOMission
+    from src.company.autonomous_project import AutonomousProjectRequest
+
+    class Runner:
+        async def run(self, request):
+            raise RuntimeError(
+                "Autonomous stage 'research' failed: Ollama timed out"
+            )
+
+    def build_request(mission, plan):
+        return AutonomousProjectRequest.model_construct(
+            mission=CEOMission(mission_id=mission.id, objective=mission.objective),
+            research_query=mission.objective,
+            project_request=None,
+            manager_mission=None,
+            tasks=(),
+            qa_request=None,
+            files={"README.md": "Generated fixture.\\n"},
+        )
+
+    adapter = FactoryAutonomousRunner(
+        Runner(),
+        build_request,
+        workspace_service=ProjectExecutionService(tmp_path),
+    )
+    plan = make_plan()
+    mission = CompanyMission(name="Notes App", objective="Build a searchable notes app")
+    persisted = []
+
+    with pytest.raises(RuntimeError, match="Ollama timed out"):
+        await adapter.run(mission, plan, on_progress=lambda value: persisted.append(value))
+
+    assert step(plan, "research").status == "failed"
+    assert "Ollama timed out" in step(plan, "research").detail
+    assert persisted and persisted[-1] is plan
