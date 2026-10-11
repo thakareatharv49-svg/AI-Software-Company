@@ -357,3 +357,19 @@ def test_continuous_factory_stop_is_graceful_and_idempotent() -> None:
     assert center.stop_continuous_factory() is True
     assert center.stop_continuous_factory() is False
     assert center.continuous_factory_enabled() is False
+
+
+def test_continuous_mode_accepts_new_mission_while_another_is_running() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    first = center.submit_mission(
+        MissionSubmission(name="Current", objective="Current project")
+    )
+    center._mission_controller.start(first.mission)
+    center._continuous_mode = True
+
+    later = center.submit_mission(
+        MissionSubmission(name="Next", objective="Queue while current project runs")
+    )
+
+    assert later.status == "queued"
+    assert center.mission_job(later.mission.id) is not None
