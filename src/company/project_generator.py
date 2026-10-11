@@ -918,7 +918,6 @@ Requirements:
         """Reject browser-app output that cannot be opened in the product preview."""
         from src.company.product_quality import (
             find_exposed_secrets,
-            find_uncovered_mission_features,
             find_unfinished_product_content,
             find_weak_product_tests,
         )
