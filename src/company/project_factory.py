@@ -65,6 +65,7 @@ class ProjectFactory:
     execution_timeout_seconds: float = 1800.0
     queue: list[FactoryProject] = field(default_factory=list)
     _running: bool = field(default=False, init=False, repr=False)
+    _active_project: FactoryProject | None = field(default=None, init=False, repr=False)
     _last_autonomous_result: object | None = field(default=None, init=False, repr=False)
 
     def restore(self) -> int:
@@ -266,6 +267,9 @@ class ProjectFactory:
             return None
 
         project = self.queue.pop(0)
+        # Retain ownership until run_next returns so run() can finalize the mission
+        # if an unexpected persistence, audit, or event error escapes the stage guard.
+        self._active_project = project
         # A prior mission's pipeline must never satisfy this mission's completion check.
         self._last_autonomous_result = None
         project.status = "running"
@@ -611,7 +615,68 @@ class ProjectFactory:
                 project_id=f"project:{project.mission.id}",
             )
         )
+        self._active_project = None
         return project
+
+    def _contain_unexpected_worker_error(
+        self, project: FactoryProject, exc: Exception
+    ) -> None:
+        """Best-effort terminalize a mission if an error escapes run_next cleanup."""
+        if project.status not in {"completed", "blocked", "cancelled"}:
+            project.status = "blocked"
+            project.last_error = (
+                f"Factory worker error: {type(exc).__name__}: {exc}"
+            )
+            active_step = next(
+                (step for step in project.plan.steps if step.status == "running"),
+                None,
+            )
+            if active_step is None:
+                active_step = next(
+                    (step for step in project.plan.steps if step.status == "planned"),
+                    None,
+                )
+            if active_step is not None:
+                active_step.status = "failed"
+                active_step.detail = project.last_error
+            try:
+                self.orchestrator.stop()
+            except Exception:
+                pass
+            try:
+                self._save(project)
+            except Exception:
+                pass
+            try:
+                self._transition_job(
+                    project,
+                    MissionJobStatus.BLOCKED,
+                    f"Project blocked after factory worker error: {project.mission.name}. "
+                    f"Last error: {project.last_error}",
+                )
+            except Exception:
+                pass
+            try:
+                self._audit(
+                    project.mission.id,
+                    "FACTORY_WORKER_ERROR",
+                    f"Factory worker error: {project.mission.name}",
+                    MissionJobStatus.BLOCKED.value,
+                    {"error": project.last_error},
+                )
+            except Exception:
+                pass
+            try:
+                self.orchestrator.events.publish(
+                    CompanyEvent(
+                        event_type="FACTORY_WORKER_ERROR",
+                        message=f"Factory worker error: {project.mission.name}",
+                        project_id=f"project:{project.mission.id}",
+                    )
+                )
+            except Exception:
+                pass
+        self._active_project = None
 
     async def run(
         self,
@@ -630,10 +695,16 @@ class ProjectFactory:
             while self.queue and (
                 max_projects is None or len(completed) < max_projects
             ):
-                project = await self.run_next(
-                    max_stages=max_stages,
-                    max_retries=max_retries,
-                )
+                try:
+                    project = await self.run_next(
+                        max_stages=max_stages,
+                        max_retries=max_retries,
+                    )
+                except Exception as exc:
+                    project = self._active_project
+                    if project is None:
+                        raise
+                    self._contain_unexpected_worker_error(project, exc)
                 if project is None:
                     break
                 if project.status != "queued" and project.mission.id not in completed_ids:
