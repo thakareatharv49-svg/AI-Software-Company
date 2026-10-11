@@ -164,6 +164,16 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
             for function in test_functions
             if not _test_function_has_assertion(function, assertion_helpers)
         ]
+        empty_test_module = (
+            tree is not None
+            and (name.startswith("test_") or name.endswith("_test.py"))
+            and not test_functions
+        )
+        if empty_test_module:
+            issues.append(
+                f"Generated tests '{path}' contain no test functions. "
+                "Add tests that verify mission-specific behavior and edge cases."
+            )
         generated_smoke_only = (
             name == "test_generated_project.py"
             and bool(test_names)
