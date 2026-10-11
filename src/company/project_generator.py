@@ -548,8 +548,19 @@ Rules:
             try:
                 compact_manifest = json.loads(await self._call(compact_payload))
                 compact_items = compact_manifest.get("files")
-                if isinstance(compact_items, list) and compact_items:
+                compact_issue = manifest_validation_issue(compact_manifest)
+                if (
+                    isinstance(compact_items, list)
+                    and compact_items
+                    and compact_issue is None
+                    and len(compact_items) <= self.max_generated_project_files
+                    and len(compact_items) + required_file_count(compact_items)
+                    <= self.max_generated_project_files
+                ):
                     raw_manifest = compact_items
+                # Do not trust a compact-plan retry merely because its JSON parses.
+                # It must satisfy the same path/dependency checks and leave room for
+                # required browser assets and tests before it can replace the plan.
             except (json.JSONDecodeError, RuntimeError):
                 # Keep the original response so the existing explicit safe-limit
                 # error below reports the failure rather than masking it.
@@ -579,9 +590,13 @@ Rules:
             ):
                 raise RuntimeError(f"Unsafe path in project file plan: {raw_path!r}")
             normalized = path.as_posix()
-            if normalized in seen:
-                raise RuntimeError(f"Duplicate path in project file plan: {normalized}")
-            seen.add(normalized)
+            path_key = normalized.casefold()
+            if path_key in seen:
+                raise RuntimeError(
+                    "Duplicate path in project file plan (case-insensitive): "
+                    f"{normalized}"
+                )
+            seen.add(path_key)
             purpose = str(item.get("purpose", "")).strip()
             if not purpose:
                 raise RuntimeError(f"Project file plan has no purpose for {normalized}")
