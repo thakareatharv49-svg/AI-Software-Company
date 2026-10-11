@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "AI Software Company"
+    app_name: str = "AI Software Developer"
     environment: str = "development"
     debug: bool = True
     log_level: str = "INFO"
