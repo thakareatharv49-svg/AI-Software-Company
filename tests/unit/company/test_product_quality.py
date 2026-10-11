@@ -194,3 +194,36 @@ def test_ignores_tautology_examples_in_comments_when_behavior_is_tested() -> Non
     })
 
     assert issues == []
+
+
+
+def test_rejects_smoke_only_tests_in_large_mission_test_project_filename() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_project.py": (
+            "from pathlib import Path\n"
+            "def test_browser_entrypoint_and_local_assets_exist():\n"
+            "    assert Path('index.html').is_file()\n"
+            "def test_generated_source_files_exist():\n"
+            "    assert Path('app.js').is_file()\n"
+        )
+    })
+
+    assert len(issues) == 1
+    assert "only generated smoke checks" in issues[0]
+    assert "mission-specific behavioral tests" in issues[0]
+
+
+def test_accepts_behavioral_tests_in_large_mission_test_project_filename() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_project.py": (
+            "def test_total_uses_expenses():\n"
+            "    expenses = [12, 8]\n"
+            "    assert sum(expenses) == 20\n"
+            "def test_rejects_negative_expense():\n"
+            "    import pytest\n"
+            "    with pytest.raises(ValueError):\n"
+            "        add_expense(-1)\n"
+        )
+    })
+
+    assert issues == []

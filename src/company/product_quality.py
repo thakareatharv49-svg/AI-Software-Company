@@ -161,9 +161,12 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
                 f"Generated tests '{path}' contain no test functions. "
                 "Add tests that verify mission-specific behavior and edge cases."
             )
+        # Large-mission generation conventionally writes tests/test_project.py,
+        # while older/single-pass generation used test_generated_project.py.
+        # Apply the smoke-only rule to every generated test module so changing the
+        # filename cannot bypass the behavioral-test requirement.
         generated_smoke_only = (
-            name == "test_generated_project.py"
-            and bool(test_names)
+            bool(test_names)
             and test_names.issubset(_SMOKE_ONLY_TEST_NAMES)
         )
         if no_op_tests:
