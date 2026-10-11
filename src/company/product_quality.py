@@ -138,14 +138,15 @@ def _is_file_presence_only_test(
 def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
     """Reject missing, tautological, no-op, and smoke-only generated test suites."""
     issues: list[str] = []
-    discovered_test_modules = [
-        path for path in files
+    discovered_test_modules = []
+    for path in files:
+        normalized = path.replace("\\", "/").casefold()
+        basename = normalized.rsplit("/", 1)[-1]
         if (
-            path.replace("\\", "/").casefold().startswith("tests/")
-            or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].startswith("test_")
-            or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].endswith("_test.py")
-        )
-    ]
+            basename.startswith("test_")
+            or basename.endswith("_test.py")
+        ) and normalized.endswith(".py"):
+            discovered_test_modules.append(path)
     if not discovered_test_modules:
         return [
             "Generated project contains no automated test files. Add mission-specific "
