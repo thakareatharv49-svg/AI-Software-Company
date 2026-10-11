@@ -96,3 +96,28 @@ def test_task_planning_requires_implementation_not_only_tests() -> None:
             "Build a working application",
             {"tests/test_app.py": "def test_app():\n    assert True\n"},
         )
+
+def test_root_level_backend_modules_get_a_separate_integration_package() -> None:
+    tasks = build_generated_task_plan(
+        "Inventory",
+        "Build an inventory browser app backed by a Python API.",
+        {
+            "index.html": "<main>Inventory</main>",
+            "app.js": "const items = [];",
+            "server.py": "def list_items(): return []",
+            "models.py": "class Item: pass",
+            "tests/test_inventory.py": (
+                "def test_item_count():\\n"
+                "    items = [1, 2]\\n"
+                "    assert len(items) == 2\\n"
+            ),
+        },
+    )
+
+    titles = [task.title for task in tasks]
+    assert "Integrate Inventory: application shell" in titles
+    assert "Integrate Inventory: backend" in titles
+    qa_task = tasks[-1]
+    assert qa_task.title == "Validate Inventory quality and tests"
+    assert qa_task.dependencies == tuple(range(len(tasks) - 1))
+
