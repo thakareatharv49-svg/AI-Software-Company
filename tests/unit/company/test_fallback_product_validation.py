@@ -189,3 +189,48 @@ def test_repaired_small_mission_keeps_existing_validation_scope() -> None:
         "Build a simple landing page",
         project,
     )
+
+
+@pytest.mark.parametrize(
+    ("source_path", "source", "dependency_path"),
+    [
+        ("styles/main.css", '@import "./tokens.css";', "styles/tokens.css"),
+        ("styles/main.css", "body { background-image: url(../assets/bg.svg); }", "assets/bg.svg"),
+        ("pages/dashboard.html", '<script src="../app.js"></script>', "app.js"),
+        ("pages/dashboard.html", '<link rel="stylesheet" href="../styles/main.css">', "styles/main.css"),
+    ],
+)
+def test_browser_asset_validation_resolves_nested_relative_paths(
+    source_path: str,
+    source: str,
+    dependency_path: str,
+) -> None:
+    files = {
+        "index.html": "<!doctype html><html><body></body></html>",
+        source_path: source,
+        dependency_path: "/* dependency exists */",
+    }
+
+    OllamaProjectGenerator._validate_local_browser_assets(files)
+
+
+@pytest.mark.parametrize(
+    ("source_path", "source"),
+    [
+        ("styles/main.css", '@import "./missing.css";'),
+        ("styles/main.css", "body { background-image: url(../assets/missing.svg); }"),
+        ("pages/dashboard.html", '<script src="../missing.js"></script>'),
+        ("pages/dashboard.html", '<link rel="stylesheet" href="../missing.css">'),
+    ],
+)
+def test_browser_asset_validation_rejects_missing_nested_relative_paths(
+    source_path: str,
+    source: str,
+) -> None:
+    files = {
+        "index.html": "<!doctype html><html><body></body></html>",
+        source_path: source,
+    }
+
+    with pytest.raises(RuntimeError, match="references missing local asset"):
+        OllamaProjectGenerator._validate_local_browser_assets(files)
