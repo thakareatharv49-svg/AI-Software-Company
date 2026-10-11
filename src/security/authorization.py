@@ -1,6 +1,7 @@
 """Authorization dependencies for private company workspace APIs."""
 from __future__ import annotations
 
+import ipaddress
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -8,6 +9,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config.settings import settings
 from src.db.models.identity import AuthSessionModel
 from src.db.models.user import UserModel
 from src.db.models.workspace import WorkspaceMembershipModel, WorkspaceModel
@@ -18,15 +20,35 @@ SESSION_COOKIE = "asc_session"
 COMPANY_WORKSPACE_ID = "00000000-0000-4000-8000-000000000001"
 
 
+def _is_loopback_client(request: Request) -> bool:
+    """Return true only when the direct HTTP client uses a loopback address."""
+    if request.client is None:
+        return False
+    try:
+        return ipaddress.ip_address(request.client.host).is_loopback
+    except ValueError:
+        return False
+
+
 async def require_company_owner(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> UserModel:
-    """Require a valid server-side session and explicit owner membership.
+) -> UserModel | None:
+    """Authorize the local operator or require an authenticated company owner.
 
-    Company factory/control-center APIs are private owner operations. Customer
-    workspace APIs must use a separate workspace-scoped authorization policy.
+    A single-user local development instance may opt into access without OAuth by
+    setting LOCAL_ACCESS_ENABLED=true. The bypass is restricted to development
+    mode and loopback clients; deployments continue to require a verified session
+    and explicit owner membership. Nexora HQ remains a separate company-level
+    tracking application and does not grant access to this venture's APIs.
     """
+    if (
+        settings.local_access_enabled
+        and settings.environment.strip().lower() == "development"
+        and _is_loopback_client(request)
+    ):
+        return None
+
     raw_token = request.cookies.get(SESSION_COOKIE)
     if not raw_token:
         raise HTTPException(status_code=401, detail="Sign-in required")
