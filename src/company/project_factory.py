@@ -340,8 +340,6 @@ class ProjectFactory:
                     )
                 for step in project.plan.steps:
                     step.status = "completed"
-                # Stage telemetry is useful metadata, but an empty telemetry list must
-                 # not turn a successful pipeline into a paused/re-queued project.
                 # Stage telemetry is best-effort only. A malformed status
                 # must not turn a successfully returned pipeline into a failure.
                 try:
