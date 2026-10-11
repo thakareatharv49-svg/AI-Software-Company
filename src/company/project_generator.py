@@ -167,6 +167,7 @@ Rules:
         try:
             self._validate_mission_output(name, objective, generated)
             if large_mission:
+                self._validate_required_product_tests(generated.files)
                 self._checkpoint(name, objective).clear()
             return generated
         except RuntimeError as validation_error:
@@ -180,6 +181,8 @@ Rules:
             try:
                 repaired = await self.repair(generated.files, failure)
                 self._validate_mission_output(name, objective, repaired)
+                if large_mission:
+                    self._validate_required_product_tests(repaired.files)
             except Exception as repair_error:
                 # A checkpoint is useful while generation is incomplete, but once
                 # the completed output and its single repair both fail validation,
@@ -802,6 +805,18 @@ Requirements:
         """Apply the shared output checks to deterministic products as well."""
         OllamaProjectGenerator._validate_mission_output(name, objective, project)
         return project
+
+    @staticmethod
+    def _validate_required_product_tests(files: dict[str, str]) -> None:
+        """Keep broad, multi-feature missions from shipping without test modules."""
+        from src.company.product_quality import find_missing_product_tests
+
+        issues = find_missing_product_tests(files)
+        if issues:
+            raise RuntimeError(
+                "Generated product failed cross-product quality checks: "
+                + " ".join(issues)
+            )
 
     @staticmethod
     def _validate_mission_output(
