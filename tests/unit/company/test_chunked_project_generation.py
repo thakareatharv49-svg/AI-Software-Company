@@ -122,8 +122,8 @@ async def test_large_mission_adapts_file_token_budget_after_invalid_json(monkeyp
 
     monkeypatch.setattr(generator, "_call", fake_call)
     project = await generator._generate_large_mission(
-        "Large app",
-        "Create, edit, delete, pin and search items with responsive UI.",
+        "Large utility",
+        "Create, edit, delete, pin and search items in a Python command-line utility.",
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Recovered compact file</title>"
@@ -154,8 +154,8 @@ async def test_large_mission_retries_invalid_file_manifest(monkeypatch, tmp_path
 
     monkeypatch.setattr(generator, "_call", fake_call)
     project = await generator._generate_large_mission(
-        "Large app",
-        "Create, edit, delete, pin and search items with responsive UI.",
+        "Large utility",
+        "Create, edit, delete, pin and search items in a Python command-line utility.",
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Manifest recovered</title>"
@@ -259,8 +259,8 @@ async def test_later_file_prompt_includes_actual_previously_generated_source(
 
     monkeypatch.setattr(generator, "_call", fake_call)
     project = await generator._generate_large_mission(
-        "Notes App",
-        "Create, edit, delete, pin and search notes with responsive local storage.",
+        "Notes CLI",
+        "Create, edit, delete, pin and search notes in a Python command-line utility.",
     )
 
     assert "index.html" in project.files

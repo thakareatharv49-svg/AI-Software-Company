@@ -67,13 +67,13 @@ async def test_large_mission_resumes_completed_files_after_interruption(
     monkeypatch.setattr(generator, "_call", fake_call)
     with pytest.raises(RuntimeError, match="Failed to generate 'app.js'"):
         await generator._generate_large_mission(
-            "Notes App",
-            "Create, edit, delete, pin and search notes with responsive local storage.",
+            "Notes CLI",
+            "Create, edit, delete, pin and search notes in a Python command-line utility.",
         )
 
     resumed = await generator._generate_large_mission(
-        "Notes App",
-        "Create, edit, delete, pin and search notes with responsive local storage.",
+        "Notes CLI",
+        "Create, edit, delete, pin and search notes in a Python command-line utility.",
     )
 
     assert resumed.files["index.html"] == "<!doctype html><title>Notes</title>"

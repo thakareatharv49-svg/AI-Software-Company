@@ -211,6 +211,11 @@ Rules:
             return False
         browser_terms = (
             "web app", "web application", "website", "web site", "browser",
+            # Many natural-language missions say "Notes App" or "Finance App"
+            # without the words "web" or "browser". Unless an explicit non-browser
+            # deliverable above overrides it, treat an app request as browser-first.
+            " app", " apps", "notes app", "note taking app", "note-taking app",
+            "expense tracking app",
             "dashboard", "tracker", "planner", "storefront", "e-commerce",
             " ecommerce", "portfolio", "landing page", "management system",
             "booking system", "learning app", "educational app", "budget app",
