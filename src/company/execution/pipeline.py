@@ -118,7 +118,6 @@ class CompanyExecutionPipeline:
         payload: dict | None = None,
     ) -> None:
         event_payload = dict(payload or {})
-
         if self._active_run_id is not None:
             event_payload.setdefault("run_id", self._active_run_id)
             self.observability.record(
@@ -127,7 +126,6 @@ class CompanyExecutionPipeline:
                 project_id=project_id,
                 payload=event_payload,
             )
-
         event = CompanyEvent(
             event_type=event_type,
             project_id=project_id,
@@ -150,7 +148,6 @@ class CompanyExecutionPipeline:
     ) -> PipelineResult:
         self._active_generated_files = files
         project = self.project_engine.create(project_request)
-
         self._publish_event(
             "project.execution.started",
             project_id=project.id,
@@ -161,33 +158,26 @@ class CompanyExecutionPipeline:
         )
         project = self._transition_to_development(project)
         mission = replace(mission, project_id=project.id)
-
         self.manager.start_mission(mission)
         task_ids = self.manager.create_plan(tasks)
-
         executor = self._build_executor(agent_executor)
         await self._execute_tasks(executor)
-
         project = self.project_engine.transition(
             project.id,
             ProjectStatus.TESTING,
         )
-
         repair_callback = self._build_repair_callback(
             repair_agent_executor or agent_executor,
             project_name=project_request.name,
             objective=project_request.objective,
             project_id=project.id,
         )
-
         debug_result = await self.debugger.run(
             qa_request,
             repair=repair_callback,
         )
-
         if debug_result.attempts:
             latest_attempt = debug_result.attempts[-1]
-
             if latest_attempt.test_status != QATestStatus.PASSED:
                 self._publish_event(
                     "qa.failed",
@@ -198,29 +188,18 @@ class CompanyExecutionPipeline:
                         "status": latest_attempt.test_status.value,
                     },
                 )
-
         if debug_result.status == DebugStatus.BLOCKED:
-            self.project_engine.transition(
-                project.id,
-                ProjectStatus.DEBUGGING,
-            )
+            self.project_engine.transition(project.id, ProjectStatus.DEBUGGING)
             raise RuntimeError(
-                f"QA failed for project {project.id}: "
-                f"{debug_result.final_error}"
+                f"QA failed for project {project.id}: {debug_result.final_error}"
             )
-
         qa_result = await self.qa_runner.run(qa_request)
-
         if qa_result.status != QATestStatus.PASSED:
-            self.project_engine.transition(
-                project.id,
-                ProjectStatus.DEBUGGING,
-            )
+            self.project_engine.transition(project.id, ProjectStatus.DEBUGGING)
             raise RuntimeError(
                 f"QA failed for project {project.id}: "
                 f"{qa_result.stderr or qa_result.stdout}"
             )
-
         # QA repair agents can edit the workspace on disk. Reconcile those
         # edits before security review and GitHub publishing so the delivered
         # files are exactly the version that passed the final QA command.
@@ -228,12 +207,7 @@ class CompanyExecutionPipeline:
             qa_request.working_directory,
             files,
         )
-
-        self.project_engine.transition(
-            project.id,
-            ProjectStatus.SECURITY,
-        )
-
+        self.project_engine.transition(project.id, ProjectStatus.SECURITY)
         review_result = self.reviewer.review(
             CodeReviewRequest(
                 project_id=project.id,
@@ -246,28 +220,17 @@ class CompanyExecutionPipeline:
                 ),
             )
         )
-
         if review_result.status.value != "approved":
-            self.project_engine.transition(
-                project.id,
-                ProjectStatus.DEBUGGING,
-            )
+            self.project_engine.transition(project.id, ProjectStatus.DEBUGGING)
             raise RuntimeError(
-                f"Code review failed for project {project.id}: "
-                f"{review_result.summary}"
+                f"Code review failed for project {project.id}: {review_result.summary}"
             )
-
         self.project_engine.transition(project.id, ProjectStatus.REVIEW)
-
         gate = self.quality_gate.evaluate(
             qa_passed=qa_result.status == QATestStatus.PASSED,
             security_approved=review_result.status.value == "approved",
-            # Local execution must remain valid even when GitHub publishing
-            # is configured globally. GitHub readiness is required only when
-            # this run explicitly requests repository/PR publication.
             github_ready=(
-                github_repository is None
-                and pull_request_head is None
+                github_repository is None and pull_request_head is None
             ) or (
                 self.github is not None
                 and github_repository is not None
@@ -278,553 +241,28 @@ class CompanyExecutionPipeline:
         self._publish_event(
             "production.gate.evaluated",
             project_id=project.id,
-            payload={"allowed": gate.allowed, "checks": gate.checks},
+            payload={"approved": gate.approved, "reasons": gate.reasons},
         )
-        if not gate.allowed:
-            self.project_engine.transition(project.id, ProjectStatus.BLOCKED)
-            raise RuntimeError(gate.reason)
-
-        github_message = None
-        github_pending = False
-
-        if (
-            self.github is not None
-            and github_repository is not None
-            and pull_request_head is not None
-            and self.github_native is not None
-        ):
-            publish_commit_message = f"feat: complete {project.name}"
-            publish_error = None
-            try:
-                publish_result = await self.github_native.publish_files(
-                    github_repository,
-                    pull_request_head,
-                    files,
-                    publish_commit_message,
-                )
-                if publish_result.success:
-                    github_message = (
-                        "Published generated project directly to "
-                        f"{github_repository.owner}/{github_repository.name}:"
-                        f"{pull_request_head}"
-                    )
-                    for entry in self.github_publish_queue.due():
-                        if (
-                            entry.get("owner") == github_repository.owner
-                            and entry.get("name") == github_repository.name
-                            and entry.get("branch") == pull_request_head
-                        ):
-                            self.github_publish_queue.remove(entry)
-                else:
-                    publish_error = publish_result.message
-            except Exception as exc:
-                # Publishing is a delivery side-effect, not a build/QA gate.
-                # Network errors and API failures must not discard a valid local product.
-                publish_error = str(exc)
-
-            if publish_error is not None:
-                self.github_publish_queue.enqueue(
-                    owner=github_repository.owner,
-                    name=github_repository.name,
-                    branch=pull_request_head,
-                    files=dict(files),
-                    message=publish_commit_message,
-                )
-                github_pending = True
-                if self._is_github_rate_limited(publish_error):
-                    github_message = (
-                        "GitHub publishing is rate-limited. The local product "
-                        "passed QA/security and is completed; publishing is queued."
-                    )
-                else:
-                    github_message = (
-                        "The local product passed QA/security and is completed, "
-                        "but GitHub publishing failed and is queued for retry: "
-                        f"{publish_error}"
-                    )
-                self._publish_event(
-                    "github.publish.deferred",
-                    project_id=project.id,
-                    payload={
-                        "repository": (
-                            f"{github_repository.owner}/"
-                            f"{github_repository.name}"
-                        ),
-                        "branch": pull_request_head,
-                        "reason": publish_error,
-                    },
-                )
-
-        self.project_engine.transition(project.id, ProjectStatus.RELEASE)
-        project = self.project_engine.complete(project.id)
-
-        memory_entry = self.memory.remember(
-            MemoryCreateRequest(
-                memory_type=MemoryType.PROJECT,
-                title=f"Completed project: {project.name}",
-                content=(
-                    f"Project {project.name} completed successfully. "
-                    f"Tasks completed: {len(task_ids)}."
-                ),
-                project_id=project.id,
-            )
-        )
-
-        self.cross_project_memory.remember(MemoryInsight(
-            key="completed-project",
-            value=(
-                f"{project.name}: completed with {len(task_ids)} tasks; "
-                f"QA={qa_result.status.value}; security={review_result.status.value}."
-            ),
-            project_id=project.id,
-            importance=1.0,
-        ))
-        self.learning.record(LearningSignal(
-            category="project-execution",
-            outcome="completed",
-            value=1.0,
-            project_id=project.id,
-        ))
-        self._publish_event(
-            "company.intelligence.learned",
-            project_id=project.id,
-            payload={"category": "project-execution", "outcome": "completed"},
-        )
-
-        self._publish_event(
-            "project.execution.completed",
-            project_id=project.id,
-            payload={
-                "status": project.status.value,
-            },
-        )
-
+        if not gate.approved:
+            raise RuntimeError("Production quality gate rejected the generated project")
+        project = self.project_engine.transition(project.id, ProjectStatus.COMPLETED)
         return PipelineResult(
             project=project,
             task_ids=task_ids,
             qa_result=qa_result,
             review_result=review_result,
-            github_message=github_message,
-            github_pending=github_pending,
-            browser_preview=("index.html" in files),
-            memory_id=memory_entry.id,
         )
-
-    @staticmethod
-    def _is_github_rate_limited(message: str) -> bool:
-        lowered = message.lower()
-        return any(
-            marker in lowered
-            for marker in (
-                "secondary rate limit",
-                "temporarily blocked from content creation",
-                "rate limit exceeded",
-                "api rate limit",
-                "github api 403",
-            )
-        )
-
-    async def _flush_one_pending_github_publish(self) -> None:
-        """Retry at most one due publish without blocking local project execution."""
-        if self.github_native is None:
-            return
-        for entry in self.github_publish_queue.due()[:1]:
-            repository = GitHubRepository(
-                owner=str(entry.get("owner", "")),
-                name=str(entry.get("name", "")),
-            )
-            branch = str(entry.get("branch", "main"))
-            files = entry.get("files", {})
-            if not repository.owner or not repository.name or not isinstance(files, dict):
-                self.github_publish_queue.remove(entry)
-                continue
-            result = await self.github_native.publish_files(
-                repository,
-                branch,
-                {str(path): str(content) for path, content in files.items()},
-                str(entry.get("message", "feat: publish generated project")),
-            )
-            if result.success:
-                self.github_publish_queue.remove(entry)
-            elif self._is_github_rate_limited(result.message):
-                self.github_publish_queue.enqueue(
-                    owner=repository.owner,
-                    name=repository.name,
-                    branch=branch,
-                    files={str(path): str(content) for path, content in files.items()},
-                    message=str(entry.get("message", "feat: publish generated project")),
-                )
-
-    async def run_end_to_end(
-        self,
-        *,
-        project_request: ProjectCreateRequest,
-        mission: Mission,
-        tasks: list[TaskPlanItem],
-        qa_request: QATestRequest,
-        files: dict[str, str],
-        agent_executor: Callable | AgentExecutor | None = None,
-        repair_agent_executor: Callable | AgentExecutor | None = None,
-        github_repository: GitHubRepository | None = None,
-        pull_request_head: str | None = None,
-    ) -> PipelineResult:
-        """
-        Execute one complete autonomous company run.
-
-        This is the public M15 entry point. The existing execute()
-        method remains the authoritative project execution workflow.
-        """
-
-        self._active_run_id = self.observability.create_run_id()
-
-        # Publishing is deliberately decoupled from project generation. A due
-        # GitHub publish is retried once per factory run; a rate limit never
-        # blocks the new project's local completion.
-        try:
-            await self._flush_one_pending_github_publish()
-        except Exception:
-            pass
-
-        while True:
-            try:
-                result = await self.execute(
-                    project_request=project_request,
-                    mission=mission,
-                    tasks=tasks,
-                    qa_request=qa_request,
-                    files=files,
-                    agent_executor=agent_executor,
-                    repair_agent_executor=repair_agent_executor,
-                    github_repository=github_repository,
-                    pull_request_head=pull_request_head,
-                )
-
-                self.recovery.reset()
-
-                self._publish_event(
-                    "autonomous.run.completed",
-                    project_id=result.project.id,
-                    payload={
-                        "status": "completed",
-                        "task_count": len(result.task_ids),
-                    },
-                )
-
-                return result
-
-            except Exception as exc:
-                recovery = self.recovery.record_failure(error=exc)
-
-                self._publish_event(
-                    "autonomous.run.failed",
-                    project_id=recovery.project_id,
-                    payload={
-                        "status": "failed",
-                        "error": str(exc),
-                        "project_name": project_request.name,
-                        "recovery_action": recovery.action,
-                        "retryable": recovery.retryable,
-                        "attempt": recovery.attempt,
-                    },
-                )
-
-                if not recovery.retryable:
-                    self.recovery.reset()
-                    raise
-
-                self._publish_event(
-                    "autonomous.run.recovery_available",
-                    project_id=recovery.project_id,
-                    payload={
-                        "action": recovery.action,
-                        "attempt": recovery.attempt,
-                    },
-                )
-
-    def _select_repair_agent(self) -> str:
-        agents = self.manager.agent_registry.list_agents()
-
-        preferred = (
-            "backend-engineer",
-            "ai-engineer",
-            "infrastructure-engineer",
-            "database-engineer",
-            "frontend-engineer",
-        )
-
-        available = {agent.name for agent in agents}
-
-        for name in preferred:
-            if name in available:
-                return name
-
-        if agents:
-            return agents[0].name
-
-        raise RuntimeError("No repair agent is registered")
-
-    @staticmethod
-    def _sync_generated_files_from_workspace(
-        working_directory: str,
-        files: dict[str, str],
-    ) -> None:
-        """Refresh the deliverable file map from the post-repair workspace."""
-        root = Path(working_directory).resolve()
-        ignored_directories = {
-            ".git",
-            ".venv",
-            "venv",
-            "node_modules",
-            "__pycache__",
-            ".pytest_cache",
-            ".mypy_cache",
-            ".ruff_cache",
-            ".factory-checkpoints",
-            "dist",
-            "build",
-        }
-        refreshed: dict[str, str] = {}
-        file_count = 0
-        total_bytes = 0
-        max_file_bytes = 2_000_000
-        max_total_bytes = 20_000_000
-        max_files = 500
-
-        if not root.is_dir():
-            raise RuntimeError(
-                f"Cannot synchronize generated files: workspace does not exist: {root}"
-            )
-
-        for current_root, directories, filenames in os.walk(root, topdown=True, followlinks=False):
-            current = Path(current_root)
-            directories[:] = sorted(
-                name
-                for name in directories
-                if name not in ignored_directories
-                and not (current / name).is_symlink()
-            )
-            for filename in sorted(filenames):
-                path = current / filename
-                if path.is_symlink() or not path.is_file():
-                    continue
-                try:
-                    relative = path.relative_to(root)
-                    resolved = path.resolve()
-                    resolved.relative_to(root)
-                    size = path.stat().st_size
-                except (OSError, ValueError):
-                    continue
-                if size > max_file_bytes:
-                    # Do not publish oversized or potentially binary artifacts.
-                    continue
-                if file_count >= max_files or total_bytes + size > max_total_bytes:
-                    break
-                try:
-                    file_content = path.read_text(encoding="utf-8")
-                except (OSError, UnicodeError):
-                    continue
-
-                refreshed[relative.as_posix()] = file_content
-                file_count += 1
-                total_bytes += size
-            if file_count >= max_files or total_bytes >= max_total_bytes:
-                break
-
-        # Some pipeline callers and legacy integrations keep generated files only
-        # in memory instead of materializing them in the QA workspace. In that case,
-        # preserve the original deliverable rather than failing before security review.
-        # When the workspace does contain readable files, it remains authoritative:
-        # this synchronizes repairs and additions while removing stale/deleted files.
-        if not refreshed:
-            return
-        files.clear()
-        files.update(refreshed)
-
-    def _build_repair_callback(
-        self,
-        executor: Callable | AgentExecutor | None,
-        *,
-        project_name: str,
-        objective: str,
-        project_id: str,
-    ) -> Callable | None:
-        def validate_repaired_files() -> bool:
-            try:
-                self.project_generator._validate_mission_output(
-                    project_name,
-                    objective,
-                    GeneratedProject(
-                        files=dict(self._active_generated_files),
-                        test_command=["python", "-m", "pytest", "-q"],
-                    ),
-                )
-            except RuntimeError as exc:
-                self._publish_event(
-                    "qa.repair.rejected",
-                    project_id=project_id,
-                    payload={"reason": str(exc)[:2000], "project_name": project_name},
-                )
-                return False
-            return True
-
-        if executor is None:
-            async def generated_project_repair(request: QATestRequest, diagnosis) -> bool:
-                repaired = await self.project_generator.repair(
-                    files=self._active_generated_files,
-                    failure=diagnosis.error,
-                )
-                # Validate repaired source before allowing another QA attempt to
-                # pass with broken assets, invalid syntax, or weakened tests.
-                try:
-                    self.project_generator._validate_mission_output(
-                        project_name, objective, repaired
-                    )
-                except RuntimeError as exc:
-                    self._publish_event(
-                        "qa.repair.rejected",
-                        project_id=project_id,
-                        payload={"reason": str(exc)[:2000], "project_name": project_name},
-                    )
-                    return False
-
-                root = Path(request.working_directory).resolve()
-                for relative_path, content in repaired.files.items():
-                    target = (root / relative_path).resolve()
-                    if target != root and root not in target.parents:
-                        self._publish_event(
-                            "qa.repair.rejected",
-                            project_id=project_id,
-                            payload={
-                                "reason": f"Repair returned unsafe path: {relative_path!r}",
-                                "project_name": project_name,
-                            },
-                        )
-                        return False
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_text(content, encoding="utf-8")
-                self._active_generated_files.clear()
-                self._active_generated_files.update(repaired.files)
-                return True
-
-            return generated_project_repair
-
-        if isinstance(executor, AgentExecutor):
-            executor = self._agent_executor_adapter(executor)
-
-        async def repair(
-            request: QATestRequest,
-            diagnosis,
-        ) -> bool:
-            result = await executor(
-                AgentRequest(
-                    task_id=f"qa-repair-{diagnosis.attempt}",
-                    instruction=(
-                        "Repair the current QA failure autonomously. "
-                        "Inspect the failure, locate the faulty code, "
-                        "modify the workspace using permitted tools, and "
-                        "run the relevant test or command to verify the fix. "
-                        "Do not remove or weaken behavioral tests."
-                    ),
-                    context={
-                        "qa_command": request.command,
-                        "working_directory": request.working_directory,
-                        "failure": diagnosis.error,
-                        "stdout": diagnosis.stdout,
-                        "stderr": diagnosis.stderr,
-                    },
-                )
-            )
-
-            if isinstance(result, AgentResult):
-                success = result.success
-            elif isinstance(result, bool):
-                success = result
-            else:
-                success = bool(getattr(result, "success", False))
-
-            if not success:
-                return False
-            self._sync_generated_files_from_workspace(
-                request.working_directory,
-                self._active_generated_files,
-            )
-            return validate_repaired_files()
-
-        return repair
-
-    def _build_executor(
-        self,
-        executor: Callable | AgentExecutor | None,
-    ) -> Callable:
-        if executor is None:
-            if self.manager.agent_executor is not None:
-                return self.manager.agent_executor
-
-            async def generated_project_executor(request: AgentRequest) -> AgentResult:
-                """Complete the bookkeeping task for already-generated project files."""
-                task = self.manager.task_engine.get(request.task_id)
-                agent_name = task.assigned_agent or "factory-engineer"
-                return AgentResult(
-                    task_id=request.task_id,
-                    agent_name=agent_name,
-                    success=True,
-                    output="Generated project files are ready for QA.",
-                )
-
-            return generated_project_executor
-
-        if isinstance(executor, AgentExecutor):
-            return self._agent_executor_adapter(executor)
-
-        return executor
-
-    def _agent_executor_adapter(
-        self,
-        executor: AgentExecutor,
-    ) -> Callable:
-        async def run(request: AgentRequest):
-            task = self.manager.task_engine.get(request.task_id)
-            agent_name = task.assigned_agent
-
-            if agent_name is None:
-                raise RuntimeError(
-                    f"Task {request.task_id} has no assigned agent"
-                )
-
-            agent = self.manager.agent_registry.get(agent_name)
-
-            if agent is None:
-                raise RuntimeError(
-                    f"Agent '{agent_name}' is not registered"
-                )
-
-            context = AgentExecutionContext(
-                agent=agent,
-                allowed_permissions=agent.permissions,
-            )
-
-            return await executor.execute(context, request)
-
-        return run
 
     async def _execute_tasks(self, executor: Callable | None) -> None:
         while True:
-            decision = await self.manager.tick(executor=executor)
-
+            decision = await self.manager.tick_parallel(
+                executor=executor,
+                max_concurrency=settings.factory_max_parallel_tasks,
+            )
             if decision.decision.value == "complete_mission":
                 return
-
             if decision.decision.value == "wait":
-                if decision.task_id is None:
-                    raise RuntimeError(decision.reason)
-
-                task = self.manager.task_engine.get(decision.task_id)
-
-                if task.status.value == "failed":
-                    raise RuntimeError(decision.reason)
-
                 raise RuntimeError(decision.reason)
-
             if decision.task_id is None:
                 raise RuntimeError("Manager started a task without a task ID")
 
@@ -837,6 +275,4 @@ class CompanyExecutionPipeline:
             ProjectStatus.DEVELOPMENT,
         ):
             project = self.project_engine.transition(project.id, status)
-
         return project
-
