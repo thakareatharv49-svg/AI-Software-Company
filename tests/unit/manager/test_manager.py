@@ -48,7 +48,36 @@ def test_manager_creates_ordered_plan() -> None:
 
 
 @pytest.mark.asyncio
-async def test_manager_delegates_execution() -> None:
+async @pytest.mark.parametrize(
+    "items",
+    [
+        [TaskPlanItem(title="Task", dependencies=(-1,))],
+        [TaskPlanItem(title="Task", dependencies=(0,))],
+        [
+            TaskPlanItem(title="First"),
+            TaskPlanItem(title="Second", dependencies=(1,)),
+        ],
+        [
+            TaskPlanItem(title="First"),
+            TaskPlanItem(title="Second", dependencies=(0, 0)),
+        ],
+        [
+            TaskPlanItem(title="First"),
+            TaskPlanItem(title="Second", dependencies=("0",)),
+        ],
+    ],
+)
+def test_manager_rejects_invalid_dependency_graph_before_creating_tasks(items) -> None:
+    manager = MasterManager()
+    manager.start_mission(make_mission())
+
+    with pytest.raises(ValueError, match="dependency"):
+        manager.create_plan(items)
+
+    assert manager.task_engine.list(project_id="project-1") == []
+
+
+def test_manager_delegates_execution() -> None:
     registry = AgentRegistry()
     registry.register(make_agent())
 
