@@ -98,6 +98,16 @@ async def test_company_pipeline_completes_project(tmp_path: Path):
         "    Path('product-test-ran.txt').write_text('passed', encoding='utf-8')\n",
         encoding="utf-8",
     )
+    (generated_tests / "product.test.js").write_text(
+        "const test = require('node:test');\n"
+        "const assert = require('node:assert/strict');\n"
+        "const fs = require('node:fs');\n"
+        "test('generated JavaScript suite is executed', () => {\n"
+        "  fs.writeFileSync('javascript-test-ran.txt', 'passed');\n"
+        "  assert.equal(2 + 2, 4);\n"
+        "});\n",
+        encoding="utf-8",
+    )
 
     result = await pipeline.run_end_to_end(
         project_request=project_request,
@@ -110,6 +120,15 @@ async def test_company_pipeline_completes_project(tmp_path: Path):
                 "from pathlib import Path\n"
                 "def test_product_suite_is_executed():\n"
                 "    Path('product-test-ran.txt').write_text('passed', encoding='utf-8')\n"
+            ),
+            "tests/product.test.js": (
+                "const test = require('node:test');\n"
+                "const assert = require('node:assert/strict');\n"
+                "const fs = require('node:fs');\n"
+                "test('generated JavaScript suite is executed', () => {\n"
+                "  fs.writeFileSync('javascript-test-ran.txt', 'passed');\n"
+                "  assert.equal(2 + 2, 4);\n"
+                "});\n"
             ),
         },
         agent_executor=FakeAgentExecutor(),
@@ -127,6 +146,7 @@ async def test_company_pipeline_completes_project(tmp_path: Path):
     assert result.memory_id is not None
     assert result.github_message is not None
     assert (tmp_path / "product-test-ran.txt").read_text(encoding="utf-8") == "passed"
+    assert (tmp_path / "javascript-test-ran.txt").read_text(encoding="utf-8") == "passed"
 
 def test_pipeline_exposes_real_end_to_end_entrypoint() -> None:
     assert hasattr(CompanyExecutionPipeline, "run_end_to_end")

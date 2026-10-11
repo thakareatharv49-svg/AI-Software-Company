@@ -265,6 +265,44 @@ class CompanyExecutionPipeline:
                     f"{product_test_result.stderr or product_test_result.stdout}"
                 )
 
+        # Browser products can ship executable Node test suites as well as
+        # Python tests. Run conventional Node test files independently unless the
+        # configured QA command already invokes Node's built-in test runner.
+        has_javascript_tests = any(
+            path.replace("\\", "/").casefold().startswith("tests/")
+            and path.casefold().endswith((".test.js", ".spec.js"))
+            for path in files
+        )
+        runs_node_tests = any(
+            part == "--test" and index > 0
+            and configured_command[index - 1] in {"node", "node.exe"}
+            for index, part in enumerate(configured_command)
+        )
+        if has_javascript_tests and not runs_node_tests:
+            javascript_test_request = qa_request.model_copy(
+                update={"command": ["node", "--test"]}
+            )
+            javascript_test_result = await self.qa_runner.run(javascript_test_request)
+            self._publish_event(
+                "qa.generated_product_tests.completed",
+                project_id=project.id,
+                payload={
+                    "framework": "node:test",
+                    "status": javascript_test_result.status.value,
+                    "exit_code": javascript_test_result.exit_code,
+                    "duration_ms": javascript_test_result.duration_ms,
+                },
+            )
+            if javascript_test_result.status != QATestStatus.PASSED:
+                self.project_engine.transition(
+                    project.id,
+                    ProjectStatus.DEBUGGING,
+                )
+                raise RuntimeError(
+                    f"Generated JavaScript product tests failed for project {project.id}: "
+                    f"{javascript_test_result.stderr or javascript_test_result.stdout}"
+                )
+
         # QA repair agents can edit the workspace on disk. Reconcile those
         # edits before security review and GitHub publishing so the delivered
         # files are exactly the version that passed the final QA command.
