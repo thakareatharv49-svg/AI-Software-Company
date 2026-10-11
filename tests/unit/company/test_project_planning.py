@@ -73,3 +73,91 @@ async def test_large_mission_generates_modules_in_dependency_order(tmp_path) -> 
         "tests/test_service.py",
     ]
     assert set(project.files) == set(generated_order)
+
+
+
+@pytest.mark.asyncio
+async def test_large_manifest_enforces_file_limit_and_recovers(tmp_path) -> None:
+    generator = OllamaProjectGenerator(
+        checkpoint_dir=tmp_path,
+        max_generated_project_files=4,
+    )
+    oversized = {
+        "files": [
+            {"path": f"src/module_{index}.py", "purpose": "Module", "depends_on": []}
+            for index in range(5)
+        ]
+    }
+    valid = {
+        "files": [
+            {"path": "src/contracts.py", "purpose": "Contracts", "depends_on": []},
+            {"path": "src/service.py", "purpose": "Service", "depends_on": ["src/contracts.py"]},
+            {"path": "tests/test_service.py", "purpose": "Behavior tests", "depends_on": ["src/service.py"]},
+            {"path": "README.md", "purpose": "Usage", "depends_on": []},
+        ]
+    }
+    responses = [
+        json.dumps(oversized),
+        json.dumps(valid),
+        json.dumps({"content": "class Contract: pass"}),
+        json.dumps({"content": "from src.contracts import Contract\ndef create(): return Contract()"}),
+        json.dumps({"content": "from src.service import create\ndef test_create(): assert create() is not None"}),
+        json.dumps({"content": "# Inventory"}),
+    ]
+    prompts = []
+
+    async def fake_call(payload):
+        prompts.append(payload["prompt"])
+        return responses.pop(0)
+
+    generator._call = fake_call  # type: ignore[method-assign]
+    generated = await generator._generate_large_mission(
+        "Inventory CLI",
+        "Build an inventory CLI with create, edit, search, filter, export and validation.",
+    )
+
+    assert len(generated.files) == 4
+    assert "configured limit of 4 files" in prompts[1]
+
+
+@pytest.mark.asyncio
+async def test_large_manifest_normalizes_windows_paths_and_rejects_case_duplicates(tmp_path) -> None:
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path, max_generated_project_files=4)
+    invalid = {
+        "files": [
+            {"path": "src\\service.py", "purpose": "Service", "depends_on": []},
+            {"path": "SRC/service.py", "purpose": "Duplicate on Windows", "depends_on": []},
+        ]
+    }
+    valid = {
+        "files": [
+            {"path": "src\\contracts.py", "purpose": "Contracts", "depends_on": []},
+            {"path": "src\\service.py", "purpose": "Service", "depends_on": ["src\\contracts.py"]},
+            {"path": "tests\\test_service.py", "purpose": "Tests", "depends_on": ["src\\service.py"]},
+            {"path": "README.md", "purpose": "Readme", "depends_on": []},
+        ]
+    }
+    responses = [
+        json.dumps(invalid),
+        json.dumps(valid),
+        json.dumps({"content": "class Contract: pass"}),
+        json.dumps({"content": "from src.contracts import Contract\ndef create(): return Contract()"}),
+        json.dumps({"content": "from src.service import create\ndef test_create(): assert create() is not None"}),
+        json.dumps({"content": "# Inventory"}),
+    ]
+    prompts = []
+
+    async def fake_call(payload):
+        prompts.append(payload["prompt"])
+        return responses.pop(0)
+
+    generator._call = fake_call  # type: ignore[method-assign]
+    generated = await generator._generate_large_mission(
+        "Inventory CLI",
+        "Build an inventory CLI with create, edit, search, filter, export and validation.",
+    )
+
+    assert set(generated.files) == {
+        "src/contracts.py", "src/service.py", "tests/test_service.py", "README.md"
+    }
+    assert "case-insensitive" in prompts[1]
