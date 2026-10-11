@@ -545,7 +545,7 @@ async def test_large_mission_uses_configured_file_budget_in_manifest_prompt(monk
         json.dumps({"content": "<!doctype html><title>Budget test</title>"}),
         json.dumps({"content": "body { font-family: sans-serif; }"}),
         json.dumps({"content": "document.title = 'Budget test';"}),
-        json.dumps({"content": "def test_product_has_title():\\n    assert 'Budget test' in '<title>Budget test</title>'\\n"}),
+        json.dumps({"content": "def test_product_has_title():\n    assert 'Budget test' in '<title>Budget test</title>'\n"}),
     ]
 
     async def fake_call(payload):
