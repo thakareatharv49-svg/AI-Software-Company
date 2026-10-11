@@ -19,8 +19,9 @@ class Settings(BaseSettings):
     ollama_timeout: float = 600.0
 
     # Hard cap protects local model context, disk usage, and generation time.
-    # Increase per deployment as model and hardware capacity allow.
     factory_max_generated_project_files: int = Field(default=40, ge=4, le=200)
+    # Bound parallel agent work to avoid overwhelming local models and services.
+    factory_max_parallel_tasks: int = Field(default=2, ge=1, le=8)
 
     github_token: str = ""
     github_api_base_url: str = "https://api.github.com"
