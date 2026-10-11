@@ -93,8 +93,8 @@ async def test_large_mission_retries_only_the_failed_file(monkeypatch, tmp_path)
 
     monkeypatch.setattr(generator, "_call", fake_call)
     project = await generator._generate_large_mission(
-        "Large utility",
-        "Create, edit, delete, pin and search items in a Python command-line utility.",
+        "Large app",
+        "Create, edit, delete, pin and search items in a responsive browser app.",
     )
 
     assert project.files["index.html"] == "<!doctype html><title>Recovered</title>"
@@ -358,8 +358,8 @@ async def test_large_mission_stops_repeating_slow_non_json_file_failures(
 
     assert calls == 4
     checkpoint = generator._checkpoint(
-        "Large utility",
-        "Create, edit, delete, pin and search items in a Python command-line utility.",
+        "Large app",
+        "Create, edit, delete, pin and search items in a responsive browser app.",
     ).load()
     assert checkpoint is not None
     assert checkpoint["files"]["index.html"].startswith("<!doctype html>")
