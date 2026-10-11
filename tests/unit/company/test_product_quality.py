@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.company.product_quality import (
+    find_missing_product_tests,
     find_unfinished_product_content,
     find_weak_product_tests,
 )
@@ -281,3 +282,27 @@ def test_rejects_project_with_only_documentation_not_tests() -> None:
 
     assert len(issues) == 1
     assert "no automated test files" in issues[0]
+
+
+
+def test_requires_test_modules_for_broad_product_delivery() -> None:
+    issues = find_missing_product_tests({
+        "index.html": "<main>Inventory</main>",
+        "app.js": "function addItem(items, item) { return [...items, item]; }",
+    })
+
+    assert len(issues) == 1
+    assert "no automated test files" in issues[0]
+
+
+def test_accepts_project_with_a_test_module() -> None:
+    issues = find_missing_product_tests({
+        "src/app.py": "def add_item(items, item):\n    return [*items, item]\n",
+        "tests/test_app.py": (
+            "from src.app import add_item\n"
+            "def test_add_item():\n"
+            "    assert add_item([], 'x') == ['x']\n"
+        ),
+    })
+
+    assert issues == []
