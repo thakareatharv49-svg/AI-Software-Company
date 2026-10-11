@@ -785,7 +785,7 @@ def test_automatic_retry_resets_completed_and_failed_stage_progress():
     )
     project = FactoryProject(mission=mission, plan=plan, last_error="previous failure")
 
-    factory._reset_for_retry(project)
+    factory._reset_for_retry(project, reset_completed=True)
 
     assert project.last_error is None
     assert all(step.status == "planned" for step in project.plan.steps)
