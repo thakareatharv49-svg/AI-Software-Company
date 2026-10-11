@@ -10,6 +10,7 @@ from observability.logging import configure_logging
 from src.company.control_center.routes import router as control_router
 from src.company.customer_routes import router as customer_router
 from src.company.owner_routes import router as owner_router
+from src.company.review_routes import router as product_review_router
 from src.security.authorization import require_company_owner
 from src.security.routes.oauth_routes import router as oauth_router
 from src.security.routes.routes import router as security_router
@@ -43,6 +44,7 @@ app.include_router(customer_router)
 app.include_router(customer_web_router)
 app.include_router(control_router, dependencies=[Depends(require_company_owner)])
 app.include_router(owner_router, dependencies=[Depends(require_company_owner)])
+app.include_router(product_review_router, dependencies=[Depends(require_company_owner)])
 app.include_router(web_router)
 
 app.mount(
