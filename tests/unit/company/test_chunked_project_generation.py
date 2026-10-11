@@ -561,7 +561,6 @@ async def test_large_mission_uses_configured_file_budget_in_manifest_prompt(monk
     assert "no more than 72 files" in captured[0]["prompt"]
 
 
-
 @pytest.mark.asyncio
 async def test_large_mission_rejects_invalid_compact_manifest(monkeypatch, tmp_path) -> None:
     generator = OllamaProjectGenerator(
