@@ -49,13 +49,14 @@ function message(text, error=false) {
 }
 
 function renderPipeline(audit, status) {
-  const steps = [["plan","Plan","Mission controller"],["generate","Generate","Local Ollama"],["validate","Validate","Tests + QA + security"],["repair","Repair","Autonomous retry loop"],["publish","Publish","GitHub main"]];
+  const steps = [["plan","Plan","Mission controller"],["generate","Generate","Local Ollama"],["validate","Validate","Tests + QA + security"],["repair","Repair","Autonomous retry loop"],["review","Review","Your acceptance checklist"],["publish","Publish","GitHub after approval"]];
   const types = audit.map(e => String(e.event_type || "").toUpperCase());
   let current = "plan";
   if (types.some(t => /GENERAT|PROJECT_STARTED|FACTORY_PROJECT_STARTED/.test(t))) current = "generate";
   if (types.some(t => /VALIDAT|TEST|QA|PROJECT_COMPLETED/.test(t))) current = "validate";
   if (types.some(t => /REPAIR/.test(t))) current = "repair";
-  if (types.some(t => /PUBLISH|GITHUB/.test(t)) || status === "completed") current = "publish";
+  if (status === "completed") current = "review";
+  if (types.some(t => /PRODUCT_PUBLISHED|GITHUB_PUBLISH_SUCCEEDED/.test(t))) current = "publish";
   const box = $("pipeline"); box.replaceChildren();
   const order = steps.map(s => s[0]), currentIndex = order.indexOf(current);
   for (const [key,title,desc] of steps) {
