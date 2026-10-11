@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.company.product_quality import (
     find_exposed_secrets,
     find_missing_product_tests,
+    find_uncovered_mission_features,
     find_unfinished_product_content,
     find_weak_product_tests,
 )
@@ -339,5 +340,43 @@ def test_ignores_documentation_and_test_fixtures_for_secret_scan() -> None:
         ".env.example": "OPENAI_API_KEY=replace-with-environment-secret",
         "src/settings.py": "API_KEY = os.environ.get('OPENAI_API_KEY', '')",
     })
+
+    assert issues == []
+
+
+def test_detects_requested_features_missing_from_generated_tests() -> None:
+    objective = "Create, edit, delete, search and pin notes with persistent local storage and input validation."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "tests/test_notes.py": (
+                "def test_create_note(): pass\\n"
+                "def test_search_notes(): pass\\n"
+            ),
+        },
+    )
+
+    assert any("edit/update" in issue for issue in issues)
+    assert any("delete/remove" in issue for issue in issues)
+    assert any("pin/favorite" in issue for issue in issues)
+    assert any("persistence" in issue for issue in issues)
+    assert any("validation" in issue for issue in issues)
+
+
+def test_accepts_test_traceability_for_requested_product_workflows() -> None:
+    objective = "Create, edit, delete and search notes with persistent local storage and validation."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "tests/test_notes.py": (
+                "def test_create_note(): pass\\n"
+                "def test_update_note(): pass\\n"
+                "def test_delete_note(): pass\\n"
+                "def test_search_notes(): pass\\n"
+                "def test_localstorage_persistence(): pass\\n"
+                "def test_rejects_invalid_note(): pass\\n"
+            ),
+        },
+    )
 
     assert issues == []
