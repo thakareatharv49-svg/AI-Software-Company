@@ -531,3 +531,31 @@ async def test_test_file_prompt_prioritizes_implementation_over_large_stylesheet
     test_prompt = payloads[-1]["prompt"]
     assert "FILE: app.js" in test_prompt
     assert "function addNote(title)" in test_prompt
+
+
+@pytest.mark.asyncio
+async def test_large_mission_uses_configured_file_budget_in_manifest_prompt(monkeypatch, tmp_path):
+    generator = OllamaProjectGenerator(
+        checkpoint_dir=tmp_path,
+        max_generated_project_files=72,
+    )
+    captured = []
+    responses = [
+        json.dumps({"files": [{"path": "index.html", "purpose": "App entry point"}]}),
+        json.dumps({"content": "<!doctype html><title>Budget test</title>"}),
+        json.dumps({"content": "body { font-family: sans-serif; }"}),
+        json.dumps({"content": "document.title = 'Budget test';"}),
+        json.dumps({"content": "def test_product_has_title():\\n    assert 'Budget test' in '<title>Budget test</title>'\\n"}),
+    ]
+
+    async def fake_call(payload):
+        captured.append(payload)
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    await generator._generate_large_mission(
+        "Budget test app",
+        "Create, edit, delete and search records in a responsive browser app.",
+    )
+
+    assert "no more than 72 files" in captured[0]["prompt"]
