@@ -8,6 +8,9 @@ from src.company.project_generator import OllamaProjectGenerator
 
 def test_non_demo_mission_uses_mission_specific_preview_ready_prompt() -> None:
     generator = OllamaProjectGenerator()
+    # This test isolates the single-pass prompt contract. Modular routing is
+    # covered separately by test_large_mission_routing.py.
+    generator._is_large_mission = lambda *_args: False  # type: ignore[method-assign]
     captured: dict = {}
 
     async def fake_call(payload: dict) -> str:
@@ -127,6 +130,9 @@ def test_browser_validation_failure_triggers_one_mission_aware_repair() -> None:
     from src.company.project_generator import GeneratedProject
 
     generator = OllamaProjectGenerator()
+    # Keep this test focused on the single-pass repair contract; modular
+    # mission routing has dedicated regression coverage.
+    generator._is_large_mission = lambda *_args: False  # type: ignore[method-assign]
     repair_calls: list[tuple[dict[str, str], str]] = []
 
     async def fake_call(payload: dict) -> str:
