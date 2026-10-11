@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 from src.company.autonomous_project import (
@@ -71,6 +71,7 @@ class FactoryAutonomousRunner:
             )
             raise
         try:
+            self._validate_generated_files(request.files)
             workspace = self.workspace_service.create_workspace(mission.id)
             for path, content in request.files.items():
                 workspace.write_file(path, content)
@@ -123,6 +124,34 @@ class FactoryAutonomousRunner:
             # Completed workspaces are intentionally retained for the product
             # viewer. Failed attempts are also retained for diagnostics/retry.
             pass
+
+    @staticmethod
+    def _validate_generated_files(files: dict[str, str]) -> None:
+        """Reject empty or unsafe artifact plans before touching the workspace."""
+        if not isinstance(files, dict) or not files:
+            raise ValueError("Generated project contains no files")
+
+        has_content = False
+        for raw_path, content in files.items():
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise ValueError("Generated project contains an empty file path")
+            if not isinstance(content, str):
+                raise ValueError(f"Generated file {raw_path!r} has non-text content")
+
+            # Normalize Windows separators too, even when the factory runs on POSIX.
+            normalized = raw_path.replace("\\", "/")
+            path = PurePosixPath(normalized)
+            if (
+                path.is_absolute()
+                or any(part in {"", ".", ".."} for part in path.parts)
+                or (path.parts and path.parts[0].endswith(":"))
+                or "\x00" in normalized
+            ):
+                raise ValueError(f"Generated project contains unsafe path: {raw_path!r}")
+            has_content = has_content or bool(content.strip())
+
+        if not has_content:
+            raise ValueError("Generated project files are all empty")
 
     @staticmethod
     def _record_acceptance_failures(plan: MissionPlan, failed_checks) -> None:
