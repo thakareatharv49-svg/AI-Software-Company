@@ -559,3 +559,39 @@ async def test_large_mission_uses_configured_file_budget_in_manifest_prompt(monk
     )
 
     assert "no more than 72 files" in captured[0]["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_large_mission_rejects_invalid_compact_manifest(monkeypatch, tmp_path) -> None:
+    generator = OllamaProjectGenerator(
+        checkpoint_dir=tmp_path,
+        max_generated_project_files=5,
+    )
+    initial_manifest = {
+        "files": [
+            {"path": f"module_{index}.py", "purpose": f"Module {index}"}
+            for index in range(6)
+        ]
+    }
+    # The compact response is structurally valid and fits the nominal count,
+    # but leaves no room for mandatory browser assets. It must not replace the
+    # original plan.
+    compact_manifest = {
+        "files": [
+            {"path": "index.html", "purpose": "Browser entry"},
+            {"path": "tests/test_project.py", "purpose": "Behavior tests"},
+            {"path": "src/main.py", "purpose": "Application entry"},
+            {"path": "README.md", "purpose": "Project documentation"},
+        ]
+    }
+    responses = [json.dumps(initial_manifest), json.dumps(compact_manifest)]
+
+    async def fake_call(payload):
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    with pytest.raises(RuntimeError, match="safe limit is 5"):
+        await generator._generate_large_mission(
+            "Browser project platform",
+            "Create a browser project platform with a dashboard and analytics.",
+        )
