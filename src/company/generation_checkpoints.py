@@ -33,6 +33,56 @@ class GenerationCheckpointStore:
             return None
         return payload
 
+    def compatible_files(
+        self, manifest: list[dict[str, Any]]
+    ) -> dict[str, str]:
+        """Return cached files only when their manifest contract is unchanged.
+
+        A file generated for a different purpose or dependency contract may no
+        longer be compatible with the current plan, even if its path is reused.
+        """
+        payload = self.load()
+        if payload is None:
+            return {}
+
+        def contract(item: object) -> tuple[str, str, tuple[str, ...]] | None:
+            if not isinstance(item, dict):
+                return None
+            path = item.get("path")
+            purpose = item.get("purpose")
+            dependencies = item.get("depends_on", [])
+            if (
+                not isinstance(path, str)
+                or not path.strip()
+                or not isinstance(purpose, str)
+                or not isinstance(dependencies, list)
+                or any(not isinstance(dep, str) for dep in dependencies)
+            ):
+                return None
+            normalized_path = path.replace("\\\\", "/").strip().casefold()
+            normalized_dependencies = tuple(sorted(
+                dep.replace("\\\\", "/").strip().casefold()
+                for dep in dependencies
+            ))
+            return normalized_path, purpose.strip(), normalized_dependencies
+
+        previous = {
+            key: item.get("path")
+            for item in payload["manifest"]
+            if (key := contract(item)) is not None
+        }
+        compatible_paths = {
+            item.get("path")
+            for item in manifest
+            if (key := contract(item)) is not None and key in previous
+        }
+        cached = payload["files"]
+        return {
+            path: content
+            for path, content in cached.items()
+            if path in compatible_paths and isinstance(content, str)
+        }
+
     def save(self, *, manifest: list[dict[str, str]], files: dict[str, str]) -> None:
         """Atomically replace the checkpoint after each completed file."""
         self.directory.mkdir(parents=True, exist_ok=True)
