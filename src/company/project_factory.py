@@ -264,6 +264,8 @@ class ProjectFactory:
             return None
 
         project = self.queue.pop(0)
+        # A prior mission's pipeline must never satisfy this mission's completion check.
+        self._last_autonomous_result = None
         project.status = "running"
         project.attempts += 1
         project.last_error = None
