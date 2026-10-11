@@ -260,7 +260,7 @@ Rules:
 - Prefer a directly runnable browser app unless the mission explicitly requests another type.
 - For browser apps include index.html, style.css, app.js, and tests/test_project.py.
 - Include every local file referenced by another file.
-- Use no more than 6 files. Prefer combining related behavior into the required app.js/style.css rather than creating many tiny files. Avoid build tools, CDNs, remote APIs, and external dependencies unless explicitly required.
+- Use no more than 10 files. Prefer combining related behavior into the required app.js/style.css rather than creating many tiny files. Avoid build tools, CDNs, remote APIs, and external dependencies unless explicitly required.
 - Every file must have a clear purpose and be necessary for the requested product.
 - Paths must be safe relative paths; never use absolute paths or parent-directory segments.
 - The plan must implement the requested category and all key user workflows, not a generic demo.
@@ -324,9 +324,9 @@ Rules:
         raw_manifest = manifest.get("files")
         if not isinstance(raw_manifest, list) or not raw_manifest:
             raise RuntimeError("Ollama returned an empty project file plan")
-        if len(raw_manifest) > 6:
+        if len(raw_manifest) > 10:
             raise RuntimeError(
-                f"Project file plan contains {len(raw_manifest)} files; the safe limit is 6. "
+                f"Project file plan contains {len(raw_manifest)} files; the safe limit is 10. "
                 "Reduce the mission scope or split it into separate missions."
             )
 
@@ -380,9 +380,9 @@ Rules:
                 ("tests/test_project.py", "Automated tests for mission-specific behavior")
             )
 
-        if len(manifest_items) > 6:
+        if len(manifest_items) > 10:
             raise RuntimeError(
-                "Project file plan exceeds the safe 6-file limit after required "
+                "Project file plan exceeds the safe 10-file limit after required "
                 "browser entry point and test files were added "
                 f"({len(manifest_items)} files). Reduce the mission scope or split "
                 "it into smaller missions."
