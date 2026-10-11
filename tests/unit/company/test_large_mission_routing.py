@@ -13,7 +13,7 @@ from src.company.project_generator import OllamaProjectGenerator
         ("Learning Management System", "Build a learning management system"),
         ("Booking Platform", "Create a booking platform"),
         ("Analytics Dashboard", "Build an analytics dashboard"),
-        ("Personal Tracker", "Create a personal tracker"),
+        ("Inventory Management System", "Build an inventory management system"),
     ],
 )
 def test_complex_product_categories_use_modular_generation(name, objective):
