@@ -424,7 +424,11 @@ Rules:
                 required += 1
             return required
 
-        if len(raw_manifest) > MAX_GENERATED_PROJECT_FILES or len(raw_manifest) + required_file_count(raw_manifest) > MAX_GENERATED_PROJECT_FILES:
+        if (
+            len(raw_manifest) > MAX_GENERATED_PROJECT_FILES
+            or len(raw_manifest) + required_file_count(raw_manifest)
+            > MAX_GENERATED_PROJECT_FILES
+        ):
             compact_payload = dict(manifest_payload)
             compact_payload["prompt"] = (
                 manifest_prompt
@@ -448,7 +452,8 @@ Rules:
         if len(raw_manifest) > MAX_GENERATED_PROJECT_FILES:
             raise RuntimeError(
                 f"Project file plan contains {len(raw_manifest)} files after one compact-plan retry; "
-                f"the safe limit is {MAX_GENERATED_PROJECT_FILES}. Reduce the mission scope or split it into separate missions."
+                f"the safe limit is {MAX_GENERATED_PROJECT_FILES}. "
+                "Reduce the mission scope or split it into separate missions."
             )
 
         manifest_items: list[tuple[str, str]] = []
