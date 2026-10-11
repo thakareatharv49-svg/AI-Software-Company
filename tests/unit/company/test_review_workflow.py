@@ -1,24 +1,16 @@
 import pytest
 
 from src.company.review_workflow import (
-    InvalidReviewTransition,
-    ProductReview,
-    Requirement,
-    RequirementStatus,
-    ReviewStatus,
-    approve_review,
-    mark_published,
-    prepare_review,
-    request_changes,
-    update_requirement,
+    InvalidReviewTransition, ProductReview, Requirement, RequirementStatus,
+    ReviewStatus, approve_review, mark_published, prepare_review,
+    request_changes, update_requirement,
 )
 
 def ready_review():
     review = prepare_review(
         ProductReview(mission_id='mission-1'),
         [Requirement(description='Create a task', verification='Create and reload a task')],
-        qa_passed=True,
-        security_passed=True,
+        qa_passed=True, security_passed=True,
     )
     return review, review.requirements[0]
 
@@ -37,14 +29,7 @@ def test_approval_requires_every_acceptance_requirement_to_pass():
     assert approved.status == ReviewStatus.APPROVED
     assert approved.approved_at is not None
 
-def test_feedback_requests_a_revision_and_clears_previous_approval():
-    review, requirement = ready_review()
-    review = update_requirement(review, requirement.id, status=RequirementStatus.PASSED)
-    review = approve_review(review)
-    revised = request_changes(review, 'Add a calendar view') if review.status == ReviewStatus.IN_REVIEW else None
-    assert revised is None
-
-def test_feedback_from_review_increments_revision_and_preserves_feedback():
+def test_feedback_requests_revision_and_resubmission_preserves_history():
     review, _ = ready_review()
     revised = request_changes(review, 'Add a calendar view')
     assert revised.status == ReviewStatus.CHANGES_REQUESTED
@@ -55,19 +40,27 @@ def test_feedback_from_review_increments_revision_and_preserves_feedback():
     assert resubmitted.revision == 1
     assert len(resubmitted.feedback) == 1
 
+def test_approved_review_cannot_be_reopened_as_a_change_request():
+    review, requirement = ready_review()
+    review = update_requirement(review, requirement.id, status=RequirementStatus.PASSED)
+    approved = approve_review(review)
+    with pytest.raises(InvalidReviewTransition, match='Cannot request changes'):
+        request_changes(approved, 'Add a calendar view')
+
 def test_publication_is_blocked_until_human_approval():
     review, _ = ready_review()
     with pytest.raises(InvalidReviewTransition, match='human approves'):
         mark_published(review, 'https://github.com/example/project')
     review, requirement = ready_review()
     review = update_requirement(review, requirement.id, status=RequirementStatus.PASSED)
-    approved = approve_review(review)
-    published = mark_published(approved, 'https://github.com/example/project')
+    published = mark_published(approve_review(review), 'https://github.com/example/project')
     assert published.status == ReviewStatus.PUBLISHED
     assert published.repository_url == 'https://github.com/example/project'
     assert published.published_at is not None
 
-def test_blank_feedback_is_rejected():
+def test_blank_feedback_and_requirements_are_rejected():
+    with pytest.raises(ValueError):
+        Requirement(description='   ')
     review, _ = ready_review()
     with pytest.raises(ValueError):
         request_changes(review, '   ')
