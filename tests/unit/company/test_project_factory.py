@@ -756,3 +756,37 @@ def test_manual_retry_resets_failed_plan_stages_and_persists_reset() -> None:
     assert queued_project.plan.steps[1].detail is None
     assert persisted_job.plan.steps[1].status == "planned"
     assert persisted_job.plan.steps[1].detail is None
+
+
+def test_automatic_retry_resets_completed_and_failed_stage_progress():
+    from src.company.project_factory import FactoryProject
+
+    mission = CompanyMission(
+        name="Automatic retry",
+        objective="Build a multi-feature web app",
+    )
+    plan = build_mission_plan(mission)
+    plan.steps[0].status = "completed"
+    plan.steps[0].detail = "Completed on the failed attempt"
+    plan.steps[1].status = "failed"
+    plan.steps[1].detail = "QA failed on the previous attempt"
+    plan.steps[2].status = "running"
+    plan.steps[2].detail = "Was running when the attempt failed"
+
+    orchestrator = CompanyOrchestrator()
+    factory = ProjectFactory(
+        orchestrator,
+        MissionController(orchestrator),
+        MissionExecutionPipeline(
+            orchestrator,
+            AgentExecutor(FakeRuntime()),
+            AgentRegistry(),
+        ),
+    )
+    project = FactoryProject(mission=mission, plan=plan, last_error="previous failure")
+
+    factory._reset_for_retry(project)
+
+    assert project.last_error is None
+    assert all(step.status == "planned" for step in project.plan.steps)
+    assert all(step.detail is None for step in project.plan.steps)
