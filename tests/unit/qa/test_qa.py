@@ -83,3 +83,26 @@ async def test_debugger_resolves_after_repair():
     assert state["fixed"] is True
     assert result.status == DebugStatus.RESOLVED
     assert len(result.attempts) == 1
+
+
+@pytest.mark.asyncio
+async def test_qa_runner_rejects_empty_command():
+    runner = QARunner()
+    request = QATestRequest(command=[], working_directory=str(Path.cwd()))
+
+    result = await runner.run(request)
+
+    assert result.status == QATestStatus.FAILED
+    assert result.exit_code == 2
+    assert "command is empty" in result.stderr
+
+
+@pytest.mark.asyncio
+async def test_qa_runner_rejects_blank_command_arguments():
+    runner = QARunner()
+    request = QATestRequest(command=["", "  "], working_directory=str(Path.cwd()))
+
+    result = await runner.run(request)
+
+    assert result.status == QATestStatus.FAILED
+    assert "command is empty" in result.stderr
