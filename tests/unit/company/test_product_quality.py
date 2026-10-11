@@ -73,3 +73,32 @@ def test_rejects_constant_boolean_assertion() -> None:
     })
 
     assert len(issues) == 1
+
+
+def test_rejects_generated_smoke_only_test_suite() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_generated_project.py": (
+            "from pathlib import Path\n"
+            "def test_browser_entrypoint_and_local_assets_exist():\n"
+            "    assert Path('index.html').is_file()\n"
+        )
+    })
+
+    assert len(issues) == 1
+    assert "only generated smoke checks" in issues[0]
+    assert "behavioral tests" in issues[0]
+
+
+def test_accepts_generated_smoke_check_when_behavior_test_is_also_present() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_generated_project.py": (
+            "from pathlib import Path\n"
+            "def test_browser_entrypoint_and_local_assets_exist():\n"
+            "    assert Path('index.html').is_file()\n"
+            "def test_total_uses_expenses():\n"
+            "    expenses = [12, 8]\n"
+            "    assert sum(expenses) == 20\n"
+        )
+    })
+
+    assert issues == []
