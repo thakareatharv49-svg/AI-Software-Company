@@ -38,7 +38,11 @@ def test_task_planning_groups_root_browser_assets_as_one_shell() -> None:
     tasks = build_generated_task_plan(
         "Notes",
         "Build a notes app.",
-        {"index.html": "", "style.css": "", "app.js": ""},
+        {
+            "index.html": "<main>Notes</main>",
+            "style.css": "main { display: block; }",
+            "app.js": "const notes = [];",
+        },
     )
 
     assert len(tasks) == 1
