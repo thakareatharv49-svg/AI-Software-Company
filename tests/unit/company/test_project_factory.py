@@ -725,6 +725,9 @@ def test_manual_retry_resets_failed_plan_stages_and_persists_reset() -> None:
     failed_step = plan.steps[0]
     failed_step.status = "failed"
     failed_step.detail = "Previous attempt failed"
+    completed_step = plan.steps[1]
+    completed_step.status = "completed"
+    completed_step.detail = "Completed in previous attempt"
     store = JobStore()
     store.jobs[mission.id] = MissionJob(
         id=mission.id,
@@ -749,3 +752,7 @@ def test_manual_retry_resets_failed_plan_stages_and_persists_reset() -> None:
     assert queued_project.plan.steps[0].detail is None
     assert persisted_job.plan.steps[0].status == "planned"
     assert persisted_job.plan.steps[0].detail is None
+    assert queued_project.plan.steps[1].status == "planned"
+    assert queued_project.plan.steps[1].detail is None
+    assert persisted_job.plan.steps[1].status == "planned"
+    assert persisted_job.plan.steps[1].detail is None
