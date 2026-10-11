@@ -163,8 +163,8 @@ def test_rejects_test_that_calls_non_asserting_helper_only() -> None:
 def test_rejects_generated_test_module_without_test_functions() -> None:
     issues = find_weak_product_tests({
         "tests/test_app.py": (
-            "def build_sample_note():\\n"
-            "    return {'title': 'Plan'}\\n"
+            "def build_sample_note():\n"
+            "    return {'title': 'Plan'}\n"
         )
     })
 
@@ -175,8 +175,8 @@ def test_rejects_generated_test_module_without_test_functions() -> None:
 def test_accepts_non_test_helper_module_without_test_functions() -> None:
     issues = find_weak_product_tests({
         "tests/helpers.py": (
-            "def build_sample_note():\\n"
-            "    return {'title': 'Plan'}\\n"
+            "def build_sample_note():\n"
+            "    return {'title': 'Plan'}\n"
         )
     })
 
