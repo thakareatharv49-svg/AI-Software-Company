@@ -497,6 +497,26 @@ Rules:
                 "it into smaller missions."
             )
 
+        # Generate implementation before tests so the model can see the real
+        # interfaces and behavior it needs to verify. For browser products, make
+        # the entry point and local assets available as early shared context.
+        def generation_priority(item: tuple[str, str]) -> tuple[int, int, str]:
+            path = item[0].casefold()
+            basename = path.rsplit("/", 1)[-1]
+            is_test = (
+                path.startswith("tests/")
+                or basename.startswith("test_")
+                or basename.endswith("_test.py")
+            )
+            if is_test:
+                return (2, 0, path)
+            if is_browser_mission:
+                browser_order = {"index.html": 0, "style.css": 1, "app.js": 2}
+                return (0, browser_order.get(path, 3), path)
+            return (1, 0, path)
+
+        manifest_items.sort(key=generation_priority)
+
         allowed_paths = {path for path, _ in manifest_items}
         cached_files = (saved_checkpoint or {}).get("files", {})
         files: dict[str, str] = {
