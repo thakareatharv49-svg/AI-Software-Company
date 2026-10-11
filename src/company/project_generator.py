@@ -378,15 +378,8 @@ Rules:
                     manifest_payload["prompt"] += recovery_prompt
 
         mission_request_text = f"{name} {objective}".casefold()
-        explicit_backend_request = any(
-            marker in mission_request_text
-            for marker in (
-                "backend", "server-side", "rest api", "api endpoint",
-                "database", "authentication server",
-            )
-        ) and not any(
-            marker in mission_request_text
-            for marker in ("no backend", "without a backend", "frontend only", "front-end only")
+        explicit_backend_request = OllamaProjectGenerator._mission_requires_backend(
+            mission_request_text
         )
 
         def manifest_validation_issue(candidate: object) -> str | None:
