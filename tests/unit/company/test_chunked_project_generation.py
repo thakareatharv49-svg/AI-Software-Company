@@ -573,15 +573,15 @@ async def test_large_mission_rejects_invalid_compact_manifest(monkeypatch, tmp_p
             for index in range(6)
         ]
     }
-    # The compact response parses as JSON and fits the nominal file count, but
-    # contains Windows-colliding paths. It must not replace the original plan.
+    # The compact response is structurally valid and fits the nominal count,
+    # but leaves no room for mandatory browser assets. It must not replace the
+    # original plan.
     compact_manifest = {
         "files": [
             {"path": "index.html", "purpose": "Browser entry"},
-            {"path": "Index.html", "purpose": "Duplicate entry with different case"},
-            {"path": "style.css", "purpose": "Styles"},
-            {"path": "app.js", "purpose": "App behavior"},
             {"path": "tests/test_project.py", "purpose": "Behavior tests"},
+            {"path": "src/main.py", "purpose": "Application entry"},
+            {"path": "README.md", "purpose": "Project documentation"},
         ]
     }
     responses = [json.dumps(initial_manifest), json.dumps(compact_manifest)]
@@ -592,6 +592,6 @@ async def test_large_mission_rejects_invalid_compact_manifest(monkeypatch, tmp_p
     monkeypatch.setattr(generator, "_call", fake_call)
     with pytest.raises(RuntimeError, match="safe limit is 5"):
         await generator._generate_large_mission(
-            "Project platform",
-            "Create a project platform with a dashboard and analytics.",
+            "Browser project platform",
+            "Create a browser project platform with a dashboard and analytics.",
         )
