@@ -314,6 +314,7 @@ Rules:
 - Add optional depends_on arrays listing the exact planned paths that must exist before this file is implemented. Use dependencies to express real module/API contracts, not merely visual ordering. Keep dependencies acyclic and refer only to paths in the manifest.
 - Paths must be safe relative paths; never use absolute paths or parent-directory segments.
 - The plan must implement the requested category and all key user workflows, not a generic demo.
+- If the mission explicitly requests a backend, server, REST/API endpoints, authentication server, or database-backed behavior, include a real backend/API implementation file and tests for it. Do not silently substitute a frontend-only or localStorage-only mock for an explicitly requested server/data layer.
 """
         manifest_payload = {
             "model": settings.ollama_model,
@@ -375,6 +376,18 @@ Rules:
                         )
                     manifest_payload["prompt"] += recovery_prompt
 
+        mission_request_text = f"{name} {objective}".casefold()
+        explicit_backend_request = any(
+            marker in mission_request_text
+            for marker in (
+                "backend", "server-side", "rest api", "api endpoint",
+                "database", "authentication server",
+            )
+        ) and not any(
+            marker in mission_request_text
+            for marker in ("no backend", "without a backend", "frontend only", "front-end only")
+        )
+
         def manifest_validation_issue(candidate: object) -> str | None:
             if not isinstance(candidate, dict):
                 return "Ollama returned a project file plan that is not a JSON object"
@@ -431,6 +444,32 @@ Rules:
             planned_paths = {
                 path.casefold(): path for path in normalized_paths
             }
+            if explicit_backend_request:
+                backend_markers = {"backend", "server", "api"}
+                backend_files = [
+                    path for path in normalized_paths
+                    if not (
+                        path.casefold().startswith(("tests/", "docs/"))
+                        or path.casefold().rsplit("/", 1)[-1].startswith("test_")
+                    )
+                    and (
+                        bool(backend_markers.intersection(
+                            part.casefold() for part in PurePosixPath(path).parts[:-1]
+                        ))
+                        or PurePosixPath(path).name.casefold() in {
+                            "server.py", "server.js", "server.ts",
+                            "api.py", "api.js", "api.ts",
+                            "main.py", "app.py",
+                        }
+                    )
+                ]
+                if not backend_files:
+                    return (
+                        "Mission explicitly requests backend/server/API/database "
+                        "capabilities, but the file plan has no backend implementation "
+                        "file. Add a server/API module (for example backend/main.py, "
+                        "server.js, or api.py) and include its tests."
+                    )
             for normalized, dependencies in normalized_dependencies.items():
                 missing = [
                     dependency for dependency in dependencies
@@ -897,6 +936,43 @@ Requirements:
             )
 
         mission = f"{name} {objective}".casefold()
+        explicit_backend_request = any(
+            marker in mission
+            for marker in (
+                "backend", "server-side", "rest api", "api endpoint",
+                "database", "authentication server",
+            )
+        ) and not any(
+            marker in mission
+            for marker in ("no backend", "without a backend", "frontend only", "front-end only")
+        )
+        if explicit_backend_request:
+            backend_markers = {"backend", "server", "api"}
+            backend_files = [
+                path for path in project.files
+                if not (
+                    path.replace("\\", "/").casefold().startswith(("tests/", "docs/"))
+                    or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].startswith("test_")
+                )
+                and (
+                    bool(backend_markers.intersection(
+                        part.casefold()
+                        for part in PurePosixPath(path.replace("\\", "/")).parts[:-1]
+                    ))
+                    or PurePosixPath(path.replace("\\", "/")).name.casefold() in {
+                        "server.py", "server.js", "server.ts",
+                        "api.py", "api.js", "api.ts",
+                        "main.py", "app.py",
+                    }
+                )
+            ]
+            if not backend_files:
+                raise RuntimeError(
+                    "Mission explicitly requests backend/server/API/database "
+                    "capabilities, but generated output has no backend implementation "
+                    "file. Add a server/API module and its tests instead of shipping "
+                    "a frontend-only substitute."
+                )
         if not OllamaProjectGenerator._is_browser_mission(mission):
             return
 

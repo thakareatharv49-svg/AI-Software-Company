@@ -607,3 +607,88 @@ def test_modular_planner_accepts_full_project_response_from_local_model() -> Non
     assert "app.js" in project.files
     assert "tests/test_app.py" in project.files
 
+
+
+
+def test_full_stack_mission_rejects_frontend_only_output() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    try:
+        OllamaProjectGenerator._validate_mission_output(
+            "Inventory Management System",
+            "Build a browser app with a backend REST API and database.",
+            GeneratedProject(
+                files={
+                    "index.html": '<html><head><link rel="stylesheet" href="style.css"><script src="app.js"></script></head><body><h1>Inventory</h1></body></html>',
+                    "style.css": "body { font-family: sans-serif; }",
+                    "app.js": "document.title = 'Inventory';",
+                    "tests/test_project.py": (
+                        "def test_inventory_total():\n"
+                        "    quantities = [2, 3]\n"
+                        "    assert sum(quantities) == 5\n"
+                    ),
+                },
+                test_command=["python", "-m", "pytest", "-q"],
+            ),
+        )
+    except RuntimeError as exc:
+        assert "no backend implementation file" in str(exc)
+        assert "frontend-only" in str(exc)
+    else:
+        raise AssertionError("Explicit full-stack requests must not ship frontend-only output")
+
+
+def test_full_stack_mission_accepts_explicit_backend_module() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    OllamaProjectGenerator._validate_mission_output(
+        "Inventory Management System",
+        "Build a browser app with a backend REST API and database.",
+        GeneratedProject(
+            files={
+                "index.html": '<html><head><link rel="stylesheet" href="style.css"><script src="app.js"></script></head><body><h1>Inventory</h1></body></html>',
+                "style.css": "body { font-family: sans-serif; }",
+                "app.js": "document.title = 'Inventory';",
+                "backend/api.py": "def health():\n    return {'status': 'ok'}\n",
+                "tests/test_project.py": (
+                    "def test_inventory_total():\n"
+                    "    quantities = [2, 3]\n"
+                    "    assert sum(quantities) == 5\n"
+                ),
+            },
+            test_command=["python", "-m", "pytest", "-q"],
+        ),
+    )
+
+
+def test_full_stack_manifest_rejects_missing_backend_module(tmp_path) -> None:
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    calls = 0
+    manifest = {
+        "files": [
+            {"path": "index.html", "purpose": "Browser entry point"},
+            {"path": "style.css", "purpose": "Visual styling"},
+            {"path": "app.js", "purpose": "Frontend interactions"},
+            {"path": "tests/test_project.py", "purpose": "Product behavior tests"},
+        ]
+    }
+
+    async def fake_call(payload: dict) -> str:
+        nonlocal calls
+        calls += 1
+        return json.dumps(manifest)
+
+    generator._call = fake_call  # type: ignore[method-assign]
+
+    try:
+        asyncio.run(
+            generator._generate_large_mission(
+                "Inventory Management System",
+                "Build a browser app with a backend REST API and database.",
+            )
+        )
+    except RuntimeError as exc:
+        assert "no backend implementation file" in str(exc)
+        assert calls == 2
+    else:
+        raise AssertionError("Manifest recovery must reject a frontend-only full-stack plan")
