@@ -28,10 +28,11 @@ def build_generated_task_plan(
     objective: str,
     files: dict[str, str],
 ) -> tuple[TaskPlanItem, ...]:
-    """Create an ordered, auditable task plan from already-generated project files.
+    """Build a dependency graph from generated files.
 
-    Implementation work packages preserve first-seen file order. Test files are
-    moved to the final QA work package so it depends on all implementation tasks.
+    Independent implementation work packages have no artificial ordering
+    dependency, allowing a concurrency-aware scheduler to run them in parallel.
+    The final QA work package depends on every implementation package.
     Dependencies use task indexes, as expected by MasterManager.create_plan().
     """
     if not files:
@@ -57,13 +58,10 @@ def build_generated_task_plan(
     ]
     ordered = implementation + quality
     tasks: list[TaskPlanItem] = []
-    for index, (subsystem, paths) in enumerate(ordered):
+    implementation_count = len(implementation)
+    for subsystem, paths in ordered:
         is_quality = subsystem == "quality and tests"
-        dependencies = (
-            tuple(range(len(implementation)))
-            if is_quality and implementation
-            else ((index - 1,) if index > 0 else ())
-        )
+        dependencies = tuple(range(implementation_count)) if is_quality else ()
         tasks.append(
             TaskPlanItem(
                 title=(
