@@ -107,9 +107,7 @@ def test_deterministic_fallback_rejects_missing_automated_tests(
         )
 
 
-def test_deterministic_fallback_accepts_behavior_test_module(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_deterministic_fallback_accepts_behavior_test_module() -> None:
     project = GeneratedProject(
         files={
             "index.html": "<!doctype html><html><body><h1>Inventory</h1></body></html>",
