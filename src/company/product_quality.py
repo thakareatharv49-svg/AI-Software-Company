@@ -246,7 +246,7 @@ _MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
     ("export", {"export", "download"}, {"export", "download"}),
     ("import", {"import", "upload"}, {"import", "upload"}),
     ("budget", {"budget"}, {"budget"}),
-    ("validation", {"validation", "validate", "validates", "invalid", "reject", "validation"}, {"validation", "validate", "validates", "invalid", "reject"}),
+    ("validation", {"validation", "validate", "validates", "invalid", "reject"}, {"validation", "validate", "validates", "invalid", "reject"}),
 )
 
 
