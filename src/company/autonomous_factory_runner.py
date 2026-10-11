@@ -159,6 +159,10 @@ class FactoryAutonomousRunner:
         if len(existing_tasks) > 1:
             return existing_tasks
         project_request = getattr(request, "project_request", None)
+        # Older adapters may not provide the structured project request that
+        # generated planning needs. Preserve their original task behavior.
+        if project_request is None:
+            return existing_tasks
         project_name = getattr(project_request, "name", None) or mission.name
         project_objective = (
             getattr(project_request, "objective", None) or mission.objective
