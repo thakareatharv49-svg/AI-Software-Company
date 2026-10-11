@@ -20,12 +20,14 @@ class ProductionQualityGate:
         security_approved: bool,
         github_ready: bool = True,
         deployment_ready: bool = True,
+        artifacts_ready: bool = True,
     ) -> GateDecision:
         checks = {
             "qa": qa_passed,
             "security": security_approved,
             "github": github_ready,
             "deployment": deployment_ready,
+            "artifacts": artifacts_ready,
         }
         failed = [name for name, passed in checks.items() if not passed]
         if failed:
