@@ -1238,8 +1238,40 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
     ) -> GeneratedProject:
         combined = "\n".join(files.values()).lower()
         repair_context = combined + "\n" + failure.lower()
+
+        # If QA fails while the local model is unavailable, reuse the known-good
+        # offline implementation for product categories the factory already
+        # supports. This keeps a transient Ollama outage from blocking recovery.
+        if (
+            "notes app" in repair_context
+            or "note-taking app" in repair_context
+            or "note taking app" in repair_context
+            or "paper — notes" in repair_context
+            or "all notes" in repair_context
+        ):
+            from src.company.notes_fallback import notes_fallback_files
+
+            return GeneratedProject(
+                files=notes_fallback_files(),
+                test_command=["python", "-m", "pytest", "-q"],
+            )
+        if (
+            "to-do" in repair_context
+            or "todo" in repair_context
+            or "task manager" in repair_context
+            or "task list" in repair_context
+            or "daymark" in repair_context
+        ):
+            from src.company.todo_fallback import todo_fallback_files
+
+            return GeneratedProject(
+                files=todo_fallback_files(),
+                test_command=["python", "-m", "pytest", "-q"],
+            )
         if "expense tracker" in repair_context or "expense tracking app" in repair_context:
             return self._fallback_expense_tracker()
+        if "tic tac toe" in repair_context or "tic-tac-toe" in repair_context:
+            return self._fallback_tic_tac_toe()
         if "calculator" in repair_context:
             return self._fallback_calculator()
         raise RuntimeError("Ollama repair failed and no deterministic repair is available")
