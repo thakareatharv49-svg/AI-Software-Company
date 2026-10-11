@@ -431,10 +431,10 @@ async def test_large_mission_recovers_empty_but_valid_json_manifest(monkeypatch,
         json.dumps({"content": "function addStudySession(session) { return session; }"}),
         json.dumps({
             "content": (
-                "def add_session(session):\\n"
-                "    return dict(session)\\n\\n"
-                "def test_add_session_preserves_title():\\n"
-                "    assert add_session({'title': 'Math'})['title'] == 'Math'\\n"
+                "def add_session(session):\n"
+                "    return dict(session)\n\n"
+                "def test_add_session_preserves_title():\n"
+                "    assert add_session({'title': 'Math'})['title'] == 'Math'\n"
             )
         }),
     ]
