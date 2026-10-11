@@ -267,11 +267,27 @@ Rules:
             "confirmation", "empty state", "validation", "notifications",
         )
         marker_count = sum(1 for marker in feature_markers if marker in text)
+        # Product categories that normally require several coordinated screens,
+        # domain workflows, or data models must not fall through to one-shot
+        # generation merely because the owner's brief is short. Small local models
+        # tend to omit whole subsystems when asked to build these products at once.
+        modular_product_markers = (
+            "platform", "management system", "dashboard", "marketplace",
+            "booking system", "inventory system", "project management",
+            "learning management", "social network", "multi-user", "multi user",
+            "role-based access", "role based access", "e-commerce", "ecommerce",
+            "crm", "erp", "admin panel", "analytics",
+        )
+        requires_modular_plan = any(marker in text for marker in modular_product_markers)
         # Three explicit capabilities are already enough to make a mission
         # multi-feature. Keep the length fallback for detailed briefs that use
-        # different wording, but don't force a broad app into one-shot generation
-        # just because its requirements use fewer of our known marker phrases.
-        return len(objective) >= 280 or marker_count >= 3
+        # different wording, but route inherently multi-subsystem products through
+        # the resumable file-by-file generator even when the objective is concise.
+        return (
+            len(objective) >= 280
+            or marker_count >= 3
+            or requires_modular_plan
+        )
 
     async def _generate_large_mission(
         self,
