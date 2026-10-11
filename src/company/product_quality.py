@@ -235,18 +235,18 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
 # Objective keywords are mapped to common implementation/test vocabulary. This is a
 # traceability guard, not a substitute for executing tests or reviewing behavior.
 _MISSION_FEATURES: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
-    ("create", (r"\bcreate\\w*\\b", r"\badd\\w*\\b", r"\binsert\\w*\\b", r"\bcrud\\b"), (r"\bcreate\\w*\\b", r"\badd\\w*\\b", r"\binsert\\w*\\b", r"\bcrud\\b")),
-    ("edit/update", (r"\bedit\\w*\\b", r"\bupdate\\w*\\b", r"\bmodify\\w*\\b", r"\bcrud\\b"), (r"\bedit\\w*\\b", r"\bupdate\\w*\\b", r"\bmodify\\w*\\b", r"\bcrud\\b")),
-    ("delete/remove", (r"\bdelete\\w*\\b", r"\bremove\\w*\\b", r"\bdestroy\\w*\\b", r"\bcrud\\b"), (r"\bdelete\\w*\\b", r"\bremove\\w*\\b", r"\bdestroy\\w*\\b", r"\bcrud\\b")),
-    ("search", (r"\bsearch\\w*\\b", r"\bfind\\w*\\b", r"\bquery\\w*\\b"), (r"\bsearch\\w*\\b", r"\bfind\\w*\\b", r"\bquery\\w*\\b")),
-    ("filter", (r"\bfilter\\w*\\b",), (r"\bfilter\\w*\\b")),
-    ("pin/favorite", (r"\bpin\\w*\\b", r"\bfavorit\\w*\\b", r"\bstar\\w*\\b"), (r"\bpin\\w*\\b", r"\bfavorit\\w*\\b", r"\bstar\\w*\\b")),
-    ("persistence", (r"\bpersist\\w*\\b", r"\blocalstorage\\b", r"\bstorage\\b", r"\bsave\\w*\\b", r"\bload\\w*\\b", r"\bdatabase\\b"), (r"\bpersist\\w*\\b", r"\blocalstorage\\b", r"\bstorage\\b", r"\bsave\\w*\\b", r"\bload\\w*\\b", r"\bdatabase\\b")),
-    ("authentication", (r"\bauthentication\\b", r"\bauth\\b", r"\blogin\\b", r"\bsign.?in\\b"), (r"\bauthentication\\b", r"\bauth\\b", r"\blogin\\b", r"\bsign.?in\\b")),
-    ("export", (r"\bexport\\w*\\b", r"\bdownload\\w*\\b"), (r"\bexport\\w*\\b", r"\bdownload\\w*\\b")),
-    ("import", (r"\bimport\\w*\\b", r"\bupload\\w*\\b"), (r"\bimport\\w*\\b", r"\bupload\\w*\\b")),
-    ("budget", (r"\bbudget\\w*\\b",), (r"\bbudget\\w*\\b")),
-    ("validation", (r"\bvalidat\\w*\\b", r"\binvalid\\w*\\b", r"\breject\\w*\\b"), (r"\bvalidat\\w*\\b", r"\binvalid\\w*\\b", r"\breject\\w*\\b")),
+    ("create", (r"\bcreate\w*\b", r"\badd\w*\b", r"\binsert\w*\b", r"\bcrud\b"), (r"\bcreate\w*\b", r"\badd\w*\b", r"\binsert\w*\b", r"\bcrud\b")),
+    ("edit/update", (r"\bedit\w*\b", r"\bupdate\w*\b", r"\bmodify\w*\b", r"\bcrud\b"), (r"\bedit\w*\b", r"\bupdate\w*\b", r"\bmodify\w*\b", r"\bcrud\b")),
+    ("delete/remove", (r"\bdelete\w*\b", r"\bremove\w*\b", r"\bdestroy\w*\b", r"\bcrud\b"), (r"\bdelete\w*\b", r"\bremove\w*\b", r"\bdestroy\w*\b", r"\bcrud\b")),
+    ("search", (r"\bsearch\w*\b", r"\bfind\w*\b", r"\bquery\w*\b"), (r"\bsearch\w*\b", r"\bfind\w*\b", r"\bquery\w*\b")),
+    ("filter", (r"\bfilter\w*\b",), (r"\bfilter\w*\b")),
+    ("pin/favorite", (r"\bpin\w*\b", r"\bfavorit\w*\b", r"\bstar\w*\b"), (r"\bpin\w*\b", r"\bfavorit\w*\b", r"\bstar\w*\b")),
+    ("persistence", (r"\bpersist\w*\b", r"\blocalstorage\b", r"\bstorage\b", r"\bsave\w*\b", r"\bload\w*\b", r"\bdatabase\b"), (r"\bpersist\w*\b", r"\blocalstorage\b", r"\bstorage\b", r"\bsave\w*\b", r"\bload\w*\b", r"\bdatabase\b")),
+    ("authentication", (r"\bauthentication\b", r"\bauth\b", r"\blogin\b", r"\bsign.?in\b"), (r"\bauthentication\b", r"\bauth\b", r"\blogin\b", r"\bsign.?in\b")),
+    ("export", (r"\bexport\w*\b", r"\bdownload\w*\b"), (r"\bexport\w*\b", r"\bdownload\w*\b")),
+    ("import", (r"\bimport\w*\b", r"\bupload\w*\b"), (r"\bimport\w*\b", r"\bupload\w*\b")),
+    ("budget", (r"\bbudget\w*\b",), (r"\bbudget\w*\b")),
+    ("validation", (r"\bvalidat\w*\b", r"\binvalid\w*\b", r"\breject\w*\b"), (r"\bvalidat\w*\b", r"\binvalid\w*\b", r"\breject\w*\b")),
 )
 
 
