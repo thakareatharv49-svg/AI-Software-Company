@@ -11,6 +11,7 @@ from src.company.autonomous_project import (
     AutonomousProjectRunner,
 )
 from src.company.acceptance import AutonomousCompanyAcceptance
+from src.company.generated_task_planning import build_generated_task_plan
 from src.company.mission_controller.models import MissionPlan
 from src.company.models.contracts import CompanyMission
 from src.company.workspace import ProjectExecutionService
@@ -72,6 +73,20 @@ class FactoryAutonomousRunner:
             raise
         try:
             self._validate_generated_files(request.files)
+            # Generated files are the most concrete architecture artifact available
+            # at this point. When the request builder supplies only a single broad
+            # task, derive work packages from the actual output so frontend, backend,
+            # and quality work are visible to the execution pipeline. Preserve an
+            # explicitly decomposed task plan supplied by the caller.
+            # Some legacy/test request builders intentionally return minimal
+            # request-like objects. Only expand task plans when this request
+            # contract actually exposes tasks; do not break workspace validation
+            # for callers that have not adopted task planning yet.
+            if hasattr(request, "tasks"):
+                request = replace(
+                    request,
+                    tasks=self._derive_tasks_from_generated_files(request, mission),
+                )
             workspace = self.workspace_service.create_workspace(mission.id)
             for path, content in request.files.items():
                 workspace.write_file(path, content)
@@ -136,6 +151,34 @@ class FactoryAutonomousRunner:
             # Completed workspaces are intentionally retained for the product
             # viewer. Failed attempts are also retained for diagnostics/retry.
             pass
+
+    @staticmethod
+    def _derive_tasks_from_generated_files(request, mission):
+        """Expand a single broad task when generated output spans subsystems."""
+        existing_tasks = getattr(request, "tasks", ())
+        if len(existing_tasks) > 1:
+            return existing_tasks
+        project_request = getattr(request, "project_request", None)
+        # Older adapters may not provide the structured project request that
+        # generated planning needs. Preserve their original task behavior.
+        if project_request is None:
+            return existing_tasks
+        project_name = getattr(project_request, "name", None) or mission.name
+        project_objective = (
+            getattr(project_request, "objective", None) or mission.objective
+        )
+        generated_plan = build_generated_task_plan(
+            project_name,
+            project_objective,
+            request.files,
+        )
+        implementation_packages = sum(
+            1 for task in generated_plan
+            if not task.title.startswith("Validate ")
+        )
+        if not request.tasks or implementation_packages > 1:
+            return generated_plan
+        return existing_tasks
 
     @staticmethod
     def _validate_generated_files(files: dict[str, str]) -> None:
