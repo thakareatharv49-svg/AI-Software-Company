@@ -381,11 +381,9 @@ Rules:
             items = candidate.get("files")
             if not isinstance(items, list) or not items:
                 return "Ollama returned an empty or invalid project file plan"
-            if len(items) > self.max_generated_project_files:
-                return (
-                    f"Project file plan exceeds the configured limit of "
-                    f"{self.max_generated_project_files} files"
-                )
+            # File-count limits are enforced after the compact-plan retry below.
+            # Rejecting an oversized but structurally valid plan here would route
+            # it into structural recovery and consume the retry intended to compact it.
             seen_paths: set[str] = set()
             normalized_paths: list[str] = []
             normalized_dependencies: dict[str, list[str]] = {}
