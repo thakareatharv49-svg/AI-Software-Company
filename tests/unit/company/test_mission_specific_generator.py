@@ -343,6 +343,21 @@ def test_small_mission_reports_both_failed_generation_attempts() -> None:
     assert calls == 2
 
 
+def test_app_named_mission_is_detected_as_browser_first() -> None:
+    assert OllamaProjectGenerator._is_browser_mission(
+        "Notes App: responsive HTML CSS JavaScript app with local storage"
+    )
+    assert OllamaProjectGenerator._is_browser_mission(
+        "Personal Finance App with budgets and spending reports"
+    )
+
+
+def test_explicit_cli_mission_is_not_detected_as_browser_first() -> None:
+    assert not OllamaProjectGenerator._is_browser_mission(
+        "Build a command-line app for managing local files"
+    )
+
+
 def test_multi_feature_mission_uses_staged_generation_threshold() -> None:
     from src.company.project_generator import OllamaProjectGenerator
 
