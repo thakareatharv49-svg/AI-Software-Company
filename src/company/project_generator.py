@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from src.company.generation_checkpoints import GenerationCheckpointStore
+from src.company.project_planning import order_manifest_paths
 
 import httpx
 
@@ -271,7 +272,7 @@ Project name: {name}
 Mission objective: {objective}
 
 Return only JSON in this exact shape:
-{{"files":[{{"path":"index.html","purpose":"Application entry point"}}]}}
+{{"files":[{{"path":"index.html","purpose":"Application entry point","depends_on":[]}}]}}
 
 Rules:
 - Prefer a directly runnable browser app unless the mission explicitly requests another type.
@@ -279,6 +280,7 @@ Rules:
 - Include every local file referenced by another file.
 - Use no more than {MAX_GENERATED_PROJECT_FILES} files for this generation run. Use a modular structure appropriate to the product; do not collapse unrelated subsystems into giant files just to minimize file count. Avoid unnecessary build tools, CDNs, remote APIs, and external dependencies unless explicitly required.
 - Every file must have a clear purpose and be necessary for the requested product.
+- Add optional depends_on arrays listing the exact planned paths that must exist before this file is implemented. Use dependencies to express real module/API contracts, not merely visual ordering. Keep dependencies acyclic and refer only to paths in the manifest.
 - Paths must be safe relative paths; never use absolute paths or parent-directory segments.
 - The plan must implement the requested category and all key user workflows, not a generic demo.
 """
@@ -296,6 +298,10 @@ Rules:
                             "properties": {
                                 "path": {"type": "string"},
                                 "purpose": {"type": "string"},
+                                "depends_on": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                },
                             },
                             "required": ["path", "purpose"],
                         },
@@ -364,6 +370,39 @@ Rules:
                 seen_paths.add(normalized)
                 if not str(item.get("purpose", "")).strip():
                     return f"Project file plan has no purpose for {normalized}"
+                dependencies = item.get("depends_on", [])
+                if not isinstance(dependencies, list) or any(
+                    not isinstance(dependency, str) or not dependency.strip()
+                    for dependency in dependencies
+                ):
+                    return f"Project file plan has invalid dependencies for {normalized}"
+                if normalized in dependencies:
+                    return f"Project file {normalized} cannot depend on itself"
+                if len(set(dependencies)) != len(dependencies):
+                    return f"Project file plan repeats a dependency for {normalized}"
+            planned_paths = {
+                str(item.get("path", "")).strip().replace("\\\\", "/")
+                for item in items if isinstance(item, dict)
+            }
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                normalized = str(item.get("path", "")).strip().replace("\\\\", "/")
+                dependencies = item.get("depends_on", [])
+                if isinstance(dependencies, list):
+                    missing = [dependency for dependency in dependencies if dependency not in planned_paths]
+                    if missing:
+                        return f"Project file {normalized} depends on unknown path(s): {', '.join(missing)}"
+            try:
+                order_manifest_paths(
+                    [str(item.get("path", "")).strip().replace("\\\\", "/") for item in items if isinstance(item, dict)],
+                    {
+                        str(item.get("path", "")).strip().replace("\\\\", "/"): item.get("depends_on", [])
+                        for item in items if isinstance(item, dict)
+                    },
+                )
+            except ValueError as exc:
+                return str(exc)
             return None
 
         raw_manifest = manifest.get("files") if isinstance(manifest, dict) else None
@@ -457,6 +496,7 @@ Rules:
             )
 
         manifest_items: list[tuple[str, str]] = []
+        manifest_dependencies: dict[str, list[str]] = {}
         seen: set[str] = set()
         for item in raw_manifest:
             if not isinstance(item, dict):
@@ -478,6 +518,12 @@ Rules:
             purpose = str(item.get("purpose", "")).strip()
             if not purpose:
                 raise RuntimeError(f"Project file plan has no purpose for {normalized}")
+            dependencies = item.get("depends_on", [])
+            if not isinstance(dependencies, list) or any(
+                not isinstance(dependency, str) for dependency in dependencies
+            ):
+                raise RuntimeError(f"Project file plan has invalid dependencies for {normalized}")
+            manifest_dependencies[normalized] = list(dependencies)
             manifest_items.append((normalized, purpose))
 
         # A large-model manifest is only a plan, not a guarantee. Ensure the
@@ -535,6 +581,14 @@ Rules:
             return (1, 0, path)
 
         manifest_items.sort(key=generation_priority)
+        try:
+            ordered_paths = order_manifest_paths(
+                [path for path, _ in manifest_items], manifest_dependencies
+            )
+        except ValueError as exc:
+            raise RuntimeError(f"Invalid project file dependencies: {exc}") from exc
+        purpose_by_path = dict(manifest_items)
+        manifest_items = [(path, purpose_by_path[path]) for path in ordered_paths]
 
         allowed_paths = {path for path, _ in manifest_items}
         cached_files = (saved_checkpoint or {}).get("files", {})
@@ -547,7 +601,11 @@ Rules:
             and len(content.encode("utf-8")) <= 2_000_000
         }
         normalized_manifest = [
-            {"path": path, "purpose": purpose}
+            {
+                "path": path,
+                "purpose": purpose,
+                "depends_on": manifest_dependencies.get(path, []),
+            }
             for path, purpose in manifest_items
         ]
         checkpoint.save(manifest=normalized_manifest, files=files)
@@ -621,6 +679,7 @@ Return only JSON: {{"content":"complete file contents for {path}"}}
 
 Requirements:
 - Implement the mission's actual features and coherent polished responsive UI where relevant.
+- Follow the declared dependency order and implement the interfaces promised by dependency files before integrating consumers.
 - Keep interfaces and identifiers consistent with the file plan and previously generated files.
 - Do not return markdown fences, explanations, or another file.
 - No placeholders for required behavior, remote dependencies, CDNs, secrets, or network calls.
