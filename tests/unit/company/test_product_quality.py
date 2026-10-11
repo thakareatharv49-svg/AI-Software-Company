@@ -181,3 +181,16 @@ def test_accepts_non_test_helper_module_without_test_functions() -> None:
     })
 
     assert issues == []
+
+
+def test_ignores_tautology_examples_in_comments_when_behavior_is_tested() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_app.py": (
+            "# Avoid weak tests such as assert True or assert 1 == 1.\\n"
+            "def test_total_uses_expenses():\\n"
+            "    expenses = [12, 8]\\n"
+            "    assert sum(expenses) == 20\\n"
+        )
+    })
+
+    assert issues == []
