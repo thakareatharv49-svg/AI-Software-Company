@@ -222,6 +222,49 @@ class CompanyExecutionPipeline:
                 f"{qa_result.stderr or qa_result.stdout}"
             )
 
+        # A custom smoke/build command must not silently replace the generated
+        # product's own test suite. If tests are present and the configured QA
+        # command did not already invoke pytest, run the suite separately in the
+        # isolated project workspace before security review or delivery.
+        has_product_tests = any(
+            path.replace("\\\\", "/").startswith("tests/")
+            and path.endswith(".py")
+            for path in files
+        )
+        configured_command = [part.casefold() for part in qa_request.command]
+        runs_pytest = any(
+            part == "pytest" or part.endswith("/pytest") or part.endswith("\\\\pytest.exe")
+            for part in configured_command
+        ) or any(
+            configured_command[index:index + 2] == ["-m", "pytest"]
+            for index in range(max(0, len(configured_command) - 1))
+        )
+        if has_product_tests and not runs_pytest:
+            product_test_request = qa_request.model_copy(
+                update={
+                    "command": ["python", "-m", "pytest", "-q"],
+                }
+            )
+            product_test_result = await self.qa_runner.run(product_test_request)
+            self._publish_event(
+                "qa.generated_product_tests.completed",
+                project_id=project.id,
+                payload={
+                    "status": product_test_result.status.value,
+                    "exit_code": product_test_result.exit_code,
+                    "duration_ms": product_test_result.duration_ms,
+                },
+            )
+            if product_test_result.status != QATestStatus.PASSED:
+                self.project_engine.transition(
+                    project.id,
+                    ProjectStatus.DEBUGGING,
+                )
+                raise RuntimeError(
+                    f"Generated product tests failed for project {project.id}: "
+                    f"{product_test_result.stderr or product_test_result.stdout}"
+                )
+
         # QA repair agents can edit the workspace on disk. Reconcile those
         # edits before security review and GitHub publishing so the delivered
         # files are exactly the version that passed the final QA command.
