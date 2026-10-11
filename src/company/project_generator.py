@@ -329,6 +329,7 @@ Rules:
         # the required preview assets and test file. Ask it once for a compact
         # plan instead of immediately blocking an otherwise valid mission.
         browser_mission = self._is_browser_mission(f"{name} {objective}".casefold())
+
         def required_file_count(items: list[object]) -> int:
             planned_paths = {
                 str(item.get("path", "")).strip().replace("\\", "/")
