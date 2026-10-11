@@ -326,9 +326,64 @@ Rules:
                         )
                     manifest_payload["prompt"] += recovery_prompt
 
-        raw_manifest = manifest.get("files")
-        if not isinstance(raw_manifest, list) or not raw_manifest:
-            raise RuntimeError("Ollama returned an empty project file plan")
+        def manifest_validation_issue(candidate: object) -> str | None:
+            if not isinstance(candidate, dict):
+                return "Ollama returned a project file plan that is not a JSON object"
+            items = candidate.get("files")
+            if not isinstance(items, list) or not items:
+                return "Ollama returned an empty or invalid project file plan"
+            seen_paths: set[str] = set()
+            for item in items:
+                if not isinstance(item, dict):
+                    return "Project file plan contains an invalid entry"
+                raw_path = str(item.get("path", "")).strip().replace("\\", "/")
+                path = PurePosixPath(raw_path)
+                if (
+                    not raw_path
+                    or path.is_absolute()
+                    or ".." in path.parts
+                    or ":" in raw_path
+                    or "\n" in raw_path
+                ):
+                    return f"Unsafe path in project file plan: {raw_path!r}"
+                normalized = path.as_posix()
+                if normalized in seen_paths:
+                    return f"Duplicate path in project file plan: {normalized}"
+                seen_paths.add(normalized)
+                if not str(item.get("purpose", "")).strip():
+                    return f"Project file plan has no purpose for {normalized}"
+            return None
+
+        raw_manifest = manifest.get("files") if isinstance(manifest, dict) else None
+        manifest_issue = manifest_validation_issue(manifest)
+        if manifest_issue:
+            # Valid JSON can still be an unusable plan (empty list, malformed
+            # entries, duplicate paths or unsafe paths). Give the model one
+            # schema-aware recovery attempt before blocking the whole mission.
+            recovery_payload = dict(manifest_payload)
+            recovery_payload["prompt"] = (
+                str(recovery_payload.get("prompt", ""))
+                + "\n\nStructural recovery retry: the previous JSON was parseable "
+                "but its file plan was invalid. Fix this issue: "
+                + manifest_issue
+                + ". Return a non-empty files array containing objects with unique, "
+                "safe relative path values and non-empty purpose strings. Do not use "
+                "absolute paths, parent-directory segments, or markdown fences."
+            )
+            try:
+                manifest = json.loads(await self._call(recovery_payload))
+            except (json.JSONDecodeError, RuntimeError) as exc:
+                raise RuntimeError(
+                    f"Invalid project file plan after one structural recovery retry: "
+                    f"{manifest_issue}; recovery failed: {exc}"
+                ) from exc
+            raw_manifest = manifest.get("files") if isinstance(manifest, dict) else None
+            manifest_issue = manifest_validation_issue(manifest)
+            if manifest_issue:
+                raise RuntimeError(
+                    f"Invalid project file plan after one structural recovery retry: "
+                    f"{manifest_issue}"
+                )
 
         # A small local model may over-plan a browser app before accounting for
         # the required preview assets and test file. Ask it once for a compact

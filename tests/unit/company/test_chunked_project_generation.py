@@ -409,3 +409,69 @@ async def test_large_mission_replans_manifest_that_would_exceed_limit(
     assert set(project.files) == {
         "index.html", "style.css", "app.js", "tests/test_project.py"
     }
+
+
+@pytest.mark.asyncio
+async def test_large_mission_recovers_empty_but_valid_json_manifest(monkeypatch, tmp_path):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    responses = [
+        json.dumps({"files": []}),
+        json.dumps({
+            "files": [
+                {"path": "index.html", "purpose": "Browser application entry point"},
+            ]
+        }),
+        json.dumps({
+            "content": (
+                '<!doctype html><html><head><link rel="stylesheet" href="style.css">'
+                '</head><body><h1>Study Planner</h1><script src="app.js"></script></body></html>'
+            )
+        }),
+        json.dumps({"content": "body { font-family: sans-serif; }"}),
+        json.dumps({"content": "function addStudySession(session) { return session; }"}),
+        json.dumps({
+            "content": (
+                "def add_session(session):\n"
+                "    return dict(session)\n\n"
+                "def test_add_session_preserves_title():\n"
+                "    assert add_session({'title': 'Math'})['title'] == 'Math'\n"
+            )
+        }),
+    ]
+    prompts = []
+
+    async def fake_call(payload):
+        prompts.append(payload["prompt"])
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    project = await generator._generate_large_mission(
+        "Study Planner",
+        "Create, edit, delete and search study sessions with a responsive browser dashboard.",
+    )
+
+    assert set(project.files) == {"index.html", "style.css", "app.js", "tests/test_project.py"}
+    assert len(prompts) == 6
+    assert "Structural recovery retry" in prompts[1]
+
+
+@pytest.mark.asyncio
+async def test_large_mission_fails_clearly_after_invalid_manifest_recovery(
+    monkeypatch, tmp_path
+):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    calls = 0
+
+    async def fake_call(payload):
+        nonlocal calls
+        calls += 1
+        return json.dumps({"files": [{"path": "../unsafe.py", "purpose": "Unsafe"}]})
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    with pytest.raises(RuntimeError, match="after one structural recovery retry"):
+        await generator._generate_large_mission(
+            "Project Planner",
+            "Create, edit, delete and search study sessions with a responsive dashboard.",
+        )
+
+    assert calls == 2
