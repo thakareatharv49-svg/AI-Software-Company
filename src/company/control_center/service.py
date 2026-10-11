@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import re
 from datetime import UTC, datetime
 from threading import Lock
 
@@ -34,7 +33,6 @@ from src.company.project_generator import OllamaProjectGenerator
 from src.company.project_outputs import ProjectOutputManifest
 from src.company.generated_task_planning import build_generated_task_plan
 from src.company.research.engine import StaticResearchProvider
-from src.config.settings import settings
 from src.manager.models.contracts import Mission as ManagerMission
 from src.projects.models.contracts import ProjectCreateRequest
 from src.qa.models.contracts import QATestRequest
