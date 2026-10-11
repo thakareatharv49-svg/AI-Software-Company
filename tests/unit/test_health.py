@@ -12,7 +12,7 @@ def test_root() -> None:
 
     data = response.json()
 
-    assert data["name"] == "AI Software Company"
+    assert data["name"] == "AI Software Developer"
     assert data["version"] == "0.1.0"
     assert data["status"] == "running"
 
