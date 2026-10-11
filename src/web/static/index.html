@@ -3,42 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI Software Developer — Control Center</title>
-<link rel="stylesheet" href="/app/static/styles.css?v=8">
+<meta name="theme-color" content="#090b14">
+<meta name="description" content="Operate your autonomous AI software company: launch missions, monitor factory runs, and open completed products.">
+<title>AI Software Company — Control Center</title>
+<link rel="stylesheet" href="/app/static/styles.css?v=9">
 <link rel="stylesheet" href="/app/static/mission-composer.css?v=1">
 </head>
 <body>
 <div class="shell">
 <aside class="side">
-  <div class="logo">AI <span>Software</span><br>Developer</div>
+  <a class="brand" href="#overview" aria-label="AI Software Company home"><span class="brand-mark" aria-hidden="true">✳</span><span class="brand-copy"><strong>AI Software</strong><strong>Company</strong><small>Autonomous studio</small></span></a>
   <div class="sub">Autonomous software factory</div>
   <nav class="nav" aria-label="Main navigation">
-    <a class="active" href="#overview">◆ Control Center</a>
-    <a href="#completed-products">◇ Completed Products</a>
-    <a href="#missions-section">◇ Missions</a>
-    <a href="#factory-section">◇ Factory</a>
-    <a href="#events-section">◇ Live Events</a>
+    <a class="active" href="#overview"><span aria-hidden="true">⌂</span> Overview</a>
+    <a href="#completed-products"><span aria-hidden="true">▣</span> Products</a>
+    <a href="#missions-section"><span aria-hidden="true">◈</span> Missions</a>
+    <a href="#factory-section"><span aria-hidden="true">⟳</span> Factory</a>
+    <a href="#events-section"><span aria-hidden="true">◉</span> Live events</a>
   </nav>
-  <div class="sidefoot">Human-directed · AI-executed</div>
+  <div class="sidefoot"><span class="sidefoot-dot"></span><span>Human-directed<br><strong>AI-executed</strong></span></div>
 </aside>
 <main class="main">
 <header class="head" id="overview">
-  <div><div class="eyebrow">Control Center</div><h1>Build software with your company.</h1>
+  <div><div class="eyebrow"><span class="eyebrow-mark"></span> Your command center</div><h1>From idea to <span class="gradient-text">working software.</span></h1>
   <p>Give an objective. The factory plans, generates, tests, repairs and publishes.</p></div>
   <div class="live"><i></i><span id="live">Connecting…</span></div>
 </header>
 <section class="stats">
-  <div class="card stat"><small>Projects</small><b id="projects">—</b></div>
-  <div class="card stat"><small>Tasks</small><b id="tasks">—</b></div>
-  <div class="card stat"><small>Agents</small><b id="agents">—</b></div>
-  <div class="card stat"><small>Factory</small><b id="factory">idle</b></div>
+  <div class="card stat"><div class="stat-top"><small>Projects</small><span class="stat-icon violet" aria-hidden="true">▣</span></div><b id="projects">—</b><span class="stat-caption">Tracked by your company</span></div>
+  <div class="card stat"><div class="stat-top"><small>Tasks</small><span class="stat-icon blue" aria-hidden="true">↗</span></div><b id="tasks">—</b><span class="stat-caption">Planned work items</span></div>
+  <div class="card stat"><div class="stat-top"><small>Agents</small><span class="stat-icon teal" aria-hidden="true">✳</span></div><b id="agents">—</b><span class="stat-caption">Available workforce</span></div>
+  <div class="card stat"><div class="stat-top"><small>Factory status</small><span class="stat-icon amber" aria-hidden="true">⟳</span></div><b id="factory">idle</b><span class="stat-caption">Execution engine</span></div>
 </section>
 <section class="card products-card" id="completed-products">
 <div class="section-heading"><div><h2>Completed Products</h2><p class="muted">Open finished browser products directly from the factory.</p></div><small id="product-count" class="section-count"></small></div>
 <div id="products" class="products"><div class="empty">Checking generated products…</div></div>
 </section>
 <section class="card mission-composer" id="new-mission-section">
-<div class="mission-composer-heading"><div><div class="eyebrow">Start building</div><h2>New mission</h2><p class="muted">Describe what you want the factory to build. It will plan the work, generate files, run checks and prepare the product.</p></div><div class="composer-mark" aria-hidden="true">✦</div></div>
+<div class="mission-composer-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span> Turn a brief into a product</div><h2>What should we build today?</h2><p class="muted">Describe what you want the factory to build. It will plan the work, generate files, run checks and prepare the product.</p></div><div class="composer-mark" aria-hidden="true">✦</div></div>
 <form id="mission-form" class="stack mission-form">
 <label for="name">MISSION NAME<input id="name" maxlength="200" required placeholder="e.g. Personal expense tracker"></label>
 <label for="objective">WHAT SHOULD IT DO?<textarea id="objective" maxlength="5000" required placeholder="Build a responsive expense tracker with income and expense entries, category filters, monthly summaries, local storage, and clear empty states. Include tests or a verification checklist."></textarea><small class="field-hint">Tip: mention the main features, who it is for, and how you will know it works.</small></label>
