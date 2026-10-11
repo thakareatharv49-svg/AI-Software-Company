@@ -23,4 +23,4 @@ A review can move from `in_review` to `changes_requested`, then return to `in_re
 - Publication is a separate action from approval and must be recorded only after the GitHub operation succeeds.
 - Approval never overrides a failing quality or security gate.
 
-The domain contract and transition tests are the first implementation slice. API/UI integration, durable review storage, and routing all generated GitHub writes through the approval gate are follow-on integration work; they must be completed before this workflow is considered fully available in the control center.
+The control center now persists review state in the database, exposes owner-protected review/verification/feedback/approval/publish endpoints, and presents those controls in the mission details panel. Feedback queues a fresh run for the same mission ID with the owner's request appended to the objective. Factory-generated repository writes are deferred until the owner uses the publish action. The publication endpoint records the repository only after GitHub confirms a successful write.
