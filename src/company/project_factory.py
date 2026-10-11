@@ -209,9 +209,18 @@ class ProjectFactory:
             f"Mission manually re-queued: {job.mission.name}",
         )
         self._save_job(queued)
+        # A manual retry starts a fresh attempt. Persist the reset plan as well
+        # as the queued job so stale failed/running steps cannot poison the retry.
+        plan = queued.plan.model_copy(deep=True)
+        for step in plan.steps:
+            if step.status in {"failed", "running"}:
+                step.status = "planned"
+                step.detail = None
+        queued = queued.model_copy(update={"plan": plan})
+        self._save_job(queued)
         project = FactoryProject(
             mission=queued.mission,
-            plan=queued.plan,
+            plan=plan,
             attempts=queued.attempts,
         )
         self.queue.append(project)
