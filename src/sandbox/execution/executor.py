@@ -19,6 +19,8 @@ class SandboxExecutor:
         "python.exe",
         "pytest",
         "pytest.exe",
+        "node",
+        "node.exe",
     }
 
     SAFE_ENVIRONMENT_KEYS = {
