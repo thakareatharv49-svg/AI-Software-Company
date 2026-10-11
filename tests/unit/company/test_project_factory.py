@@ -790,3 +790,39 @@ def test_automatic_retry_resets_completed_and_failed_stage_progress():
     assert project.last_error is None
     assert all(step.status == "planned" for step in project.plan.steps)
     assert all(step.detail is None for step in project.plan.steps)
+
+
+
+@pytest.mark.asyncio
+async def test_previous_mission_result_cannot_mask_next_mission_failure() -> None:
+    class FailingAutonomousRunner:
+        async def run(self, mission, plan, on_progress=None):
+            raise RuntimeError("request preparation failed")
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        autonomous_runner=FailingAutonomousRunner(),
+    )
+    project = factory.enqueue(
+        CompanyMission(name="Second mission", objective="Fail before pipeline starts")
+    )
+    # Simulate a successful result retained from the previously completed mission.
+    factory._last_autonomous_result = SimpleNamespace(pipeline=object())
+
+    result = await factory.run(max_projects=1, max_retries=0)
+
+    assert result == [project]
+    assert project.status == "blocked"
+    assert "request preparation failed" in (project.last_error or "")
+    assert next(
+        step for step in project.plan.steps if step.stage.value == "execution"
+    ).status == "failed"
