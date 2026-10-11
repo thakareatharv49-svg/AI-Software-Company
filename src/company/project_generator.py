@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import shutil
 import subprocess
@@ -377,15 +378,8 @@ Rules:
                     manifest_payload["prompt"] += recovery_prompt
 
         mission_request_text = f"{name} {objective}".casefold()
-        explicit_backend_request = any(
-            marker in mission_request_text
-            for marker in (
-                "backend", "server-side", "rest api", "api endpoint",
-                "database", "authentication server",
-            )
-        ) and not any(
-            marker in mission_request_text
-            for marker in ("no backend", "without a backend", "frontend only", "front-end only")
+        explicit_backend_request = OllamaProjectGenerator._mission_requires_backend(
+            mission_request_text
         )
 
         def manifest_validation_issue(candidate: object) -> str | None:
@@ -936,36 +930,34 @@ Requirements:
             )
 
         mission = f"{name} {objective}".casefold()
-        explicit_backend_request = any(
-            marker in mission
-            for marker in (
-                "backend", "server-side", "rest api", "api endpoint",
-                "database", "authentication server",
-            )
-        ) and not any(
-            marker in mission
-            for marker in ("no backend", "without a backend", "frontend only", "front-end only")
-        )
+        explicit_backend_request = OllamaProjectGenerator._mission_requires_backend(mission)
         if explicit_backend_request:
-            backend_markers = {"backend", "server", "api"}
-            backend_files = [
-                path for path in project.files
-                if not (
-                    path.replace("\\", "/").casefold().startswith(("tests/", "docs/"))
-                    or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].startswith("test_")
-                )
-                and (
-                    bool(backend_markers.intersection(
-                        part.casefold()
-                        for part in PurePosixPath(path.replace("\\", "/")).parts[:-1]
+            backend_directory_markers = {
+                "backend", "server", "api", "routes", "controllers",
+                "database", "db", "auth",
+            }
+            backend_filenames = {
+                "server.py", "server.js", "server.ts",
+                "api.py", "api.js", "api.ts",
+                "routes.py", "routes.js", "routes.ts",
+                "database.py", "database.js", "database.ts",
+                "db.py", "db.js", "db.ts",
+                "auth.py", "auth.js", "auth.ts",
+                "wsgi.py", "asgi.py", "main.py", "app.py",
+            }
+            backend_files = []
+            for path in project.files:
+                normalized = path.replace("\\\\", "/").casefold()
+                pure_path = PurePosixPath(normalized)
+                if normalized.startswith(("tests/", "docs/")) or pure_path.name.startswith("test_"):
+                    continue
+                if (
+                    bool(backend_directory_markers.intersection(
+                        part.casefold() for part in pure_path.parts[:-1]
                     ))
-                    or PurePosixPath(path.replace("\\", "/")).name.casefold() in {
-                        "server.py", "server.js", "server.ts",
-                        "api.py", "api.js", "api.ts",
-                        "main.py", "app.py",
-                    }
-                )
-            ]
+                    or pure_path.name in backend_filenames
+                ):
+                    backend_files.append(path)
             if not backend_files:
                 raise RuntimeError(
                     "Mission explicitly requests backend/server/API/database "
@@ -973,6 +965,8 @@ Requirements:
                     "file. Add a server/API module and its tests instead of shipping "
                     "a frontend-only substitute."
                 )
+
+        OllamaProjectGenerator._validate_python_syntax(project.files)
         if not OllamaProjectGenerator._is_browser_mission(mission):
             return
 
@@ -985,6 +979,53 @@ Requirements:
 
         OllamaProjectGenerator._validate_local_browser_assets(project.files)
         OllamaProjectGenerator._validate_javascript_syntax(project.files)
+
+    @staticmethod
+    def _mission_requires_backend(mission: str) -> bool:
+        """Recognize explicit backend requests without treating exclusions as requirements."""
+        text = f" {mission.casefold()} "
+        frontend_only = (
+            " no backend ", " without a backend ", " without backend ",
+            " frontend only ", " front-end only ", " frontend-only ",
+            " front-end-only ",
+        )
+        if any(phrase in text for phrase in frontend_only):
+            return False
+
+        backend_markers = (
+            "backend", "server-side", "rest api", "api endpoint",
+            "authentication server",
+        )
+        api_is_excluded = any(
+            phrase in text
+            for phrase in (" no api ", " without an api ", " without api ",
+                           " no rest api ", " without a rest api ")
+        )
+        database_is_excluded = any(
+            phrase in text
+            for phrase in (" no database ", " without a database ",
+                           " without database ", " database-free ")
+        )
+        return (
+            any(marker in text for marker in backend_markers)
+            or ("api" in text and not api_is_excluded and "api-only" not in text)
+            or ("database" in text and not database_is_excluded)
+        )
+
+    @staticmethod
+    def _validate_python_syntax(files: dict[str, str]) -> None:
+        """Reject malformed Python before spending time on runtime QA or repair."""
+        for path, content in files.items():
+            if not path.casefold().endswith(".py"):
+                continue
+            try:
+                ast.parse(content, filename=path)
+            except SyntaxError as exc:
+                location = f"{path}:{exc.lineno or 1}:{exc.offset or 1}"
+                detail = exc.msg or "invalid Python syntax"
+                raise RuntimeError(
+                    f"Generated Python syntax check failed at {location}: {detail}."
+                ) from exc
 
     @staticmethod
     def _validate_local_browser_assets(files: dict[str, str]) -> None:
