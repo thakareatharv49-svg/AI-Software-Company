@@ -261,7 +261,7 @@ def test_dashboard_completed_product_preview_uses_defined_identifier() -> None:
     html = (static_dir / "index.html").read_text(encoding="utf-8")
     css = (static_dir / "styles.css").read_text(encoding="utf-8")
 
-    assert '/app/static/app.js?v=14' in html
+    assert '/app/static/app.js?v=16' in html
     assert '/app/static/styles.css?v=10' in html
     assert 'href="#missions-section"' in html and 'id="missions-section"' in html
     assert 'href="#factory-section"' in html and 'id="factory-section"' in html
