@@ -174,17 +174,28 @@ def verify_product_requirement(
 
 
 @router.post('/{mission_id}/review/feedback', response_model=ProductReview)
-def submit_product_feedback(
+async def submit_product_feedback(
     mission_id: str,
     payload: FeedbackRequest,
     center: Annotated[CompanyControlCenter, Depends(get_control_center)],
 ) -> ProductReview:
+    job = _get_job(mission_id, center)
+    if job.status != MissionJobStatus.COMPLETED:
+        raise HTTPException(status_code=409, detail='Wait until the current revision finishes before requesting changes')
     review = _get_review(mission_id, center)
     try:
         updated = request_changes(review, payload.message)
+        revised_job = center._factory.revise(mission_id, payload.message)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail='Mission job not found') from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    center._sync_mission_from_job(revised_job)
     _review_store().save(updated)
+    try:
+        await center.run_factory(max_projects=1, max_retries=2, mission_id=mission_id)
+    except (RuntimeError, ValueError, KeyError) as exc:
+        raise HTTPException(status_code=409, detail=f'Revision is queued but the factory could not start: {exc}') from exc
     return updated
 
 
