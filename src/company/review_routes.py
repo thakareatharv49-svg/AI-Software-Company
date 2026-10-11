@@ -246,4 +246,11 @@ async def publish_approved_product(
         raise HTTPException(status_code=502, detail=f'GitHub publishing failed; product remains approved: {result.message}')
     updated = mark_published(review, f'https://github.com/{repository.owner}/{repository.name}')
     _review_store().save(updated)
+    center._audit(
+        mission_id,
+        'PRODUCT_PUBLISHED',
+        f'Owner-approved product published to {repository.owner}/{repository.name}',
+        status=updated.status.value,
+        metadata={'repository_url': updated.repository_url, 'revision': updated.revision},
+    )
     return updated
