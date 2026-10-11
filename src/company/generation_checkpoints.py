@@ -66,21 +66,44 @@ class GenerationCheckpointStore:
             ))
             return normalized_path, purpose.strip(), normalized_dependencies
 
-        previous = {
-            key: item.get("path")
+        previous_by_path = {
+            key[0]: key
             for item in payload["manifest"]
             if (key := contract(item)) is not None
         }
-        compatible_paths = {
-            item.get("path")
+        current_by_path = {
+            key[0]: (key, item)
             for item in manifest
-            if (key := contract(item)) is not None and key in previous
+            if (key := contract(item)) is not None
         }
         cached = payload["files"]
+        compatible = {
+            path
+            for normalized_path, (current_contract, item) in current_by_path.items()
+            if previous_by_path.get(normalized_path) == current_contract
+            and item.get("path") in cached
+            and isinstance(cached[item.get("path")], str)
+        }
+
+        # If a dependency must be regenerated, every cached consumer of that
+        # dependency is stale too. Repeat until the invalidation set stabilizes
+        # so changes propagate through multi-level module graphs.
+        changed = True
+        while changed:
+            changed = False
+            for normalized_path, (current_contract, item) in current_by_path.items():
+                original_path = item.get("path")
+                if original_path not in compatible:
+                    continue
+                dependencies = current_contract[2]
+                if any(dependency not in compatible for dependency in dependencies):
+                    compatible.remove(original_path)
+                    changed = True
+
         return {
             path: content
             for path, content in cached.items()
-            if path in compatible_paths and isinstance(content, str)
+            if path in compatible and isinstance(content, str)
         }
 
     def save(self, *, manifest: list[dict[str, str]], files: dict[str, str]) -> None:
