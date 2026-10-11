@@ -324,10 +324,58 @@ Rules:
         raw_manifest = manifest.get("files")
         if not isinstance(raw_manifest, list) or not raw_manifest:
             raise RuntimeError("Ollama returned an empty project file plan")
+
+        # A small local model may over-plan a browser app before accounting for
+        # the required preview assets and test file. Ask it once for a compact
+        # plan instead of immediately blocking an otherwise valid mission.
+        browser_mission = self._is_browser_mission(f"{name} {objective}".casefold())
+        def required_file_count(items: list[object]) -> int:
+            planned_paths = {
+                str(item.get("path", "")).strip().replace("\\\\", "/")
+                for item in items
+                if isinstance(item, dict)
+            }
+            required = 0
+            if browser_mission:
+                required += sum(
+                    path not in planned_paths
+                    for path in ("index.html", "style.css", "app.js")
+                )
+            has_test_file = any(
+                path.lower().startswith("tests/")
+                or path.lower().startswith("test_")
+                or path.lower().endswith("_test.py")
+                for path in planned_paths
+            )
+            if not has_test_file:
+                required += 1
+            return required
+
+        if len(raw_manifest) > 10 or len(raw_manifest) + required_file_count(raw_manifest) > 10:
+            compact_payload = dict(manifest_payload)
+            compact_payload["prompt"] = (
+                manifest_prompt
+                + "\\n\\nCorrective retry: the previous plan exceeded the safe 10-file "
+                "limit once mandatory browser assets and tests are included. Return a "
+                "compact revised plan with no more than 6 planned files, include "
+                "index.html, style.css, app.js, and tests/test_project.py for browser "
+                "apps, and combine related implementation into fewer files. Preserve "
+                "all mission-critical workflows; do not split features into tiny modules."
+            )
+            try:
+                compact_manifest = json.loads(await self._call(compact_payload))
+                compact_items = compact_manifest.get("files")
+                if isinstance(compact_items, list) and compact_items:
+                    raw_manifest = compact_items
+            except (json.JSONDecodeError, RuntimeError):
+                # Keep the original response so the existing explicit safe-limit
+                # error below reports the failure rather than masking it.
+                pass
+
         if len(raw_manifest) > 10:
             raise RuntimeError(
-                f"Project file plan contains {len(raw_manifest)} files; the safe limit is 10. "
-                "Reduce the mission scope or split it into separate missions."
+                f"Project file plan contains {len(raw_manifest)} files after one compact-plan retry; "
+                "the safe limit is 10. Reduce the mission scope or split it into separate missions."
             )
 
         manifest_items: list[tuple[str, str]] = []
