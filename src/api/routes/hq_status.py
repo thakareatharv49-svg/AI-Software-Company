@@ -28,10 +28,13 @@ def get_hq_status_control_center() -> CompanyControlCenter:
     return control_center
 
 
+HQStatusControlCenter = Depends(get_hq_status_control_center)
+
+
 @router.get("/api/hq/status", response_model=HQStatusResponse)
 def hq_status(
     request: Request,
-    center: CompanyControlCenter = Depends(get_hq_status_control_center),
+    center: CompanyControlCenter = HQStatusControlCenter,
 ) -> HQStatusResponse:
     """Expose only aggregate counts; mission names, objectives and controls stay private."""
     expected_token = settings.nexora_hq_status_token
