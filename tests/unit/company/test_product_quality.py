@@ -108,8 +108,8 @@ def test_accepts_generated_smoke_check_when_behavior_test_is_also_present() -> N
 def test_rejects_generated_test_function_without_assertions() -> None:
     issues = find_weak_product_tests({
         "tests/test_app.py": (
-            "def test_add_expense():\\n"
-            "    create_expense(amount=12)\\n"
+            "def test_add_expense():\n"
+            "    create_expense(amount=12)\n"
         )
     })
 
@@ -121,10 +121,10 @@ def test_rejects_generated_test_function_without_assertions() -> None:
 def test_accepts_expected_exception_check_without_plain_assert() -> None:
     issues = find_weak_product_tests({
         "tests/test_app.py": (
-            "import pytest\\n"
-            "def test_rejects_negative_amount():\\n"
-            "    with pytest.raises(ValueError):\\n"
-            "        add_expense(-1)\\n"
+            "import pytest\n"
+            "def test_rejects_negative_amount():\n"
+            "    with pytest.raises(ValueError):\n"
+            "        add_expense(-1)\n"
         )
     })
 
