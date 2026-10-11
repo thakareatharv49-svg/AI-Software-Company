@@ -46,15 +46,35 @@ class MasterManager:
     def create_plan(self, items: Sequence[TaskPlanItem]) -> list[str]:
         if self.mission is None:
             raise ValueError("No active mission")
+        # Validate the complete dependency graph before creating any tasks.
+        # Dependencies are expressed as indexes into this ordered plan, so every
+        # dependency must refer to a unique task that appears earlier in the plan.
+        # Silently dropping invalid indexes can make QA run too early or leave a
+        # mission apparently planned while required work was never gated.
+        for task_index, item in enumerate(items):
+            dependencies = item.dependencies
+            if len(set(dependencies)) != len(dependencies):
+                raise ValueError(
+                    f"Task {task_index} contains duplicate dependency indexes"
+                )
+            for dependency_index in dependencies:
+                if type(dependency_index) is not int:
+                    raise ValueError(
+                        f"Task {task_index} dependency indexes must be integers"
+                    )
+                if dependency_index < 0 or dependency_index >= task_index:
+                    raise ValueError(
+                        f"Task {task_index} dependency index {dependency_index} "
+                        "must reference an earlier task"
+                    )
+
         self.status = ManagerStatus.PLANNING
         created_ids: list[str] = []
         project_id = self.mission.project_id
         for item in items:
             priority = TaskPriority(item.priority.lower())
             dependency_ids = tuple(
-                created_ids[index]
-                for index in item.dependencies
-                if 0 <= index < len(created_ids)
+                created_ids[index] for index in item.dependencies
             )
             task = self.task_engine.create(
                 TaskCreateRequest(
