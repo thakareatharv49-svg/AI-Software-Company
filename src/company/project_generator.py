@@ -548,11 +548,37 @@ Rules:
             # the model context window.
             existing_context_parts: list[str] = []
             remaining_context_chars = 6_000
-            for existing_path, existing_content in files.items():
+            context_files = list(files.items())
+            current_basename = path.casefold().rsplit("/", 1)[-1]
+            generating_tests = (
+                path.casefold().startswith("tests/")
+                or current_basename.startswith("test_")
+                or current_basename.endswith("_test.py")
+            )
+            if generating_tests:
+                def context_priority(item: tuple[str, str]) -> tuple[int, str]:
+                    existing_path = item[0].casefold()
+                    basename = existing_path.rsplit("/", 1)[-1]
+                    is_test = (
+                        existing_path.startswith("tests/")
+                        or basename.startswith("test_")
+                        or basename.endswith("_test.py")
+                    )
+                    if is_test:
+                        return (3, existing_path)
+                    if existing_path.endswith((".py", ".js", ".mjs", ".cjs")):
+                        return (0, existing_path)
+                    if existing_path.endswith((".html", ".htm")):
+                        return (1, existing_path)
+                    if existing_path.endswith(".css"):
+                        return (2, existing_path)
+                    return (2, existing_path)
+                context_files.sort(key=context_priority)
+            for existing_path, existing_content in context_files:
                 header = f"FILE: {existing_path}\n"
                 if remaining_context_chars <= len(header) + 80:
                     break
-                available = remaining_context_chars - len(header) - 80
+                available = min(2_200, remaining_context_chars - len(header) - 80)
                 excerpt = existing_content[:available]
                 truncated = len(excerpt) < len(existing_content)
                 block = header + excerpt
