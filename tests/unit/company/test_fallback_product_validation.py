@@ -83,6 +83,36 @@ def test_parsed_browser_product_gets_automated_smoke_test() -> None:
 
 
 
+
+@pytest.mark.parametrize(
+    "module_source",
+    [
+        "import './missing.js';",
+        "export { start } from './missing.js';",
+        "export * from './missing.js';",
+    ],
+)
+def test_browser_asset_validation_rejects_missing_module_dependencies(
+    module_source: str,
+) -> None:
+    files = {
+        "index.html": '<!doctype html><script type="module" src="./app.js"></script>',
+        "app.js": module_source,
+    }
+
+    with pytest.raises(RuntimeError, match="references missing local asset"):
+        OllamaProjectGenerator._validate_local_browser_assets(files)
+
+
+def test_browser_asset_validation_accepts_existing_side_effect_import() -> None:
+    files = {
+        "index.html": '<!doctype html><script type="module" src="./app.js"></script>',
+        "app.js": "import './startup.js';",
+        "startup.js": "globalThis.started = true;",
+    }
+
+    OllamaProjectGenerator._validate_local_browser_assets(files)
+
 def test_deterministic_fallback_rejects_missing_automated_tests(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
