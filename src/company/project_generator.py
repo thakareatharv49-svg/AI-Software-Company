@@ -355,7 +355,7 @@ Rules:
             compact_payload = dict(manifest_payload)
             compact_payload["prompt"] = (
                 manifest_prompt
-                + "\\n\\nCorrective retry: the previous plan exceeded the safe 10-file "
+                + "\n\nCorrective retry: the previous plan exceeded the safe 10-file "
                 "limit once mandatory browser assets and tests are included. Return a "
                 "compact revised plan with no more than 6 planned files, include "
                 "index.html, style.css, app.js, and tests/test_project.py for browser "
