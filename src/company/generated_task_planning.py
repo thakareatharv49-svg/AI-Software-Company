@@ -40,7 +40,12 @@ def build_generated_task_plan(
     groups: OrderedDict[str, list[str]] = OrderedDict()
     for raw_path in files:
         path = PurePosixPath(raw_path.replace("\\", "/")).as_posix()
-        if path in {"", "."} or path.startswith("../") or PurePosixPath(path).is_absolute():
+        if (
+            path in {"", "."}
+            or path.startswith("../")
+            or PurePosixPath(path).is_absolute()
+            or ":" in path
+        ):
             raise ValueError(f"Unsafe generated file path in task plan: {raw_path!r}")
         groups.setdefault(_subsystem_for_path(path), []).append(path)
 
