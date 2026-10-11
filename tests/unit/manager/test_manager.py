@@ -150,6 +150,36 @@ async def test_manager_recovers_when_task_succeeds_on_retry() -> None:
 
 
 @pytest.mark.asyncio
+async def test_manager_reports_terminal_failure_and_blocked_dependents() -> None:
+    registry = AgentRegistry()
+    registry.register(make_agent())
+    manager = MasterManager(agent_registry=registry)
+    manager.start_mission(make_mission())
+    ids = manager.create_plan([
+        TaskPlanItem(title="Implement backend"),
+        TaskPlanItem(title="Run QA", dependencies=(0,)),
+    ])
+
+    async def fail(request):
+        class Result:
+            success = False
+            error = "Implementation tests failed"
+        return Result()
+
+    first = await manager.tick(executor=fail)
+    assert first.decision == ManagerDecisionType.WAIT
+    assert manager.task_engine.get(ids[0]).status.value == "failed"
+    assert manager.task_engine.get(ids[1]).status.value == "blocked"
+
+    second = await manager.tick(executor=fail)
+    assert second.decision == ManagerDecisionType.BLOCK
+    assert "Implement backend" in second.reason
+    assert "Run QA" in second.reason
+    assert "Implementation tests failed" in second.reason
+    assert manager.status == ManagerStatus.BLOCKED
+
+
+@pytest.mark.asyncio
 async def test_parallel_tick_executes_independent_tasks_concurrently() -> None:
     registry = AgentRegistry()
     registry.register(make_agent(capacity=2))

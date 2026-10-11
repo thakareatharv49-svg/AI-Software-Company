@@ -89,6 +89,60 @@ class MasterManager:
         self.status = ManagerStatus.IDLE
         return created_ids
 
+    def _no_ready_task_decision(self) -> ManagerDecision:
+        """Distinguish a recoverable wait from a mission blocked by failed work."""
+        if self.mission is None:
+            return ManagerDecision(
+                decision=ManagerDecisionType.BLOCK,
+                reason="No active mission",
+            )
+
+        tasks = self.task_engine.list(project_id=self.mission.project_id)
+        failed = [task for task in tasks if task.status == TaskStatus.FAILED]
+        if failed:
+            failed_ids = {task.id for task in failed}
+            blocked = [
+                task for task in tasks
+                if task.status == TaskStatus.BLOCKED
+                and any(dependency_id in failed_ids for dependency_id in task.dependencies)
+            ]
+            details = ", ".join(
+                f"{task.title}: {task.error or 'execution failed'}"
+                for task in failed
+            )
+            if blocked:
+                details += "; blocked dependents: " + ", ".join(
+                    task.title for task in blocked
+                )
+            self.status = ManagerStatus.BLOCKED
+            return ManagerDecision(
+                decision=ManagerDecisionType.BLOCK,
+                reason=f"Mission cannot progress because required task(s) failed: {details}",
+                task_id=failed[0].id,
+            )
+
+        remaining = [
+            task for task in tasks
+            if task.status in {
+                TaskStatus.PENDING,
+                TaskStatus.READY,
+                TaskStatus.IN_PROGRESS,
+                TaskStatus.BLOCKED,
+            }
+        ]
+        if not remaining:
+            self.status = ManagerStatus.COMPLETED
+            return ManagerDecision(
+                decision=ManagerDecisionType.COMPLETE_MISSION,
+                reason="All mission tasks are complete",
+            )
+
+        self.status = ManagerStatus.BLOCKED
+        return ManagerDecision(
+            decision=ManagerDecisionType.WAIT,
+            reason="No task is currently ready; waiting for in-progress or dependency work",
+        )
+
     def choose_agent(self, task_id: str) -> str | None:
         task = self.task_engine.get(task_id)
         if task.assigned_agent:
@@ -160,27 +214,7 @@ class MasterManager:
 
         ready = self.task_engine.ready_tasks(self.mission.project_id)
         if not ready:
-            remaining = self.task_engine.list(
-                project_id=self.mission.project_id,
-                statuses=[
-                    TaskStatus.PENDING,
-                    TaskStatus.READY,
-                    TaskStatus.IN_PROGRESS,
-                    TaskStatus.BLOCKED,
-                    TaskStatus.FAILED,
-                ],
-            )
-            if not remaining:
-                self.status = ManagerStatus.COMPLETED
-                return ManagerDecision(
-                    decision=ManagerDecisionType.COMPLETE_MISSION,
-                    reason="All mission tasks are complete",
-                )
-            self.status = ManagerStatus.BLOCKED
-            return ManagerDecision(
-                decision=ManagerDecisionType.WAIT,
-                reason="No task is currently ready",
-            )
+            return self._no_ready_task_decision()
 
         agents = [
             agent for agent in self.agent_registry.list_agents()
@@ -256,27 +290,7 @@ class MasterManager:
             )
         ready = self.task_engine.ready_tasks(self.mission.project_id)
         if not ready:
-            remaining = self.task_engine.list(
-                project_id=self.mission.project_id,
-                statuses=[
-                    TaskStatus.PENDING,
-                    TaskStatus.READY,
-                    TaskStatus.IN_PROGRESS,
-                    TaskStatus.BLOCKED,
-                    TaskStatus.FAILED,
-                ],
-            )
-            if not remaining:
-                self.status = ManagerStatus.COMPLETED
-                return ManagerDecision(
-                    decision=ManagerDecisionType.COMPLETE_MISSION,
-                    reason="All mission tasks are complete",
-                )
-            self.status = ManagerStatus.BLOCKED
-            return ManagerDecision(
-                decision=ManagerDecisionType.WAIT,
-                reason="No task is currently ready",
-            )
+            return self._no_ready_task_decision()
         task = ready[0]
         agent_name = self.choose_agent(task.id)
         if agent_name is None:
