@@ -227,3 +227,34 @@ def test_accepts_behavioral_tests_in_large_mission_test_project_filename() -> No
     })
 
     assert issues == []
+
+
+
+def test_rejects_file_existence_only_tests_with_generic_names() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_project.py": (
+            "from pathlib import Path\n"
+            "def test_app_is_present():\n"
+            "    assert Path('index.html').is_file()\n"
+            "def test_script_is_present():\n"
+            "    assert Path('app.js').exists()\n"
+        )
+    })
+
+    assert len(issues) == 1
+    assert "only generated smoke checks" in issues[0]
+
+
+def test_accepts_file_smoke_check_alongside_behavior_test() -> None:
+    issues = find_weak_product_tests({
+        "tests/test_project.py": (
+            "from pathlib import Path\n"
+            "def test_app_is_present():\n"
+            "    assert Path('index.html').is_file()\n"
+            "def test_total_uses_expenses():\n"
+            "    expenses = [12, 8]\n"
+            "    assert sum(expenses) == 20\n"
+        )
+    })
+
+    assert issues == []
