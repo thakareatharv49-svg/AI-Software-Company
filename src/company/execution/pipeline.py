@@ -6,6 +6,7 @@ from pathlib import Path
 from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
+from src.company.artifact_validation import validate_generated_artifacts
 from src.company.gates.quality import ProductionQualityGate
 from src.company.github_native.publish_queue import GitHubPublishQueue
 from src.company.github_native.service import GitHubNativeService
@@ -259,6 +260,7 @@ class CompanyExecutionPipeline:
 
         self.project_engine.transition(project.id, ProjectStatus.REVIEW)
 
+        artifact_issues = validate_generated_artifacts(files)
         gate = self.quality_gate.evaluate(
             qa_passed=qa_result.status == QATestStatus.PASSED,
             security_approved=review_result.status.value == "approved",
@@ -274,15 +276,21 @@ class CompanyExecutionPipeline:
                 and pull_request_head is not None
             ),
             deployment_ready=True,
+            artifacts_ready=not artifact_issues,
         )
         self._publish_event(
             "production.gate.evaluated",
             project_id=project.id,
-            payload={"allowed": gate.allowed, "checks": gate.checks},
+            payload={
+                "allowed": gate.allowed,
+                "checks": gate.checks,
+                "artifact_issues": artifact_issues,
+            },
         )
         if not gate.allowed:
             self.project_engine.transition(project.id, ProjectStatus.BLOCKED)
-            raise RuntimeError(gate.reason)
+            detail = " ".join(artifact_issues)
+            raise RuntimeError(f"{gate.reason} {detail}".strip())
 
         github_message = None
         github_pending = False
