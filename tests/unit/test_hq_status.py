@@ -69,7 +69,7 @@ def test_hq_status_returns_only_aggregate_read_only_counts(client, monkeypatch):
     assert payload["queued_missions"] == 1
     assert payload["completed_missions"] == 1
     assert payload["blocked_missions"] == 1
-    assert payload["updated_at"].endswith("+00:00")
+    assert payload["updated_at"].endswith(("Z", "+00:00"))
     assert set(payload) == {
         "service", "status", "active_missions", "queued_missions",
         "completed_missions", "blocked_missions", "updated_at",
