@@ -145,7 +145,7 @@ class FactoryAutonomousRunner:
                 path.is_absolute()
                 or any(part in {"", ".", ".."} for part in path.parts)
                 or (path.parts and path.parts[0].endswith(":"))
-                or "\\x00" in normalized
+                or "\x00" in normalized
             ):
                 raise ValueError(f"Generated project contains unsafe path: {raw_path!r}")
             has_content = has_content or bool(content.strip())
