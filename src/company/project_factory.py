@@ -231,13 +231,23 @@ class ProjectFactory:
         self._audit(mission_id, "MISSION_REQUEUED", queued.message, queued.status.value)
         return queued
 
-    def _reset_for_retry(self, project: FactoryProject) -> None:
-        """Reset lifecycle progress before restarting the mission from its first stage."""
+    def _reset_for_retry(
+        self,
+        project: FactoryProject,
+        *,
+        reset_completed: bool = False,
+    ) -> None:
+        """Reset transient progress, optionally restarting the full lifecycle."""
         for step in project.plan.steps:
-            # Automatic retries restart the entire autonomous lifecycle, just like
-            # manual retries. Keeping completed steps from a failed attempt makes
-            # the dashboard show stale progress while the new attempt is running.
-            if step.status != "planned" or step.detail is not None:
+            # A bounded max_stages run is a deliberate pause/resume, not a retry
+            # from scratch. Preserve its completed stages; real failed attempts
+            # must clear all progress so the dashboard reflects the new attempt.
+            should_reset = (
+                step.status != "planned" or step.detail is not None
+            ) and (
+                reset_completed or step.status in {"failed", "running"}
+            )
+            if should_reset:
                 step.status = "planned"
                 step.detail = None
 
@@ -444,7 +454,7 @@ class ProjectFactory:
             project.last_error = project.last_error or "Project execution blocked"
             if project.attempts <= max_retries and max_retries > 0:
                 project.status = "queued"
-                self._reset_for_retry(project)
+                self._reset_for_retry(project, reset_completed=True)
                 self.queue.insert(0, project)
                 self._transition_job(
                     project,
@@ -479,7 +489,7 @@ class ProjectFactory:
                 event_type = "FACTORY_PROJECT_BLOCKED_RATE_LIMIT"
             elif project.attempts <= max_retries:
                 project.status = "queued"
-                self._reset_for_retry(project)
+                self._reset_for_retry(project, reset_completed=True)
                 self.queue.insert(0, project)
                 self._transition_job(
                     project,
@@ -544,7 +554,7 @@ class ProjectFactory:
                 event_type = "FACTORY_PROJECT_BLOCKED"
             elif execution_failed:
                 project.status = "queued"
-                self._reset_for_retry(project)
+                self._reset_for_retry(project, reset_completed=max_stages is None)
                 self.queue.insert(0, project)
                 self._transition_job(
                     project,
