@@ -138,7 +138,7 @@ async def test_large_mission_adapts_file_token_budget_after_invalid_json(monkeyp
 
     assert project.files["index.html"] == "<!doctype html><title>Recovered compact file</title>"
     assert [payload["options"]["num_predict"] for payload in payloads[:3]] == [
-        1800,
+        3500,
         3500,
         5000,
     ]
@@ -290,7 +290,7 @@ async def test_large_mission_rejects_manifest_that_exceeds_limit_after_required_
     manifest = {
         "files": [
             {"path": f"src/module_{index}.py", "purpose": f"Module {index}"}
-            for index in range(8)
+            for index in range(40)
         ]
     }
 
@@ -298,7 +298,7 @@ async def test_large_mission_rejects_manifest_that_exceeds_limit_after_required_
         return json.dumps(manifest)
 
     monkeypatch.setattr(generator, "_call", fake_call)
-    with pytest.raises(RuntimeError, match="safe 10-file limit"):
+    with pytest.raises(RuntimeError, match="safe 40-file limit"):
         await generator._generate_large_mission(
             "Browser Dashboard",
             "Build a browser dashboard with search, filters, settings, and responsive layout.",
@@ -383,7 +383,7 @@ async def test_large_mission_replans_manifest_that_would_exceed_limit(
     oversized = {
         "files": [
             {"path": f"src/module_{index}.py", "purpose": f"Module {index}"}
-            for index in range(8)
+            for index in range(40)
         ]
     }
     compact = {
@@ -400,7 +400,7 @@ async def test_large_mission_replans_manifest_that_would_exceed_limit(
         json.dumps({"content": "<!doctype html><html><head><title>Planner</title><link rel=\"stylesheet\" href=\"style.css\"></head><body><script src=\"app.js\"></script></body></html>"}),
         json.dumps({"content": "body { font-family: sans-serif; }"}),
         json.dumps({"content": "function addTask(title) { return { title, completed: false }; }"}),
-        json.dumps({"content": "def test_add_task_preserves_title():\n    task = {\'title\': \'Plan\', \'completed\': False}\n    assert task[\'title\'] == \'Plan\'\n"}),
+        json.dumps({"content": "def test_add_task_preserves_title():\n    task = {'title': 'Plan', 'completed': False}\n    assert task['title'] == 'Plan'\n"}),
     ]
     prompts = []
 
@@ -419,7 +419,6 @@ async def test_large_mission_replans_manifest_that_would_exceed_limit(
     assert set(project.files) == {
         "index.html", "style.css", "app.js", "tests/test_project.py"
     }
-
 
 @pytest.mark.asyncio
 async def test_large_mission_recovers_empty_but_valid_json_manifest(monkeypatch, tmp_path):
