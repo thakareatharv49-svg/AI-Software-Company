@@ -96,7 +96,12 @@ async def test_company_pipeline_completes_project(tmp_path: Path):
         tasks=tasks,
         qa_request=qa_request,
         files={
-            "example.py": "def hello():\n    return 'hello'\n",
+            "example.py": "def hello():\\n    return 'hello'\\n",
+            "tests/test_product.py": (
+                "from pathlib import Path\\n"
+                "def test_product_suite_is_executed():\\n"
+                "    Path('product-test-ran.txt').write_text('passed', encoding='utf-8')\\n"
+            ),
         },
         agent_executor=FakeAgentExecutor(),
         github_repository=GitHubRepository(
@@ -112,6 +117,7 @@ async def test_company_pipeline_completes_project(tmp_path: Path):
     assert result.review_result.status.value == "approved"
     assert result.memory_id is not None
     assert result.github_message is not None
+    assert (tmp_path / "product-test-ran.txt").read_text(encoding="utf-8") == "passed"
 
 def test_pipeline_exposes_real_end_to_end_entrypoint() -> None:
     assert hasattr(CompanyExecutionPipeline, "run_end_to_end")
