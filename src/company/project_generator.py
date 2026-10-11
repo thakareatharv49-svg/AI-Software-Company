@@ -359,10 +359,14 @@ Rules:
         def manifest_validation_issue(candidate: object) -> str | None:
             if not isinstance(candidate, dict):
                 return "Ollama returned a project file plan that is not a JSON object"
-            items = candidate.get("files")
-            if not isinstance(items, list) or not items:
-                return "Ollama returned an empty or invalid project file plan"
+            if len(items) > self.max_generated_project_files:
+                return (
+                    f"Project file plan exceeds the configured limit of "
+                    f"{self.max_generated_project_files} files"
+                )
             seen_paths: set[str] = set()
+            normalized_paths: list[str] = []
+            normalized_dependencies: dict[str, list[str]] = {}
             for item in items:
                 if not isinstance(item, dict):
                     return "Project file plan contains an invalid entry"
@@ -377,9 +381,14 @@ Rules:
                 ):
                     return f"Unsafe path in project file plan: {raw_path!r}"
                 normalized = path.as_posix()
-                if normalized in seen_paths:
-                    return f"Duplicate path in project file plan: {normalized}"
-                seen_paths.add(normalized)
+                path_key = normalized.casefold()
+                if path_key in seen_paths:
+                    return (
+                        f"Duplicate path in project file plan (case-insensitive): "
+                        f"{normalized}"
+                    )
+                seen_paths.add(path_key)
+                normalized_paths.append(normalized)
                 if not str(item.get("purpose", "")).strip():
                     return f"Project file plan has no purpose for {normalized}"
                 dependencies = item.get("depends_on", [])
@@ -388,30 +397,37 @@ Rules:
                     for dependency in dependencies
                 ):
                     return f"Project file plan has invalid dependencies for {normalized}"
-                if normalized in dependencies:
+                normalized_dependency_paths = [
+                    PurePosixPath(dependency.replace("\\", "/")).as_posix()
+                    for dependency in dependencies
+                ]
+                dependency_keys = [dependency.casefold() for dependency in normalized_dependency_paths]
+                if path_key in dependency_keys:
                     return f"Project file {normalized} cannot depend on itself"
-                if len(set(dependencies)) != len(dependencies):
+                if len(set(dependency_keys)) != len(dependency_keys):
                     return f"Project file plan repeats a dependency for {normalized}"
+                item["depends_on"] = normalized_dependency_paths
+                normalized_dependencies[normalized] = normalized_dependency_paths
             planned_paths = {
-                str(item.get("path", "")).strip().replace("\\\\", "/")
-                for item in items if isinstance(item, dict)
+                path.casefold(): path for path in normalized_paths
             }
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                normalized = str(item.get("path", "")).strip().replace("\\\\", "/")
-                dependencies = item.get("depends_on", [])
-                if isinstance(dependencies, list):
-                    missing = [dependency for dependency in dependencies if dependency not in planned_paths]
-                    if missing:
-                        return f"Project file {normalized} depends on unknown path(s): {', '.join(missing)}"
+            for normalized, dependencies in normalized_dependencies.items():
+                missing = [
+                    dependency for dependency in dependencies
+                    if dependency.casefold() not in planned_paths
+                ]
+                if missing:
+                    return (
+                        f"Project file {normalized} depends on unknown path(s): "
+                        f"{', '.join(missing)}"
+                    )
+                normalized_dependencies[normalized] = [
+                    planned_paths[dependency.casefold()] for dependency in dependencies
+                ]
             try:
                 order_manifest_paths(
-                    [str(item.get("path", "")).strip().replace("\\\\", "/") for item in items if isinstance(item, dict)],
-                    {
-                        str(item.get("path", "")).strip().replace("\\\\", "/"): item.get("depends_on", [])
-                        for item in items if isinstance(item, dict)
-                    },
+                    normalized_paths,
+                    normalized_dependencies,
                 )
             except ValueError as exc:
                 return str(exc)
