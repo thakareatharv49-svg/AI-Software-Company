@@ -557,17 +557,16 @@ def test_javascript_syntax_check_includes_inline_scripts() -> None:
 
 
 
-def test_browser_product_without_tests_is_rejected() -> None:
-    from src.company.project_generator import GeneratedProject
+
+def test_broad_product_without_tests_is_rejected() -> None:
+    from src.company.project_generator import OllamaProjectGenerator
 
     try:
         OllamaProjectGenerator._validate_required_product_tests({
-            "Inventory Dashboard": "Build a browser app to manage inventory items and stock levels.",
-            GeneratedProject(
-            "index.html": '<html><head><script src="app.js"></script></head><body><main>Inventory</main></body></html>',
+            "index.html": "<main>Inventory</main>",
             "app.js": "function addItem(items, item) { return [...items, item]; }",
         })
     except RuntimeError as exc:
         assert "no automated test files" in str(exc)
     else:
-        raise AssertionError("Generated products without automated tests must be rejected")
+        raise AssertionError("Broad generated products without tests must be rejected")
