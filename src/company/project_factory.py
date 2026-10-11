@@ -331,16 +331,15 @@ class ProjectFactory:
                 # Capture the authoritative result immediately. Processing optional
                 # stage telemetry below must never erase a completed pipeline result.
                 self._last_autonomous_result = autonomous_result
-                for step in project.plan.steps:
-                    step.status = "completed"
-                # The autonomous runner's returned pipeline is the authoritative
-                # completion signal. Stage telemetry is useful metadata, but an empty
-                # telemetry list must not turn a successfully returned pipeline into a
-                # paused/re-queued factory project.
+                # Validate the authoritative completion signal before mutating visible
+                # stage statuses; otherwise an invalid result leaves most stages falsely
+                # marked completed when the mission is blocked.
                 if getattr(autonomous_result, "pipeline", None) is None:
                     raise RuntimeError(
                         "Autonomous runner returned no pipeline result"
                     )
+                for step in project.plan.steps:
+                    step.status = "completed"
                 # Stage telemetry is best-effort only. A malformed status
                 # must not turn a successfully returned pipeline into a failure.
                 try:

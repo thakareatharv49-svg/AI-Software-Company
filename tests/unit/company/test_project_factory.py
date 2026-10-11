@@ -826,3 +826,36 @@ async def test_previous_mission_result_cannot_mask_next_mission_failure() -> Non
     assert next(
         step for step in project.plan.steps if step.stage.value == "execution"
     ).status == "failed"
+
+
+
+@pytest.mark.asyncio
+async def test_missing_autonomous_pipeline_does_not_mark_all_stages_completed() -> None:
+    class InvalidAutonomousRunner:
+        async def run(self, mission, plan, on_progress=None):
+            return SimpleNamespace(pipeline=None, stages=[])
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        autonomous_runner=InvalidAutonomousRunner(),
+    )
+    project = factory.enqueue(
+        CompanyMission(name="Invalid result", objective="Return no pipeline")
+    )
+
+    result = await factory.run(max_projects=1, max_retries=0)
+
+    assert result == [project]
+    assert project.status == "blocked"
+    assert "no pipeline result" in (project.last_error or "")
+    assert sum(step.status == "completed" for step in project.plan.steps) == 0
+    assert any(step.status == "failed" for step in project.plan.steps)
