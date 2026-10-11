@@ -12,8 +12,17 @@ def _subsystem_for_path(path: str) -> str:
     if not parts:
         return "application shell"
     first = parts[0].casefold()
-    if first in {"tests", "test"} or PurePosixPath(path).name.casefold().startswith("test_"):
+    filename = PurePosixPath(path).name.casefold()
+    if first in {"tests", "test"} or filename.startswith("test_"):
         return "quality and tests"
+    # Generators frequently emit small Python services at the repository root
+    # instead of placing them under src/. Keep those services distinct from the
+    # browser shell so the factory creates an integration work package for them.
+    if len(parts) == 1 and filename in {
+        "api.py", "server.py", "database.py", "db.py", "models.py",
+        "routes.py", "schemas.py", "services.py",
+    }:
+        return "backend"
     if first == "src" and len(parts) > 2:
         return f"src/{parts[1]}"
     if first in {"frontend", "backend", "api", "database", "public", "assets", "docs", "scripts"}:
