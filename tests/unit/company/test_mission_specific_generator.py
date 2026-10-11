@@ -515,3 +515,42 @@ def test_browser_validation_rejects_missing_relative_javascript_module() -> None
         assert "app.js" in str(exc)
     else:
         raise AssertionError("Missing local JavaScript modules must be rejected")
+
+
+
+def test_javascript_syntax_check_preserves_esm_module_type() -> None:
+    import shutil
+
+    import pytest
+
+    from src.company.project_generator import OllamaProjectGenerator
+
+    if not shutil.which("node"):
+        pytest.skip("Node.js is not installed")
+
+    # Top-level await is valid in an ES module and invalid in a classic script.
+    OllamaProjectGenerator._validate_javascript_syntax({
+        "index.html": '<script type="module" src="app.mjs"></script>',
+        "app.mjs": "await Promise.resolve();",
+    })
+
+
+def test_javascript_syntax_check_includes_inline_scripts() -> None:
+    import shutil
+
+    import pytest
+
+    from src.company.project_generator import OllamaProjectGenerator
+
+    if not shutil.which("node"):
+        pytest.skip("Node.js is not installed")
+
+    try:
+        OllamaProjectGenerator._validate_javascript_syntax({
+            "index.html": "<html><script>function broken( {</script></html>",
+        })
+    except RuntimeError as exc:
+        assert "index.html:inline-script-1" in str(exc)
+        assert "syntax error" in str(exc)
+    else:
+        raise AssertionError("Invalid inline JavaScript must be rejected")
