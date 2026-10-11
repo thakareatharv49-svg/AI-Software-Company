@@ -37,7 +37,6 @@ from src.company.research.engine import StaticResearchProvider
 from src.config.settings import settings
 from src.github.models.contracts import GitHubRepository
 from src.manager.models.contracts import Mission as ManagerMission
-from src.manager.models.contracts import TaskPlanItem
 from src.projects.models.contracts import ProjectCreateRequest
 from src.qa.models.contracts import QATestRequest
 from src.runtime.providers.ollama import OllamaProvider
