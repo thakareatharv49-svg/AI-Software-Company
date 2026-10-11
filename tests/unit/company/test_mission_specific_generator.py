@@ -561,17 +561,12 @@ def test_browser_product_without_tests_is_rejected() -> None:
     from src.company.project_generator import GeneratedProject
 
     try:
-        OllamaProjectGenerator._validate_mission_output(
-            "Inventory Dashboard",
-            "Build a browser app to manage inventory items and stock levels.",
+        OllamaProjectGenerator._validate_required_product_tests({
+            "Inventory Dashboard": "Build a browser app to manage inventory items and stock levels.",
             GeneratedProject(
-                files={
-                    "index.html": '<html><head><script src="app.js"></script></head><body><main>Inventory</main></body></html>',
-                    "app.js": "function addItem(items, item) { return [...items, item]; }",
-                },
-                test_command=["python", "-m", "pytest", "-q"],
-            ),
-        )
+            "index.html": '<html><head><script src="app.js"></script></head><body><main>Inventory</main></body></html>',
+            "app.js": "function addItem(items, item) { return [...items, item]; }",
+        })
     except RuntimeError as exc:
         assert "no automated test files" in str(exc)
     else:
