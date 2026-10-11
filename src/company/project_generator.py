@@ -276,7 +276,7 @@ Rules:
             "booking system", "inventory system", "project management",
             "learning management", "social network", "multi-user", "multi user",
             "role-based access", "role based access", "e-commerce", "ecommerce",
-            "crm", "erp", "admin panel", "analytics", "tracker",
+            "crm", "erp", "admin panel", "analytics",
         )
         requires_modular_plan = any(marker in text for marker in modular_product_markers)
         # Three explicit capabilities are already enough to make a mission
