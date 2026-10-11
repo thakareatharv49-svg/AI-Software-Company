@@ -78,7 +78,7 @@ class GenerationCheckpointStore:
         }
         cached = payload["files"]
         compatible = {
-            path
+            normalized_path
             for normalized_path, (current_contract, item) in current_by_path.items()
             if previous_by_path.get(normalized_path) == current_contract
             and item.get("path") in cached
@@ -92,18 +92,18 @@ class GenerationCheckpointStore:
         while changed:
             changed = False
             for normalized_path, (current_contract, item) in current_by_path.items():
-                original_path = item.get("path")
-                if original_path not in compatible:
+                if normalized_path not in compatible:
                     continue
                 dependencies = current_contract[2]
                 if any(dependency not in compatible for dependency in dependencies):
-                    compatible.remove(original_path)
+                    compatible.remove(normalized_path)
                     changed = True
 
         return {
             path: content
             for path, content in cached.items()
-            if path in compatible and isinstance(content, str)
+            if path.replace("\\\\", "/").casefold() in compatible
+            and isinstance(content, str)
         }
 
     def save(self, *, manifest: list[dict[str, str]], files: dict[str, str]) -> None:
