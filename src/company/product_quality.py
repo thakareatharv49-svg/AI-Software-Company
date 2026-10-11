@@ -81,8 +81,27 @@ def _has_literal_only_assertion(content: str) -> bool:
     return False
 
 
+def _test_function_has_assertion(function: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """Return whether a test function makes an explicit, observable assertion."""
+    for node in ast.walk(function):
+        if isinstance(node, ast.Assert):
+            return True
+        if not isinstance(node, ast.Call):
+            continue
+        called = node.func
+        # Support pytest exception assertions and unittest-style assertion methods.
+        if isinstance(called, ast.Attribute):
+            if called.attr == "raises" and isinstance(called.value, ast.Name):
+                if called.value.id == "pytest":
+                    return True
+            if called.attr.startswith("assert") and isinstance(called.value, ast.Name):
+                if called.value.id in {"self", "case", "test_case"}:
+                    return True
+    return False
+
+
 def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
-    """Reject tautologies and auto-generated smoke-only suites lacking behavior tests."""
+    """Reject tautologies, no-op test functions, and smoke-only generated suites."""
     import re
 
     issues: list[str] = []
@@ -114,11 +133,32 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
             if tree is not None
             else set()
         )
+        test_functions = (
+            [
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name.startswith("test_")
+            ]
+            if tree is not None
+            else []
+        )
+        no_op_tests = [
+            function.name
+            for function in test_functions
+            if not _test_function_has_assertion(function)
+        ]
         generated_smoke_only = (
             name == "test_generated_project.py"
             and bool(test_names)
             and test_names.issubset(_SMOKE_ONLY_TEST_NAMES)
         )
+        if no_op_tests:
+            issues.append(
+                f"Generated tests '{path}' contain test function(s) without an "
+                f"explicit assertion or exception check: {', '.join(no_op_tests)}. "
+                "Assert the expected product behavior or expected failure."
+            )
         if generated_smoke_only:
             issues.append(
                 f"Generated tests '{path}' contain only generated smoke checks; "
