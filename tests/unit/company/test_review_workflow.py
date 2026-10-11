@@ -35,10 +35,14 @@ def test_feedback_requests_revision_and_resubmission_preserves_history():
     assert revised.status == ReviewStatus.CHANGES_REQUESTED
     assert revised.revision == 1
     assert revised.feedback[0].message == 'Add a calendar view'
-    resubmitted = prepare_review(revised, [Requirement(description='Calendar view works')], qa_passed=True, security_passed=True)
+    original_requirement_id = review.requirements[0].id
+    resubmitted = prepare_review(revised, [Requirement(description='Create a task'), Requirement(description='Calendar view works')], qa_passed=True, security_passed=True)
     assert resubmitted.status == ReviewStatus.IN_REVIEW
     assert resubmitted.revision == 1
     assert len(resubmitted.feedback) == 1
+    assert len(resubmitted.requirements) == 2
+    assert resubmitted.requirements[0].id == original_requirement_id
+    assert all(item.status == RequirementStatus.PENDING for item in resubmitted.requirements)
 
 def test_approved_review_cannot_be_reopened_as_a_change_request():
     review, requirement = ready_review()
