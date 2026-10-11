@@ -59,9 +59,9 @@ class GenerationCheckpointStore:
                 or any(not isinstance(dep, str) for dep in dependencies)
             ):
                 return None
-            normalized_path = path.replace("\\\\", "/").strip().casefold()
+            normalized_path = path.replace("\\", "/").strip().casefold()
             normalized_dependencies = tuple(sorted(
-                dep.replace("\\\\", "/").strip().casefold()
+                dep.replace("\\", "/").strip().casefold()
                 for dep in dependencies
             ))
             return normalized_path, purpose.strip(), normalized_dependencies
