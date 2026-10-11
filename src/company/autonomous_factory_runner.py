@@ -78,10 +78,15 @@ class FactoryAutonomousRunner:
             # task, derive work packages from the actual output so frontend, backend,
             # and quality work are visible to the execution pipeline. Preserve an
             # explicitly decomposed task plan supplied by the caller.
-            request = replace(
-                request,
-                tasks=self._derive_tasks_from_generated_files(request, mission),
-            )
+            # Some legacy/test request builders intentionally return minimal
+            # request-like objects. Only expand task plans when this request
+            # contract actually exposes tasks; do not break workspace validation
+            # for callers that have not adopted task planning yet.
+            if hasattr(request, "tasks"):
+                request = replace(
+                    request,
+                    tasks=self._derive_tasks_from_generated_files(request, mission),
+                )
             workspace = self.workspace_service.create_workspace(mission.id)
             for path, content in request.files.items():
                 workspace.write_file(path, content)
@@ -150,11 +155,17 @@ class FactoryAutonomousRunner:
     @staticmethod
     def _derive_tasks_from_generated_files(request, mission):
         """Expand a single broad task when generated output spans subsystems."""
-        if len(request.tasks) > 1:
-            return request.tasks
+        existing_tasks = getattr(request, "tasks", ())
+        if len(existing_tasks) > 1:
+            return existing_tasks
+        project_request = getattr(request, "project_request", None)
+        project_name = getattr(project_request, "name", None) or mission.name
+        project_objective = (
+            getattr(project_request, "objective", None) or mission.objective
+        )
         generated_plan = build_generated_task_plan(
-            request.project_request.name,
-            request.project_request.objective or mission.objective,
+            project_name,
+            project_objective,
             request.files,
         )
         implementation_packages = sum(
@@ -163,7 +174,7 @@ class FactoryAutonomousRunner:
         )
         if not request.tasks or implementation_packages > 1:
             return generated_plan
-        return request.tasks
+        return existing_tasks
 
     @staticmethod
     def _validate_generated_files(files: dict[str, str]) -> None:
