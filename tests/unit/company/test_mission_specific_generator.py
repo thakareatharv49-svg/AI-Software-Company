@@ -388,9 +388,9 @@ def test_repair_prompt_preserves_browser_product_context() -> None:
                 "index.html": "<!doctype html><html><head><title>Study Planner</title></head><body><h1>Study Planner</h1><script src='app.js'></script></body></html>",
                 "app.js": "document.title = 'Study Planner';",
                 "tests/test_project.py": (
-                    "def test_study_planner_default_state():\\n"
-                    "    sessions = []\\n"
-                    "    assert len(sessions) == 0\\n"
+                    "def test_study_planner_default_state():\n"
+                    "    sessions = []\n"
+                    "    assert len(sessions) == 0\n"
                 ),
             },
             "test_command": ["python", "-m", "pytest", "-q"],
@@ -402,7 +402,7 @@ def test_repair_prompt_preserves_browser_product_context() -> None:
             "index.html": "<html><script src='app.js'></script></html>",
             "app.js": "document.title = 'Study Planner';",
         },
-        "Project name: Study Planner\\nMission objective: Build a browser study planner.\\nPreview validation failure: missing style.css",
+        "Project name: Study Planner\nMission objective: Build a browser study planner.\nPreview validation failure: missing style.css",
     ))
 
     prompt = captured["prompt"]
@@ -436,10 +436,10 @@ def test_failed_large_mission_repair_clears_stale_checkpoint(tmp_path) -> None:
         "style.css": "body { font-family: sans-serif; }",
         "app.js": "document.title = 'Study Planner';",
         "tests/test_project.py": (
-            "def normalize_query(value):\\n"
-            "    return value.strip().lower()\\n\\n"
-            "def test_normalize_query_trims_and_lowercases():\\n"
-            "    assert normalize_query('  Math  ') == 'math'\\n"
+            "def normalize_query(value):\n"
+            "    return value.strip().lower()\n\n"
+            "def test_normalize_query_trims_and_lowercases():\n"
+            "    assert normalize_query('  Math  ') == 'math'\n"
         ),
     }
     checkpoint.save(manifest=manifest, files=files)
@@ -505,7 +505,7 @@ def test_browser_validation_rejects_missing_relative_javascript_module() -> None
             GeneratedProject(
                 files={
                     "index.html": '<html><script type="module" src="app.js"></script></html>',
-                    "app.js": 'import { createPlanner } from "./planner.js";\\ncreatePlanner();',
+                    "app.js": 'import { createPlanner } from "./planner.js";\ncreatePlanner();',
                 },
                 test_command=["python", "-m", "pytest", "-q"],
             ),
