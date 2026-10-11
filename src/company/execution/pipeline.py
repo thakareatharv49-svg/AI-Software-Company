@@ -269,15 +269,13 @@ class CompanyExecutionPipeline:
         # Python tests. Run conventional Node test files independently unless the
         # configured QA command already invokes Node's built-in test runner.
         has_javascript_tests = any(
-            path.replace("\\\\", "/").casefold().startswith("tests/")
+            path.replace("\\", "/").casefold().startswith("tests/")
             and path.casefold().endswith((".test.js", ".spec.js"))
             for path in files
         )
         runs_node_tests = any(
-            configured_command[index:index + 2] == ["--test", ""]
-            for index in range(max(0, len(configured_command) - 1))
-        ) or any(
-            part == "--test" and index > 0 and configured_command[index - 1] in {"node", "node.exe"}
+            part == "--test" and index > 0
+            and configured_command[index - 1] in {"node", "node.exe"}
             for index, part in enumerate(configured_command)
         )
         if has_javascript_tests and not runs_node_tests:
