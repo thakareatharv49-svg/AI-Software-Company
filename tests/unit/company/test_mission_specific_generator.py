@@ -410,3 +410,65 @@ def test_repair_prompt_preserves_browser_product_context() -> None:
     assert "browser/web app" in prompt
     assert "Study Planner" in prompt
     assert "index.html" in repaired.files
+
+
+def test_failed_large_mission_repair_clears_stale_checkpoint(tmp_path) -> None:
+    from src.company.generation_checkpoints import GenerationCheckpointStore
+    from src.company.project_generator import GeneratedProject
+
+    name = "Study Planner"
+    objective = (
+        "Build a browser study planner with search, create, edit, delete, "
+        "and responsive layout."
+    )
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    checkpoint = GenerationCheckpointStore(tmp_path, key=f"{name}\\0{objective}")
+    manifest = [
+        {"path": "index.html", "purpose": "Browser entry point"},
+        {"path": "style.css", "purpose": "Responsive styling"},
+        {"path": "app.js", "purpose": "Planner interactions"},
+        {"path": "tests/test_project.py", "purpose": "Behavioral tests"},
+    ]
+    files = {
+        "index.html": (
+            '<!doctype html><html><head><link rel="stylesheet" '
+            'href="missing.css"></head><body><script src="app.js"></script></body></html>'
+        ),
+        "style.css": "body { font-family: sans-serif; }",
+        "app.js": "document.title = 'Study Planner';",
+        "tests/test_project.py": (
+            "def normalize_query(value):\\n"
+            "    return value.strip().lower()\\n\\n"
+            "def test_normalize_query_trims_and_lowercases():\\n"
+            "    assert normalize_query('  Math  ') == 'math'\\n"
+        ),
+    }
+    checkpoint.save(manifest=manifest, files=files)
+
+    async def invalid_repair(
+        current_files: dict[str, str], failure: str
+    ) -> GeneratedProject:
+        return GeneratedProject(
+            files={
+                "index.html": '<html><script src="missing.js"></script></html>',
+                "style.css": "body { color: black; }",
+                "app.js": "document.title = 'Study Planner';",
+                "tests/test_project.py": files["tests/test_project.py"],
+            },
+            test_command=["python", "-m", "pytest", "-q"],
+        )
+
+    generator.repair = invalid_repair  # type: ignore[method-assign]
+
+    try:
+        asyncio.run(generator.generate(name, objective))
+    except RuntimeError as exc:
+        assert "after one repair" in str(exc)
+        assert "missing.js" in str(exc)
+    else:
+        raise AssertionError("Invalid repaired output must still fail")
+
+    assert not checkpoint.path.exists(), (
+        "A failed final repair must not leave invalid generated files cached "
+        "for the next automatic mission retry."
+    )
