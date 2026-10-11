@@ -296,7 +296,7 @@ class CompanyControlCenter:
                     try:
                         # Durable jobs are the source of truth. Polling also picks up
                         # missions submitted while the factory is idle.
-                        for job in self.mission_jobs():
+                        for job in sorted(self.mission_jobs(), key=lambda item: item.created_at):
                             if (
                                 job.status == MissionJobStatus.QUEUED
                                 and not self._factory.has_queued_mission(job.id)
