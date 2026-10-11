@@ -140,7 +140,7 @@ def test_repaired_large_mission_cannot_remove_its_test_module() -> None:
     with pytest.raises(RuntimeError, match="no automated test files"):
         OllamaProjectGenerator._validate_repaired_output(
             "Inventory Management Platform",
-            "Build a multi-feature inventory web application with reporting and user roles",
+            "Build a responsive inventory web application with create, edit, delete, search, reporting, and user roles",
             project,
         )
 
