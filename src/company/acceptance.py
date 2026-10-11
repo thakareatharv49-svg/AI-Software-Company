@@ -51,6 +51,26 @@ class AutonomousCompanyAcceptance:
         raw = getattr(value, "value", value)
         return str(raw).strip().lower()
 
+    @staticmethod
+    def _requires_browser_preview(objective: str) -> bool:
+        """Require a browser entry point for app-like missions, not CLI/library work."""
+        text = objective.casefold()
+        non_browser_terms = (
+            "command-line", "command line", "cli tool", "terminal utility",
+            "api-only", "api only", "backend-only", "backend only",
+            "python library", "javascript library", "native mobile app",
+            "desktop app",
+        )
+        if any(term in f" {text} " for term in non_browser_terms):
+            return False
+        browser_terms = (
+            "web app", "web application", "website", "web site", "browser",
+            " app", " apps", "tracker", "planner", "dashboard", "storefront",
+            "e-commerce", " ecommerce", "management system", "portfolio",
+            "landing page",
+        )
+        return any(term in f" {text} " for term in browser_terms)
+
     def evaluate(self, result: AutonomousProjectResult) -> CompanyAcceptanceReport:
         checks: list[AcceptanceCheck] = []
         stage_map = {stage.name: stage for stage in result.stages}
@@ -102,6 +122,23 @@ class AutonomousCompanyAcceptance:
                 "Security/code review gate approved.",
             )
         )
+        objective = str(getattr(result.ceo.mission, "objective", ""))
+        if self._requires_browser_preview(objective):
+            preview_available = bool(
+                getattr(result.pipeline, "browser_preview", False)
+            )
+            checks.append(
+                AcceptanceCheck(
+                    "browser_preview_available",
+                    preview_available,
+                    "Browser app has a root index.html entry point."
+                    if preview_available
+                    else (
+                        "App-like mission has no browser preview; generated "
+                        "files must include a root index.html."
+                    ),
+                )
+            )
         checks.append(
             AcceptanceCheck(
                 "deployment_completed",
