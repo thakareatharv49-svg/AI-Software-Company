@@ -190,6 +190,10 @@ async def submit_product_feedback(
         raise HTTPException(status_code=404, detail='Mission job not found') from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    with center._lock:
+        record = center._missions.get(mission_id)
+        if record is not None:
+            center._missions[mission_id] = record.model_copy(update={'mission': revised_job.mission})
     center._sync_mission_from_job(revised_job)
     _review_store().save(updated)
     try:
