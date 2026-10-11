@@ -315,3 +315,44 @@ def test_cleanup_is_rejected_while_factory_is_running() -> None:
     finally:
         center._factory_task = None
         app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_continuous_factory_processes_projects_one_at_a_time_and_can_stop() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    first = center.submit_mission(
+        MissionSubmission(name="Continuous first", objective="Build the first project")
+    )
+    second = center.submit_mission(
+        MissionSubmission(name="Continuous second", objective="Build the second project")
+    )
+    first_job = center.mission_job(first.mission.id)
+    second_job = center.mission_job(second.mission.id)
+    assert first_job is not None and second_job is not None
+    center.mission_jobs = lambda: [first_job, second_job]
+
+    processed: list[str] = []
+
+    async def fake_run(*, max_projects=None, max_stages=None, max_retries=2):
+        assert max_projects == 1
+        project = center._factory.queue.pop(0)
+        project.status = "completed"
+        processed.append(project.mission.id)
+        center.stop_continuous_factory()
+
+    center._factory.run = fake_run
+    await center.start_continuous_factory(max_retries=1)
+    assert center._factory_task is not None
+    await center._factory_task
+
+    assert processed == [first.mission.id]
+    assert center.continuous_factory_enabled() is False
+
+
+def test_continuous_factory_stop_is_graceful_and_idempotent() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    center._continuous_mode = True
+
+    assert center.stop_continuous_factory() is True
+    assert center.stop_continuous_factory() is False
+    assert center.continuous_factory_enabled() is False
