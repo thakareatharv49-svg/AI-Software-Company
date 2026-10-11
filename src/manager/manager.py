@@ -107,23 +107,33 @@ class MasterManager:
         return name
 
     async def _run_task(self, task_id: str, agent_name: str, runner: Callable) -> str | None:
+        """Run a task with bounded retries for transient agent failures."""
+        from src.config.settings import settings
+
         task = self.task_engine.get(task_id)
-        try:
-            result = await runner(
-                AgentRequest(
-                    task_id=task.id,
-                    instruction=task.description or task.title,
+        max_attempts = settings.factory_task_max_attempts
+        for attempt in range(max_attempts):
+            try:
+                result = await runner(
+                    AgentRequest(
+                        task_id=task.id,
+                        instruction=task.description or task.title,
+                    )
                 )
-            )
-            if getattr(result, "success", False):
-                self.task_engine.complete(task.id)
-                return None
-            error = getattr(result, "error", None) or "Agent execution failed"
+                if getattr(result, "success", False):
+                    self.task_engine.complete(task.id)
+                    return None
+                error = getattr(result, "error", None) or "Agent execution failed"
+            except Exception as exc:
+                error = str(exc) or exc.__class__.__name__
+
             self.task_engine.fail(task.id, error)
-            return error
-        except Exception as exc:
-            self.task_engine.fail(task.id, str(exc))
-            return str(exc)
+            if attempt + 1 >= max_attempts:
+                return error
+            self.task_engine.retry(task.id)
+            self.task_engine.start(task.id)
+
+        return "Agent execution failed after bounded retries"
 
     async def tick_parallel(
         self,
