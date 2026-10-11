@@ -1554,20 +1554,23 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
             return default
 
         executable = command[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
+        normalized = tuple(command)
 
-        # Keep QA local and deterministic. The model must not turn the test
-        # phase into an arbitrary shell, installer, or network command.
-        if executable in {"pytest", "pytest.exe"}:
+        # The generated test command is untrusted model output. Permit only
+        # conventional local test-runner invocations; arbitrary pytest flags,
+        # config paths, plugins, or test paths could load unexpected code.
+        allowed_commands = {
+            ("pytest",), ("pytest", "-q"), ("pytest.exe",), ("pytest.exe", "-q"),
+            ("python", "-m", "pytest"), ("python", "-m", "pytest", "-q"),
+            ("python3", "-m", "pytest"), ("python3", "-m", "pytest", "-q"),
+            ("python.exe", "-m", "pytest"), ("python.exe", "-m", "pytest", "-q"),
+            ("py", "-m", "pytest"), ("py", "-m", "pytest", "-q"),
+            ("python", "-m", "unittest"), ("python3", "-m", "unittest"),
+            ("py", "-m", "unittest"),
+        }
+        if normalized in allowed_commands and executable in {
+            "pytest", "pytest.exe", "python", "python3", "python.exe", "py", "py.exe"
+        }:
             return command
-
-        if executable in {"python", "python3", "python.exe", "py", "py.exe"}:
-            args = command[1:]
-            if (
-                len(args) >= 2
-                and args[0] == "-m"
-                and args[1].lower() in {"pytest", "unittest"}
-            ):
-                return command
-            return default
 
         return default
