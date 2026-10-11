@@ -91,7 +91,7 @@ class GenerationCheckpointStore:
         changed = True
         while changed:
             changed = False
-            for normalized_path, (current_contract, item) in current_by_path.items():
+            for normalized_path, (current_contract, _item) in current_by_path.items():
                 if normalized_path not in compatible:
                     continue
                 dependencies = current_contract[2]
