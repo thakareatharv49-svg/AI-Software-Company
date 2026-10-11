@@ -354,7 +354,7 @@ Rules:
                     return f"Project file plan has no purpose for {normalized}"
             return None
 
-        raw_manifest = manifest.get("files")
+        raw_manifest = manifest.get("files") if isinstance(manifest, dict) else None
         manifest_issue = manifest_validation_issue(manifest)
         if manifest_issue:
             # Valid JSON can still be an unusable plan (empty list, malformed
