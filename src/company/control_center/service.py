@@ -114,6 +114,7 @@ class CompanyControlCenter:
         except SQLAlchemyError:
             pass
         self._factory_task: asyncio.Task[None] | None = None
+        self._continuous_mode = False
         self._lock = Lock()
 
     @property
@@ -200,6 +201,14 @@ class CompanyControlCenter:
         mission_id: str | None = None,
     ) -> None:
         if self._factory_task is not None and not self._factory_task.done():
+            if self._continuous_mode:
+                if mission_id is not None:
+                    job = self.mission_job(mission_id)
+                    if job is None:
+                        raise KeyError(mission_id)
+                    if self._factory.has_queued_mission(mission_id):
+                        self._factory.prioritize_mission(mission_id)
+                return
             # Do not cancel an asyncio task that owns asyncio.to_thread(). Cancelling
             # the task does not stop the underlying worker thread, so doing that here
             # can create two factory runs against the same database and workspace.
@@ -266,8 +275,57 @@ class CompanyControlCenter:
         # on the application's loop and shares the same async context.
         self._factory_task = asyncio.create_task(runner())
 
+    async def start_continuous_factory(self, max_retries: int = 2) -> None:
+        """Process one queued project at a time until continuous mode is stopped."""
+        if max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
+        if self._continuous_mode and self._factory_task is not None and not self._factory_task.done():
+            return
+        if self._factory_task is not None and not self._factory_task.done():
+            raise RuntimeError("Factory is already running in one-shot mode")
+
+        self._continuous_mode = True
+
+        async def continuous_runner() -> None:
+            try:
+                while self._continuous_mode:
+                    # Durable jobs are the source of truth. Polling also picks up
+                    # missions submitted while the factory is idle.
+                    for job in self.mission_jobs():
+                        if (
+                            job.status == MissionJobStatus.QUEUED
+                            and not self._factory.has_queued_mission(job.id)
+                        ):
+                            self._factory.enqueue(job.mission)
+
+                    if self._factory.queue:
+                        await self._factory.run(max_projects=1, max_retries=max_retries)
+                        # Check the stop flag between projects; never cancel active generation.
+                        await asyncio.sleep(0)
+                    else:
+                        await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                raise
+            finally:
+                self._continuous_mode = False
+
+        self._factory_task = asyncio.create_task(continuous_runner())
+
+    def stop_continuous_factory(self) -> bool:
+        """Stop after the current project finishes without cancelling generation."""
+        was_enabled = self._continuous_mode
+        self._continuous_mode = False
+        return was_enabled
+
     def factory_running(self) -> bool:
-        return self._factory_task is not None and not self._factory_task.done()
+        # Enabled continuous mode may be idle while waiting for the next mission.
+        if self._factory._running:
+            return True
+        task_active = self._factory_task is not None and not self._factory_task.done()
+        return task_active and not self._continuous_mode
+
+    def continuous_factory_enabled(self) -> bool:
+        return self._continuous_mode
 
     def enqueue_factory_mission(self, mission_id: str) -> None:
         record = self._get_mission(mission_id)
