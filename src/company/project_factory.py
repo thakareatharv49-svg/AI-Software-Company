@@ -213,7 +213,10 @@ class ProjectFactory:
         # as the queued job so stale failed/running steps cannot poison the retry.
         plan = queued.plan.model_copy(deep=True)
         for step in plan.steps:
-            if step.status in {"failed", "running"}:
+            # Manual retry restarts the mission from its first lifecycle stage.
+            # Clear completed statuses too, otherwise the dashboard can display
+            # stale success while the new attempt is still executing.
+            if step.status != "planned" or step.detail is not None:
                 step.status = "planned"
                 step.detail = None
         queued = queued.model_copy(update={"plan": plan})
