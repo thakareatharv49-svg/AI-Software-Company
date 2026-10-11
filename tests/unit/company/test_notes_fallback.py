@@ -65,3 +65,25 @@ def test_notes_fallback_javascript_parses_when_node_is_available(tmp_path: Path)
         check=False,
     )
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+
+def test_notes_fallback_core_workflows_execute_in_node_when_available(tmp_path: Path) -> None:
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is not installed")
+
+    root = Path(__file__).resolve().parents[3]
+    app = tmp_path / "app.js"
+    app.write_text(notes_fallback_files()["app.js"], encoding="utf-8")
+    harness = root / "tests" / "fixtures" / "notes_fallback_dom_harness.cjs"
+    result = subprocess.run(
+        [node, str(harness), str(app)],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert "create, persistence, pin, filter, search, edit, delete" in result.stdout
