@@ -20,8 +20,11 @@ class GeneratedProject:
     test_command: list[str]
 
 
+MAX_GENERATED_PROJECT_FILES = 40
+
+
 class OllamaProjectGenerator:
-    """Generate and repair small runnable projects."""
+    """Generate complete projects using bounded, resumable file-by-file generation."""
 
     def __init__(self, checkpoint_dir: str | Path | None = None) -> None:
         self.checkpoint_dir = Path(checkpoint_dir or ".factory-checkpoints")
@@ -274,7 +277,7 @@ Rules:
 - Prefer a directly runnable browser app unless the mission explicitly requests another type.
 - For browser apps include index.html, style.css, app.js, and tests/test_project.py.
 - Include every local file referenced by another file.
-- Use no more than 10 files. Prefer combining related behavior into the required app.js/style.css rather than creating many tiny files. Avoid build tools, CDNs, remote APIs, and external dependencies unless explicitly required.
+- Use no more than {MAX_GENERATED_PROJECT_FILES} files for this generation run. Use a modular structure appropriate to the product; do not collapse unrelated subsystems into giant files just to minimize file count. Avoid unnecessary build tools, CDNs, remote APIs, and external dependencies unless explicitly required.
 - Every file must have a clear purpose and be necessary for the requested product.
 - Paths must be safe relative paths; never use absolute paths or parent-directory segments.
 - The plan must implement the requested category and all key user workflows, not a generic demo.
@@ -301,7 +304,7 @@ Rules:
                 "required": ["files"],
             },
             "keep_alive": "10m",
-            "options": {"temperature": 0.1, "num_predict": 1800},
+            "options": {"temperature": 0.1, "num_predict": 3500},
         }
         if saved_checkpoint is not None:
             manifest = {"files": saved_checkpoint["manifest"]}
@@ -421,13 +424,13 @@ Rules:
                 required += 1
             return required
 
-        if len(raw_manifest) > 10 or len(raw_manifest) + required_file_count(raw_manifest) > 10:
+        if len(raw_manifest) > MAX_GENERATED_PROJECT_FILES or len(raw_manifest) + required_file_count(raw_manifest) > MAX_GENERATED_PROJECT_FILES:
             compact_payload = dict(manifest_payload)
             compact_payload["prompt"] = (
                 manifest_prompt
-                + "\n\nCorrective retry: the previous plan exceeded the safe 10-file "
-                "limit once mandatory browser assets and tests are included. Return a "
-                "compact revised plan with no more than 6 planned files, include "
+                + "\n\nCorrective retry: the previous plan exceeded the safe "
+                f"{MAX_GENERATED_PROJECT_FILES}-file limit once mandatory browser assets and tests are included. Return a "
+                "compact revised plan with no more than 32 planned files, include "
                 "index.html, style.css, app.js, and tests/test_project.py for browser "
                 "apps, and combine related implementation into fewer files. Preserve "
                 "all mission-critical workflows; do not split features into tiny modules."
@@ -442,10 +445,10 @@ Rules:
                 # error below reports the failure rather than masking it.
                 pass
 
-        if len(raw_manifest) > 10:
+        if len(raw_manifest) > MAX_GENERATED_PROJECT_FILES:
             raise RuntimeError(
                 f"Project file plan contains {len(raw_manifest)} files after one compact-plan retry; "
-                "the safe limit is 10. Reduce the mission scope or split it into separate missions."
+                f"the safe limit is {MAX_GENERATED_PROJECT_FILES}. Reduce the mission scope or split it into separate missions."
             )
 
         manifest_items: list[tuple[str, str]] = []
@@ -498,9 +501,9 @@ Rules:
                 ("tests/test_project.py", "Automated tests for mission-specific behavior")
             )
 
-        if len(manifest_items) > 10:
+        if len(manifest_items) > MAX_GENERATED_PROJECT_FILES:
             raise RuntimeError(
-                "Project file plan exceeds the safe 10-file limit after required "
+                f"Project file plan exceeds the safe {MAX_GENERATED_PROJECT_FILES}-file limit after required "
                 "browser entry point and test files were added "
                 f"({len(manifest_items)} files). Reduce the mission scope or split "
                 "it into smaller missions."
