@@ -702,7 +702,7 @@ def test_generated_python_syntax_is_checked_for_non_browser_projects() -> None:
             "Text Utility",
             "Create a small command-line text utility.",
             GeneratedProject(
-                files={"main.py": "def normalize(value):\\n    return value.strip(\\n"},
+                files={"main.py": "def normalize(value):\n    return value.strip(\n"},
                 test_command=["python", "-m", "pytest", "-q"],
             ),
         )
@@ -715,7 +715,7 @@ def test_generated_python_syntax_is_checked_for_non_browser_projects() -> None:
 
 def test_generated_python_syntax_accepts_valid_modules() -> None:
     OllamaProjectGenerator._validate_python_syntax({
-        "src/main.py": "def normalize(value):\\n    return value.strip().lower()\\n",
+        "src/main.py": "def normalize(value):\n    return value.strip().lower()\n",
         "README.md": "This file is not Python and should not be parsed.",
     })
 
@@ -742,11 +742,11 @@ def test_full_stack_mission_accepts_common_routes_module_layout() -> None:
             files={
                 "index.html": '<html><body><script src="app.js"></script></body></html>',
                 "app.js": "document.title = 'Inventory';",
-                "src/routes.py": "def health():\\n    return {'status': 'ok'}\\n",
+                "src/routes.py": "def health():\n    return {'status': 'ok'}\n",
                 "tests/test_project.py": (
-                    "def test_inventory_total():\\n"
-                    "    quantities = [2, 3]\\n"
-                    "    assert sum(quantities) == 5\\n"
+                    "def test_inventory_total():\n"
+                    "    quantities = [2, 3]\n"
+                    "    assert sum(quantities) == 5\n"
                 ),
             },
             test_command=["python", "-m", "pytest", "-q"],
