@@ -7,7 +7,7 @@ import pytest
 from config.settings import Settings, settings
 from src.company.mission_jobs import MissionJobStatus
 from src.main import app
-from src.api.routes.hq_status import get_hq_status_control_center
+from api.routes.hq_status import get_hq_status_control_center
 
 
 TOKEN = "test-nexora-hq-service-token-32-characters"
