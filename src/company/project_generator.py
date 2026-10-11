@@ -359,6 +359,9 @@ Rules:
         def manifest_validation_issue(candidate: object) -> str | None:
             if not isinstance(candidate, dict):
                 return "Ollama returned a project file plan that is not a JSON object"
+            items = candidate.get("files")
+            if not isinstance(items, list) or not items:
+                return "Ollama returned an empty or invalid project file plan"
             if len(items) > self.max_generated_project_files:
                 return (
                     f"Project file plan exceeds the configured limit of "
