@@ -78,19 +78,10 @@ class FactoryAutonomousRunner:
             # task, derive work packages from the actual output so frontend, backend,
             # and quality work are visible to the execution pipeline. Preserve an
             # explicitly decomposed task plan supplied by the caller.
-            if len(request.tasks) <= 1:
-                generated_plan = build_generated_task_plan(
-                    request.project_request.name,
-                    request.project_request.objective or mission.objective,
-                    request.files,
-                )
-                implementation_packages = sum(
-                    1 for task in generated_plan
-                    if not task.title.startswith("Validate ")
-                )
-                current_is_broad = len(request.tasks) == 1 and implementation_packages > 1
-                if current_is_broad or not request.tasks:
-                    request = replace(request, tasks=generated_plan)
+            request = replace(
+                request,
+                tasks=self._derive_tasks_from_generated_files(request, mission),
+            )
             workspace = self.workspace_service.create_workspace(mission.id)
             for path, content in request.files.items():
                 workspace.write_file(path, content)
@@ -155,6 +146,24 @@ class FactoryAutonomousRunner:
             # Completed workspaces are intentionally retained for the product
             # viewer. Failed attempts are also retained for diagnostics/retry.
             pass
+
+    @staticmethod
+    def _derive_tasks_from_generated_files(request, mission):
+        """Expand a single broad task when generated output spans subsystems."""
+        if len(request.tasks) > 1:
+            return request.tasks
+        generated_plan = build_generated_task_plan(
+            request.project_request.name,
+            request.project_request.objective or mission.objective,
+            request.files,
+        )
+        implementation_packages = sum(
+            1 for task in generated_plan
+            if not task.title.startswith("Validate ")
+        )
+        if not request.tasks or implementation_packages > 1:
+            return generated_plan
+        return request.tasks
 
     @staticmethod
     def _validate_generated_files(files: dict[str, str]) -> None:
