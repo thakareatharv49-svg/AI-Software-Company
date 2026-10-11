@@ -280,7 +280,7 @@ async def test_large_mission_rejects_manifest_that_exceeds_limit_after_required_
     manifest = {
         "files": [
             {"path": f"src/module_{index}.py", "purpose": f"Module {index}"}
-            for index in range(5)
+            for index in range(8)
         ]
     }
 
@@ -288,7 +288,7 @@ async def test_large_mission_rejects_manifest_that_exceeds_limit_after_required_
         return json.dumps(manifest)
 
     monkeypatch.setattr(generator, "_call", fake_call)
-    with pytest.raises(RuntimeError, match="safe 6-file limit"):
+    with pytest.raises(RuntimeError, match="safe 10-file limit"):
         await generator._generate_large_mission(
             "Browser Dashboard",
             "Build a browser dashboard with search, filters, settings, and responsive layout.",
