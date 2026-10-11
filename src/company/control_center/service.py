@@ -32,6 +32,7 @@ from src.company.persistence import (
 from src.company.project_factory import ProjectFactory
 from src.company.project_generator import OllamaProjectGenerator
 from src.company.project_outputs import ProjectOutputManifest
+from src.company.generated_task_planning import build_generated_task_plan
 from src.company.research.engine import StaticResearchProvider
 from src.config.settings import settings
 from src.github.models.contracts import GitHubRepository
@@ -547,12 +548,10 @@ class CompanyControlCenter:
                 name=mission.name,
                 objective=mission.objective,
             ),
-            tasks=(
-                TaskPlanItem(
-                    title=f"Implement {mission.name}",
-                    description=mission.objective,
-                    priority="high",
-                ),
+            tasks=build_generated_task_plan(
+                mission.name,
+                mission.objective,
+                generated.files,
             ),
             qa_request=QATestRequest(
                 command=generated.test_command,
