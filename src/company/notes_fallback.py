@@ -273,9 +273,9 @@ def test_notes_app_implements_create_edit_delete_pin_and_search():
         "state.notes.filter",
         "visibleNotes",
         "window.confirm",
-        "button.dataset.action === 'edit'",
-        "button.dataset.action === 'delete'",
-        "button.dataset.action === 'pin'",
+        'button.dataset.action === "edit"',
+        'button.dataset.action === "delete"',
+        'button.dataset.action === "pin"',
     ):
         assert behavior in js
 
