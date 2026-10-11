@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.company.control_center.routes import get_control_center
 from src.company.control_center.service import CompanyControlCenter
@@ -44,10 +44,13 @@ class RequirementUpdateRequest(BaseModel):
 class FeedbackRequest(BaseModel):
     message: str = Field(min_length=1, max_length=10000)
 
-    def model_post_init(self, __context: object) -> None:
-        self.message = self.message.strip()
-        if not self.message:
+    @field_validator('message')
+    @classmethod
+    def nonblank_message(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
             raise ValueError('Feedback cannot be blank')
+        return value
 
 
 @lru_cache(maxsize=1)
