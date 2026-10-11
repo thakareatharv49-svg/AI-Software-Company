@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
     log_level: str = "INFO"
+    # Explicit opt-in for a single-user local instance; never enabled by default.
+    local_access_enabled: bool = False
 
     database_url: str = (
         "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_software_company"
