@@ -314,6 +314,7 @@ Rules:
 - Add optional depends_on arrays listing the exact planned paths that must exist before this file is implemented. Use dependencies to express real module/API contracts, not merely visual ordering. Keep dependencies acyclic and refer only to paths in the manifest.
 - Paths must be safe relative paths; never use absolute paths or parent-directory segments.
 - The plan must implement the requested category and all key user workflows, not a generic demo.
+- If the mission explicitly requests a backend, server, REST/API endpoints, authentication server, or database-backed behavior, include a real backend/API implementation file and tests for it. Do not silently substitute a frontend-only or localStorage-only mock for an explicitly requested server/data layer.
 """
         manifest_payload = {
             "model": settings.ollama_model,
