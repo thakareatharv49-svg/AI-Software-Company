@@ -38,9 +38,6 @@ def build_generated_task_plan(
     if not files:
         raise ValueError("Cannot build a task plan for a project with no generated files")
 
-    if not any(content.strip() for content in files.values()):
-        raise ValueError("Cannot build a task plan from entirely empty generated files")
-
     groups: OrderedDict[str, list[str]] = OrderedDict()
     seen_paths: set[str] = set()
     for raw_path in files:
@@ -61,6 +58,9 @@ def build_generated_task_plan(
             )
         seen_paths.add(normalized_path)
         groups.setdefault(_subsystem_for_path(path), []).append(path)
+
+    if not any(content.strip() for content in files.values()):
+        raise ValueError("Cannot build a task plan from entirely empty generated files")
 
     implementation = [
         (name, paths) for name, paths in groups.items() if name != "quality and tests"
