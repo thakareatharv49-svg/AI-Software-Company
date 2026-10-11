@@ -20,3 +20,17 @@ def test_quality_gate_requires_all_production_checks():
 
     assert not blocked.allowed
     assert blocked.checks["security"] is False
+
+
+def test_quality_gate_blocks_unsafe_or_empty_release_artifacts():
+    decision = ProductionQualityGate().evaluate(
+        qa_passed=True,
+        security_approved=True,
+        github_ready=True,
+        deployment_ready=True,
+        artifacts_ready=False,
+    )
+
+    assert not decision.allowed
+    assert decision.checks["artifacts"] is False
+    assert "artifacts" in decision.reason
