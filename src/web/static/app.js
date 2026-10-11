@@ -61,7 +61,7 @@ function renderPipeline(audit, status) {
   const order = steps.map(s => s[0]), currentIndex = order.indexOf(current);
   for (const [key,title,desc] of steps) {
     const row=document.createElement("div"), index=order.indexOf(key);
-    const done = key === "publish" ? types.some(t => /PRODUCT_PUBLISHED|GITHUB_PUBLISH_SUCCEEDED/.test(t)) : index < currentIndex || (status === "completed" && index <= currentIndex);
+    const done = key === "publish" ? types.some(t => /PRODUCT_PUBLISHED|GITHUB_PUBLISH_SUCCEEDED/.test(t)) : index < currentIndex;
     row.className="pipeline-step " + (done ? "done " : "") + (index===currentIndex && !done ? "active" : "");
     const marker=document.createElement("b"); marker.textContent=done ? "✓" : String(index+1).padStart(2,"0");
     const label=document.createElement("span"); label.textContent=title;
