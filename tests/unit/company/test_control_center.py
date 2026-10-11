@@ -73,7 +73,7 @@ def test_control_api_serves_mission_and_app() -> None:
         assert response.json()["status"] == "queued"
         assert client.get("/api/company/state").json()["status"] == "idle"
         assert client.get("/app").status_code == 200
-        assert "AI Software Developer" in client.get("/app").text
+        assert "AI Software Company" in client.get("/app").text
     finally:
         app.dependency_overrides.clear()
 
@@ -262,7 +262,7 @@ def test_dashboard_completed_product_preview_uses_defined_identifier() -> None:
     css = (static_dir / "styles.css").read_text(encoding="utf-8")
 
     assert '/app/static/app.js?v=13' in html
-    assert '/app/static/styles.css?v=8' in html
+    assert '/app/static/styles.css?v=9' in html
     assert 'href="#missions-section"' in html and 'id="missions-section"' in html
     assert 'href="#factory-section"' in html and 'id="factory-section"' in html
     assert ".nav a{" in css
