@@ -161,14 +161,23 @@ Rules:
                 f"Mission objective: {objective}\n"
                 f"Preview validation failure: {validation_error}"
             )
-            repaired = await self.repair(generated.files, failure)
             try:
+                repaired = await self.repair(generated.files, failure)
                 self._validate_mission_output(name, objective, repaired)
-            except RuntimeError as repair_error:
-                raise RuntimeError(
-                    f"Generated product failed preview validation after one repair: "
-                    f"{repair_error}"
-                ) from repair_error
+            except Exception as repair_error:
+                # A checkpoint is useful while generation is incomplete, but once
+                # the completed output and its single repair both fail validation,
+                # resuming the same cached files would repeat the same failure.
+                # Remove that stale snapshot so the next mission retry can create
+                # a fresh manifest and regenerate the invalid files.
+                if large_mission:
+                    self._checkpoint(name, objective).clear()
+                if isinstance(repair_error, RuntimeError):
+                    raise RuntimeError(
+                        f"Generated product failed preview validation after one repair: "
+                        f"{repair_error}"
+                    ) from repair_error
+                raise
             if large_mission:
                 self._checkpoint(name, objective).clear()
             return repaired
