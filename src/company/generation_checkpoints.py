@@ -102,7 +102,7 @@ class GenerationCheckpointStore:
         return {
             path: content
             for path, content in cached.items()
-            if path.replace("\\\\", "/").casefold() in compatible
+            if path.replace("\\", "/").casefold() in compatible
             and isinstance(content, str)
         }
 
