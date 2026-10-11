@@ -363,3 +363,49 @@ async def test_large_mission_stops_repeating_slow_non_json_file_failures(
     ).load()
     assert checkpoint is not None
     assert checkpoint["files"]["index.html"].startswith("<!doctype html>")
+
+
+@pytest.mark.asyncio
+async def test_large_mission_replans_manifest_that_would_exceed_limit(
+    monkeypatch, tmp_path
+):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    oversized = {
+        "files": [
+            {"path": f"src/module_{index}.py", "purpose": f"Module {index}"}
+            for index in range(8)
+        ]
+    }
+    compact = {
+        "files": [
+            {"path": "index.html", "purpose": "Browser entry point"},
+            {"path": "style.css", "purpose": "Responsive styling"},
+            {"path": "app.js", "purpose": "Mission-specific interactions"},
+            {"path": "tests/test_project.py", "purpose": "Behavior tests"},
+        ]
+    }
+    responses = [
+        json.dumps(oversized),
+        json.dumps(compact),
+        json.dumps({"content": "<!doctype html><html><head><title>Planner</title><link rel=\"stylesheet\" href=\"style.css\"></head><body><script src=\"app.js\"></script></body></html>"}),
+        json.dumps({"content": "body { font-family: sans-serif; }"}),
+        json.dumps({"content": "function addTask(title) { return { title, completed: false }; }"}),
+        json.dumps({"content": "def test_add_task_preserves_title():\n    task = {\\\"title\\\": \\\"Plan\\\", \\\"completed\\\": False}\n    assert task[\\\"title\\\"] == \\\"Plan\\\"\n"}),
+    ]
+    prompts = []
+
+    async def fake_call(payload):
+        prompts.append(payload["prompt"])
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    project = await generator._generate_large_mission(
+        "Project Planner",
+        "Create a project planner app with search, editing, task completion, and a responsive dashboard.",
+    )
+
+    assert len(prompts) == 6
+    assert "Corrective retry" in prompts[1]
+    assert set(project.files) == {
+        "index.html", "style.css", "app.js", "tests/test_project.py"
+    }
