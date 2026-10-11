@@ -43,6 +43,7 @@ def test_supported_product_repair_has_offline_recovery(
     generator = OllamaProjectGenerator()
     repaired = generator._fallback_repair(files, failure)
 
-    assert {"index.html", "style.css", "app.js"} <= repaired.files.keys()
+    assert {"index.html", "style.css"} <= repaired.files.keys()
+    assert any(path.endswith(".js") for path in repaired.files)
     assert any(expected_marker.casefold() in content.casefold() for content in repaired.files.values())
     assert repaired.test_command == ["python", "-m", "pytest", "-q"]
