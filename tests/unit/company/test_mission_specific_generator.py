@@ -554,3 +554,25 @@ def test_javascript_syntax_check_includes_inline_scripts() -> None:
         assert "syntax error" in str(exc)
     else:
         raise AssertionError("Invalid inline JavaScript must be rejected")
+
+
+
+def test_browser_product_without_tests_is_rejected() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    try:
+        OllamaProjectGenerator._validate_mission_output(
+            "Inventory Dashboard",
+            "Build a browser app to manage inventory items and stock levels.",
+            GeneratedProject(
+                files={
+                    "index.html": '<html><head><script src="app.js"></script></head><body><main>Inventory</main></body></html>',
+                    "app.js": "function addItem(items, item) { return [...items, item]; }",
+                },
+                test_command=["python", "-m", "pytest", "-q"],
+            ),
+        )
+    except RuntimeError as exc:
+        assert "no automated test files" in str(exc)
+    else:
+        raise AssertionError("Generated products without automated tests must be rejected")
