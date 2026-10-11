@@ -510,9 +510,11 @@ Rules:
             )
             if is_test:
                 return (2, 0, path)
-            if is_browser_mission:
-                browser_order = {"index.html": 0, "style.css": 1, "app.js": 2}
-                return (0, browser_order.get(path, 3), path)
+            # Keep conventional browser assets ordered when present, even if a
+            # mission explicitly asks for a CLI but its file plan includes them.
+            browser_order = {"index.html": 0, "style.css": 1, "app.js": 2}
+            if path in browser_order:
+                return (0, browser_order[path], path)
             return (1, 0, path)
 
         manifest_items.sort(key=generation_priority)
