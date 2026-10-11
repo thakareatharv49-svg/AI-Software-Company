@@ -570,3 +570,40 @@ def test_broad_product_without_tests_is_rejected() -> None:
         assert "no automated test files" in str(exc)
     else:
         raise AssertionError("Broad generated products without tests must be rejected")
+
+def test_modular_planner_accepts_full_project_response_from_local_model() -> None:
+    generator = OllamaProjectGenerator()
+    generator._is_large_mission = lambda *_args: True  # type: ignore[method-assign]
+
+    async def full_project_response(payload: dict) -> str:
+        return json.dumps({
+            "files": {
+                "index.html": (
+                    "<!doctype html><html><head><title>Study Planner</title>"
+                    "<link rel='stylesheet' href='style.css'></head><body>"
+                    "<h1>Study Planner</h1><script src='app.js'></script></body></html>"
+                ),
+                "style.css": "body { font-family: sans-serif; }",
+                "app.js": "document.querySelector('h1').textContent = 'Study Planner';",
+                "tests/test_app.py": (
+                    "def test_default_study_sessions_are_empty():\n"
+                    "    sessions = []\n"
+                    "    assert sessions == []\n"
+                ),
+            },
+            "test_command": ["python", "-m", "pytest", "-q"],
+        })
+
+    generator._call = full_project_response  # type: ignore[method-assign]
+    project = asyncio.run(
+        generator.generate(
+            "Study Planner",
+            "Build a browser study planner with sessions and a responsive layout.",
+        )
+    )
+
+    assert "index.html" in project.files
+    assert "style.css" in project.files
+    assert "app.js" in project.files
+    assert "tests/test_app.py" in project.files
+
