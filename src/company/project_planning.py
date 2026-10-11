@@ -22,13 +22,13 @@ def order_manifest_paths(
         required = tuple(dependencies.get(path, ()))
         if path in required:
             raise ValueError(f"Project file {path!r} cannot depend on itself")
+        if len(set(required)) != len(required):
+            raise ValueError(f"Project file {path!r} repeats a dependency")
         missing = [item for item in required if item not in known]
         if missing:
             raise ValueError(
                 f"Project file {path!r} depends on unknown path(s): {', '.join(missing)}"
             )
-        if len(set(required)) != len(required):
-            raise ValueError(f"Project file {path!r} repeats a dependency")
         normalized[path] = required
 
     result: list[str] = []
