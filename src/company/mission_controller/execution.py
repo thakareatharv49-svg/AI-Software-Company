@@ -73,6 +73,24 @@ class MissionExecutionPipeline:
         self.register_default_agents(plan)
 
         step = self._next_ready_step(plan)
+        if step is None and any(item.status == "planned" for item in plan.steps):
+            completed = {
+                item.stage.value for item in plan.steps if item.status == "completed"
+            }
+            unresolved = [
+                f"{item.stage.value} requires {', '.join(item.depends_on)}"
+                for item in plan.steps
+                if item.status == "planned"
+                and not set(item.depends_on).issubset(completed)
+            ]
+            error = "Mission plan has no dependency-ready stage: " + "; ".join(unresolved)
+            self.orchestrator.block(error)
+            return AgentResult(
+                task_id=self.orchestrator.state.current_task_id or "",
+                agent_name="mission-controller",
+                success=False,
+                error=error,
+            )
         if step is None:
             return AgentResult(
                 task_id=self.orchestrator.state.current_task_id or "",
@@ -113,6 +131,9 @@ class MissionExecutionPipeline:
                         "mission_name": mission.name,
                         "mission_objective": mission.objective,
                         "constraints": mission.constraints,
+                        "acceptance_criteria": plan.acceptance_criteria,
+                        "assigned_specialist": step.agent_role,
+                        "dependencies": step.depends_on,
                         "stage": step.stage.value,
                     },
                 ),
@@ -164,7 +185,16 @@ class MissionExecutionPipeline:
             )
         )
 
-        next_step = next((item for item in plan.steps if item.status == "planned"), None)
+        next_step = self._next_ready_step(plan)
+        if next_step is None and any(item.status == "planned" for item in plan.steps):
+            error = "Mission plan has remaining stages with unresolved dependencies"
+            self.orchestrator.block(error)
+            return AgentResult(
+                task_id=task_id,
+                agent_name=agent_name,
+                success=False,
+                error=error,
+            )
         if next_step is None:
             self.orchestrator.complete_project()
             self.orchestrator.events.publish(
