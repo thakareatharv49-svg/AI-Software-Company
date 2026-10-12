@@ -52,6 +52,8 @@ class ProductReview(BaseModel):
     revision: int = 0
     qa_passed: bool = False
     security_passed: bool = False
+    qa_evidence: str = ''
+    security_evidence: str = ''
     approved_at: datetime | None = None
     published_at: datetime | None = None
     repository_url: str | None = None
@@ -86,15 +88,38 @@ def _merge_requirements(existing: list[Requirement], incoming: list[Requirement]
             merged.append(prior.model_copy(update={'status': RequirementStatus.PENDING, 'evidence': None}))
     return merged
 
-def prepare_review(review: ProductReview, requirements: list[Requirement], *, qa_passed: bool, security_passed: bool) -> ProductReview:
+def prepare_review(
+    review: ProductReview,
+    requirements: list[Requirement],
+    *,
+    qa_passed: bool,
+    security_passed: bool,
+    qa_evidence: str,
+    security_evidence: str,
+) -> ProductReview:
     if review.status not in {ReviewStatus.DRAFT, ReviewStatus.CHANGES_REQUESTED}:
         raise InvalidReviewTransition(f'Cannot submit for review from {review.status.value}')
     if not requirements:
         raise InvalidReviewTransition('At least one acceptance requirement is required')
     if not qa_passed or not security_passed:
-        raise InvalidReviewTransition('Automated QA and security checks must pass before human review')
+        raise InvalidReviewTransition('QA and security checks must pass before human review')
+    qa_evidence = qa_evidence.strip()
+    security_evidence = security_evidence.strip()
+    if not qa_evidence or not security_evidence:
+        raise InvalidReviewTransition('QA and security evidence must be supplied before human review')
     merged = _merge_requirements(review.requirements, requirements) if review.status == ReviewStatus.CHANGES_REQUESTED else [item.model_copy(update={'status': RequirementStatus.PENDING, 'evidence': None}, deep=True) for item in requirements]
-    return _updated(review, status=ReviewStatus.IN_REVIEW, requirements=merged, qa_passed=True, security_passed=True, approved_at=None, published_at=None, repository_url=None)
+    return _updated(
+        review,
+        status=ReviewStatus.IN_REVIEW,
+        requirements=merged,
+        qa_passed=True,
+        security_passed=True,
+        qa_evidence=qa_evidence,
+        security_evidence=security_evidence,
+        approved_at=None,
+        published_at=None,
+        repository_url=None,
+    )
 
 def update_requirement(review: ProductReview, requirement_id: str, *, status: RequirementStatus, evidence: str | None = None) -> ProductReview:
     if review.status != ReviewStatus.IN_REVIEW:
