@@ -336,8 +336,10 @@ Rules:
 - For browser apps include index.html, style.css, app.js, and tests/test_project.py.
 - Include every local file referenced by another file.
 - Use no more than {self.max_generated_project_files} files for this generation run. Use a modular structure appropriate to the product; do not collapse unrelated subsystems into giant files just to minimize file count. Avoid unnecessary build tools, CDNs, remote APIs, and external dependencies unless explicitly required.
-- Every file must have a clear purpose and be necessary for the requested product.
-- Add optional depends_on arrays listing the exact planned paths that must exist before this file is implemented. Use dependencies to express real module/API contracts, not merely visual ordering. Keep dependencies acyclic and refer only to paths in the manifest.
+- Every file must have a clear purpose and be necessary for the requested product. For implementation modules, the purpose must name the module's responsibility and the public functions, classes, routes, or data contract it owns.
+- Plan around the mission's distinct user workflows and domain capabilities. Ensure each major requested capability maps to one or more implementation files; do not omit a capability merely because another file is already large.
+- Add depends_on arrays for every real consumer/provider relationship. A consumer must depend on the file that defines the API, shared data model, or helper it uses. Keep dependencies acyclic and refer only to paths in the manifest.
+- Keep shared business rules and data contracts in one owning module rather than reimplementing them in multiple feature files. Generate providers before consumers, and tests after the behavior they verify.
 - Paths must be safe relative paths; never use absolute paths or parent-directory segments.
 - The plan must implement the requested category and all key user workflows, not a generic demo.
 - If the mission explicitly requests a backend, server, REST/API endpoints, authentication server, or database-backed behavior, include a real backend/API implementation file and tests for it. Do not silently substitute a frontend-only or localStorage-only mock for an explicitly requested server/data layer.
@@ -830,6 +832,11 @@ Rules:
                 existing_context_parts.append(block)
                 remaining_context_chars -= len(block) + 2
             existing_summary = "\n\n".join(existing_context_parts) or "(none yet)"
+            dependency_paths = manifest_dependencies.get(path, [])
+            dependency_contracts = "\\n".join(
+                f"- {dependency}: {purpose_by_path.get(dependency, 'Declared module dependency')}"
+                for dependency in dependency_paths
+            ) or "(none declared)"
             file_prompt = f"""Implement exactly one file for a runnable software product.
 Project name: {name}
 Mission objective: {objective}
@@ -839,6 +846,8 @@ Full file plan:
 
 File to generate: {path}
 Purpose: {purpose}
+Declared dependencies and their contracts:
+{dependency_contracts}
 
 Already generated files:
 {existing_summary}
@@ -848,6 +857,7 @@ Return only JSON: {{"content":"complete file contents for {path}"}}
 Requirements:
 - Implement the mission's actual features and coherent polished responsive UI where relevant.
 - Follow the declared dependency order and implement the interfaces promised by dependency files before integrating consumers.
+- Treat the listed dependency purposes as contracts: call the named exports/routes/data shapes instead of guessing new names, copying their business logic, or creating parallel implementations. If a required interface is missing from the generated dependency source, report the mismatch in this file's implementation only when it can be handled safely; otherwise keep the consumer consistent with the existing provider.
 - Keep interfaces and identifiers consistent with the file plan and previously generated files.
 - Do not return markdown fences, explanations, or another file.
 - No placeholders for required behavior, remote dependencies, CDNs, secrets, or network calls.

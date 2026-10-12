@@ -643,8 +643,12 @@ async def test_large_generation_keeps_file_context_bounded_and_dependency_first(
     )
     assert "FILE: index.html" in app_prompt
     assert "- index.html" in app_prompt
-    assert "- index.html: App entry point" not in app_prompt
     assert "- style.css: Visual styling" not in app_prompt
+    assert "Declared dependencies and their contracts:" in app_prompt
+    assert "- index.html: App entry point" in app_prompt
+    manifest_prompt = payloads[0]["prompt"]
+    assert "major requested capability maps to one or more implementation files" in manifest_prompt
+    assert "A consumer must depend on the file that defines the API" in manifest_prompt
 
 
 
