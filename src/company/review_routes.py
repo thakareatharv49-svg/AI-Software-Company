@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field, field_validator
 
 from src.company.control_center.routes import get_control_center
@@ -237,7 +237,7 @@ def live_product_preview(
     mission_id: str,
     request: Request,
     center: Annotated[CompanyControlCenter, Depends(get_control_center)],
-) -> HTMLResponse:
+) -> Response:
     """Render a generated static web app under a restrictive browser CSP sandbox."""
     job = _get_job(mission_id, center)
     if job.status != MissionJobStatus.COMPLETED:
@@ -249,7 +249,15 @@ def live_product_preview(
             status_code=422,
             detail='Live preview requires index.html in the product root or a supported frontend output folder',
         )
-    entrypoint_path, _ = entrypoint
+    entrypoint_path, prefix = entrypoint
+    if prefix:
+        # Serve nested entry points at their own directory URL so ordinary
+        # relative references and ../shared assets resolve under the preview route.
+        return RedirectResponse(
+            url=f'/api/missions/{mission_id}/review/live-preview/{quote(prefix, safe="/")}/',
+            status_code=307,
+            headers={"Cache-Control": "no-store"},
+        )
     return HTMLResponse(content=files[entrypoint_path], headers=_preview_headers(request))
 
 
@@ -276,8 +284,13 @@ def live_product_preview_asset(
     entrypoint = _preview_entrypoint(files)
     if entrypoint is None:
         raise HTTPException(status_code=422, detail='Product has no supported browser entry point')
-    _, prefix = entrypoint
-    resolved = posixpath.normpath(posixpath.join(prefix, normalized))
+    entrypoint_path, prefix = entrypoint
+    if prefix and normalized.rstrip('/') == prefix:
+        return HTMLResponse(content=files[entrypoint_path], headers=_preview_headers(request))
+    if prefix and (normalized == prefix or normalized.startswith(prefix + '/')):
+        resolved = posixpath.normpath(normalized)
+    else:
+        resolved = posixpath.normpath(posixpath.join(prefix, normalized))
     if resolved in {'', '.', '..'} or resolved.startswith('../') or resolved.startswith('/'):
         raise HTTPException(status_code=404, detail='Preview asset not found')
     content = files.get(resolved)
