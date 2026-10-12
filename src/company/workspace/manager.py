@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 import sys
@@ -52,13 +53,19 @@ class ProjectWorkspace:
 
         safe_id = safe_id or "project"
 
-        # Keep one stable workspace per mission so a completed product can be
-        # be opened directly from the company UI. A new factory attempt starts
-        # from a clean copy of the generated project.
-        root = parent / safe_id
+        # Slug normalization is lossy: distinct IDs such as "a/b" and "a-b"
+        # must never share a directory or delete one another's workspace.
+        # The digest also avoids case-insensitive filesystem collisions.
+        identity_digest = hashlib.sha256(project_id.encode("utf-8")).hexdigest()[:16]
+        root = parent / f"{safe_id[:80]}-{identity_digest}"
+
+        # Reusing the exact same project ID intentionally starts a clean retry.
+        # Different IDs always have different deterministic paths.
         if root.exists():
-            shutil.rmtree(root, ignore_errors=True)
-        root.mkdir(parents=True, exist_ok=True)
+            if root.is_symlink():
+                raise ValueError("workspace root must not be a symbolic link")
+            shutil.rmtree(root)
+        root.mkdir(parents=True, exist_ok=False)
 
         return cls(root, **limits)
 
