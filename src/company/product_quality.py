@@ -246,6 +246,12 @@ _MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
     ("export", {"export", "download"}, {"export", "download"}),
     ("import", {"import", "upload"}, {"import", "upload"}),
     ("budget", {"budget"}, {"budget"}),
+    ("sorting", {"sort", "sorting", "order"}, {"sort", "sorting", "order"}),
+    ("delete confirmation", {"confirm", "confirmation", "confirming"}, {"confirm", "confirmation", "cancel"}),
+    ("empty state", {"empty"}, {"empty"}),
+    ("responsive layout", {"responsive", "mobile", "tablet"}, {"responsive", "mobile", "tablet", "viewport"}),
+    ("notifications", {"notification", "notifications", "notify", "alert"}, {"notification", "notifications", "notify", "alert"}),
+    ("undo/redo", {"undo", "redo"}, {"undo", "redo"}),
     ("validation", {"validation", "validate", "validates", "invalid", "reject"}, {"validation", "validate", "validates", "invalid", "reject"}),
 )
 
