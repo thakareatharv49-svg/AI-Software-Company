@@ -26,7 +26,10 @@ class MissionExecutionPipeline:
         self.executor = executor
         self.registry = registry
 
-    def register_default_agents(self) -> None:
+    def register_default_agents(self, plan: MissionPlan | None = None) -> None:
+        planned_roles = {
+            step.stage: step.agent_role for step in plan.steps
+        } if plan is not None else {}
         for stage, name in _STAGE_AGENTS.items():
             try:
                 self.registry.get(name)
@@ -34,11 +37,25 @@ class MissionExecutionPipeline:
                 self.registry.register(
                     AgentDefinition(
                         name=name,
-                        role=f"{stage.value} specialist",
+                        role=planned_roles.get(stage, f"{stage.value} specialist"),
                         description=f"Executes the {stage.value} mission stage.",
                         capabilities=[stage.value],
                     )
                 )
+
+    @staticmethod
+    def _next_ready_step(plan: MissionPlan):
+        completed = {
+            step.stage.value for step in plan.steps if step.status == "completed"
+        }
+        return next(
+            (
+                step for step in plan.steps
+                if step.status == "planned"
+                and set(step.depends_on).issubset(completed)
+            ),
+            None,
+        )
 
     async def execute_next(
         self,
@@ -53,9 +70,9 @@ class MissionExecutionPipeline:
                 error="Company must be running before executing a stage",
             )
 
-        self.register_default_agents()
+        self.register_default_agents(plan)
 
-        step = next((item for item in plan.steps if item.status == "planned"), None)
+        step = self._next_ready_step(plan)
         if step is None:
             return AgentResult(
                 task_id=self.orchestrator.state.current_task_id or "",
