@@ -58,3 +58,13 @@ def test_production_rejects_host_execution_mode() -> None:
             session_cookie_secure=True,
             sandbox_mode="host",
         )
+
+def test_company_env_also_activates_production_safety(monkeypatch) -> None:
+    monkeypatch.setenv("COMPANY_ENV", "production")
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.setenv("SESSION_COOKIE_SECURE", "true")
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://example.com")
+    monkeypatch.setenv("SANDBOX_MODE", "host")
+
+    with pytest.raises(ValidationError, match="SANDBOX_MODE"):
+        Settings(_env_file=None)
