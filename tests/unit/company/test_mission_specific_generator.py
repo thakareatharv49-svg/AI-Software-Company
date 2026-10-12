@@ -786,7 +786,7 @@ def test_backend_validation_accepts_modern_server_framework_signatures() -> None
     from src.company.project_generator import GeneratedProject
 
     server_sources = (
-        ("hono.js", "const app = new Hono();\\napp.get('/health', (c) => c.text('ok'));", "Hono"),
+        ("hono.js", "const app = new Hono();\napp.get('/health', (c) => c.text('ok'));", "Hono"),
         ("main.ts", "const app = await NestFactory.create(AppModule);", "NestFactory.create"),
         ("server.js", "Bun.serve({ port: 3000, fetch: () => new Response('ok') });", "Bun.serve"),
         ("main.ts", "Deno.serve(() => new Response('ok'));", "Deno.serve"),
@@ -799,9 +799,9 @@ def test_backend_validation_accepts_modern_server_framework_signatures() -> None
                 files={
                     path: source,
                     "tests/test_api.py": (
-                        "def test_api_uses_server_signature():\\n"
-                        f"    source = {source!r}\\n"
-                        f"    assert {signature!r} in source\\n"
+                        "def test_api_uses_server_signature():\n"
+                        f"    source = {source!r}\n"
+                        f"    assert {signature!r} in source\n"
                     ),
                 },
                 test_command=["python", "-m", "pytest", "-q"],
