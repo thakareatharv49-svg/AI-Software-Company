@@ -164,7 +164,7 @@ def test_automatic_retry_feedback_reuses_original_mission_checkpoint(tmp_path) -
     objective = "Build a clinic management system with appointments and patient records"
     retry_objective = (
         objective
-        + "\\n\\nAUTOMATIC RECOVERY FEEDBACK FROM THE PREVIOUS ATTEMPT:\\n"
+        + "\n\nAUTOMATIC RECOVERY FEEDBACK FROM THE PREVIOUS ATTEMPT:\n"
         + "QA failed: appointment validation is missing"
     )
 
@@ -177,7 +177,7 @@ def test_automatic_retry_feedback_reuses_original_mission_checkpoint(tmp_path) -
 def test_owner_requested_revision_uses_a_distinct_checkpoint(tmp_path) -> None:
     generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
     objective = "Build a clinic management system"
-    revision = objective + "\\n\\nOWNER-REQUESTED REVISION FEEDBACK:\\nAdd billing"
+    revision = objective + "\n\nOWNER-REQUESTED REVISION FEEDBACK:\nAdd billing"
 
     original = generator._checkpoint("Clinic Management System", objective)
     revised = generator._checkpoint("Clinic Management System", revision)
