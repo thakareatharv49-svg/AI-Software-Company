@@ -930,11 +930,13 @@ Requirements:
         from src.company.product_quality import (
             find_exposed_secrets,
             find_unfinished_product_content,
+            find_weak_javascript_tests,
             find_weak_product_tests,
         )
 
         quality_issues = find_unfinished_product_content(project.files)
         quality_issues.extend(find_weak_product_tests(project.files))
+        quality_issues.extend(find_weak_javascript_tests(project.files))
         # Feature traceability is diagnostic-only because lexical matches can
         # reject valid suites that use domain-specific names.
         quality_issues.extend(find_exposed_secrets(project.files))
