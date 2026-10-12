@@ -126,6 +126,17 @@ class FactoryAutonomousRunner:
                     pass
             raise
 
+        plan = plan.model_copy(
+            update=self._quality_evidence_updates(result, request.qa_request.command)
+        )
+        if on_progress is not None:
+            # Persist evidence from the exact successful pipeline run before the
+            # mission can be marked completed or submitted for human review.
+            try:
+                on_progress(plan)
+            except Exception:
+                pass
+
         try:
             report = AutonomousCompanyAcceptance().evaluate(result)
             if not report.passed:
@@ -151,6 +162,36 @@ class FactoryAutonomousRunner:
             # Completed workspaces are intentionally retained for the product
             # viewer. Failed attempts are also retained for diagnostics/retry.
             pass
+
+    @staticmethod
+    def _quality_evidence_updates(result: AutonomousProjectResult, qa_command: list[str]) -> dict:
+        """Build review evidence from actual runner results, never caller text."""
+        qa = result.pipeline.qa_result
+        security = result.pipeline.review_result
+        qa_status = str(getattr(qa.status, "value", qa.status))
+        security_status = str(getattr(security.status, "value", security.status))
+        command = [str(part) for part in qa_command]
+        qa_evidence = (
+            "Factory QA runner result: "
+            f"status={qa_status}; exit_code={qa.exit_code}; "
+            f"duration_ms={qa.duration_ms}; command={' '.join(command)[:500]}"
+        )
+        security_summary = str(security.summary or "")[:1000]
+        security_evidence = (
+            "Factory security reviewer result: "
+            f"status={security_status}; approved={bool(security.approved)}; "
+            f"summary={security_summary or 'No summary supplied.'}"
+        )
+        return {
+            "qa_status": qa_status,
+            "qa_exit_code": qa.exit_code,
+            "qa_duration_ms": qa.duration_ms,
+            "qa_command": command,
+            "qa_evidence": qa_evidence,
+            "security_status": security_status,
+            "security_summary": security_summary,
+            "security_evidence": security_evidence,
+        }
 
     @staticmethod
     def _derive_tasks_from_generated_files(request, mission):
