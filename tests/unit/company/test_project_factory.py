@@ -153,6 +153,53 @@ async def test_factory_retries_a_failed_project() -> None:
     assert project.attempts == 2
 
 
+
+@pytest.mark.asyncio
+async def test_automatic_retry_includes_previous_failure_as_recovery_feedback() -> None:
+    class FailOnceRunner:
+        def __init__(self):
+            self.objectives = []
+
+        async def run(self, mission, plan, on_progress=None):
+            self.objectives.append(mission.objective)
+            if len(self.objectives) == 1:
+                raise RuntimeError("QA failed: missing transaction validation")
+            return SimpleNamespace(pipeline=object(), stages=[])
+
+    runner = FailOnceRunner()
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        autonomous_runner=runner,
+    )
+    project = factory.enqueue(
+        CompanyMission(
+            name="Expense Tracker",
+            objective="Build an expense tracker with transaction validation",
+        )
+    )
+
+    result = await factory.run(max_projects=1, max_retries=1)
+
+    assert result == [project]
+    assert project.status == "completed"
+    assert project.attempts == 2
+    assert "Build an expense tracker with transaction validation" in runner.objectives[1]
+    assert "missing transaction validation" in runner.objectives[1]
+    assert "preserving all original mission requirements" in runner.objectives[1]
+    # Recovery feedback is scoped to the retry prompt; the saved user mission
+    # remains unchanged for history and future revisions.
+    assert project.mission.objective == "Build an expense tracker with transaction validation"
+
+
 @pytest.mark.asyncio
 async def test_factory_rejects_duplicate_run() -> None:
     orchestrator = CompanyOrchestrator()
