@@ -347,8 +347,9 @@ def find_missing_product_tests(files: Mapping[str, str]) -> list[str]:
         ):
             test_modules.append(path)
             continue
+        is_test_directory = normalized.startswith(("tests/", "__tests__/")) or "/__tests__/" in normalized
         if filename.endswith(javascript_suffixes) and (
-            filename.startswith("test_")
+            (is_test_directory and filename.startswith("test_"))
             or filename.endswith((
                 "_test.js", "_test.jsx", "_test.mjs", "_test.cjs",
                 "_test.ts", "_test.tsx", "_test.mts", "_test.cts",
