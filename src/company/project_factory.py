@@ -207,6 +207,17 @@ class ProjectFactory:
                 f"Mission '{mission_id}' cannot be retried from '{job.status.value}'"
             )
         self.queue = [item for item in self.queue if item.mission.id != mission_id]
+        # Capture the concrete failed-stage diagnosis before resetting the plan.
+        # Otherwise a manual retry silently loses the feedback used by automatic
+        # retries and can repeat the same failed generation attempt.
+        retry_feedback = next(
+            (
+                step.detail.strip()
+                for step in job.plan.steps
+                if step.status == "failed" and step.detail and step.detail.strip()
+            ),
+            None,
+        )
         queued = transition_job(
             job,
             MissionJobStatus.QUEUED,
@@ -229,6 +240,7 @@ class ProjectFactory:
             mission=queued.mission,
             plan=plan,
             attempts=queued.attempts,
+            retry_feedback=retry_feedback[:2000] if retry_feedback else None,
         )
         self.queue.append(project)
         self._save(project)
