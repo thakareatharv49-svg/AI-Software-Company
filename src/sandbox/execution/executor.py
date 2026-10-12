@@ -182,8 +182,7 @@ class SandboxExecutor:
             created = subprocess.run(
                 create_command,
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 timeout=30,
                 check=False,
