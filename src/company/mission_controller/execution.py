@@ -124,7 +124,8 @@ class MissionExecutionPipeline:
 
         if not result.success:
             step.status = "failed"
-            self.orchestrator.block(result.error or "Agent execution failed")
+            step.detail = result.error or "Agent execution failed"
+            self.orchestrator.block(step.detail)
             self.orchestrator.events.publish(
                 CompanyEvent(
                     event_type="STAGE_FAILED",
