@@ -82,7 +82,7 @@ def test_compact_manifest_retry_uses_configured_file_budget(tmp_path) -> None:
         nonlocal calls
         calls += 1
         if calls == 1:
-            assert "8-file limit" in payload["prompt"]
+            assert "no more than 8 files for this generation run" in payload["prompt"]
             return json.dumps({"files": oversized})
         if calls == 2:
             assert "no more than 8 files total" in payload["prompt"]
