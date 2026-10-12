@@ -1,4 +1,5 @@
-﻿import sys
+﻿import os
+import sys
 
 import pytest
 
@@ -129,3 +130,43 @@ async def test_duplicate_run_rejected():
             "duplicate",
             [python_command("print('again')")],
         )
+
+
+
+@pytest.mark.asyncio
+async def test_workspace_bound_run_uses_workspace_and_does_not_inherit_secrets(tmp_path, monkeypatch):
+    monkeypatch.setenv("FACTORY_QA_SECRET", "must-not-leak")
+    runner = AutonomousQARunner(timeout_seconds=5, workspace=tmp_path)
+    result = await runner.run(
+        "qa-workspace",
+        [python_command(
+            "import os, pathlib; "
+            "pathlib.Path('workspace-output.txt').write_text('inside'); "
+            "print(os.environ.get('FACTORY_QA_SECRET', 'hidden'))"
+        )],
+    )
+
+    assert result.status == QARunStatus.PASSED
+    assert result.results[0].stdout.strip() == "hidden"
+    assert (tmp_path / "workspace-output.txt").read_text() == "inside"
+    assert not os.path.exists("workspace-output.txt")
+
+
+@pytest.mark.asyncio
+async def test_workspace_bound_run_rejects_unapproved_executable(tmp_path):
+    runner = AutonomousQARunner(timeout_seconds=5, workspace=tmp_path)
+
+    result = await runner.run("qa-unapproved-command", [("bash", "-c", "echo unsafe")])
+
+    assert result.status == QARunStatus.FAILED
+    assert "not allowed in a workspace-bound QA run" in (result.error or "")
+
+
+@pytest.mark.asyncio
+async def test_qa_output_is_bounded():
+    runner = AutonomousQARunner(timeout_seconds=5, max_output_chars=100)
+
+    result = await runner.run("qa-output-limit", [python_command("print('x' * 1000)")])
+
+    assert result.status == QARunStatus.PASSED
+    assert len(result.results[0].stdout) == 100
