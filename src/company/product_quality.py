@@ -263,6 +263,11 @@ def find_weak_javascript_tests(files: Mapping[str, str]) -> list[str]:
         r"""(?:async\s*)?\(\s*\)\s*=>\s*\{\s*\}\s*\)""",
         re.IGNORECASE | re.DOTALL,
     )
+    empty_function_test = re.compile(
+        r"""\b(?:test|it)\s*\(\s*(['\"])[^'\"]*\1\s*,\s*"""
+        r"""(?:async\s+)?function\s*\(\s*\)\s*\{\s*\}\s*\)""",
+        re.IGNORECASE | re.DOTALL,
+    )
     tautologies = (
         re.compile(r"""\bexpect\(\s*(true|false|null|[-+]?\d+(?:\.\d+)?|(['"]).*?\2)\s*\)\s*\.\s*toBe\(\s*\1\s*\)""", re.DOTALL),
         re.compile(r"""\bassert\.(?:equal|strictEqual|deepEqual)\(\s*(true|false|null|[-+]?\d+(?:\.\d+)?|(['"]).*?\2)\s*,\s*\1\s*\)""", re.DOTALL),
@@ -277,7 +282,7 @@ def find_weak_javascript_tests(files: Mapping[str, str]) -> list[str]:
         )
         if not is_test or not filename.endswith((".js", ".jsx", ".ts", ".tsx")):
             continue
-        if empty_test.search(content):
+        if empty_test.search(content) or empty_function_test.search(content):
             issues.append(
                 f"Generated JavaScript test '{path}' contains an empty test body. "
                 "Exercise product behavior and assert the expected result."

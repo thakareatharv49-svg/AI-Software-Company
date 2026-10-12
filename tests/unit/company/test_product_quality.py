@@ -468,3 +468,24 @@ def test_feature_traceability_does_not_treat_source_helpers_as_tests() -> None:
 
     assert any("create" in issue for issue in issues)
     assert any("delete/remove" in issue for issue in issues)
+
+
+
+def test_rejects_empty_javascript_test_using_function_callback() -> None:
+    issues = find_weak_javascript_tests({
+        "src/records.test.js": "test('creates a record', function () {});",
+    })
+
+    assert len(issues) == 1
+    assert "empty test body" in issues[0]
+
+
+def test_accepts_javascript_test_with_behavior_assertion() -> None:
+    issues = find_weak_javascript_tests({
+        "src/records.test.js": (
+            "test('creates a record', function () { "
+            "assert.equal(createRecord('Plan').title, 'Plan'); });"
+        ),
+    })
+
+    assert issues == []
