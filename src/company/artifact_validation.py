@@ -6,6 +6,8 @@ import posixpath
 import re
 from urllib.parse import unquote, urlsplit
 
+from src.company.secret_scanning import scan_generated_secrets
+
 
 _HTML_REFERENCE = re.compile(
     r"""\b(?:src|href)\s*=\s*(['"])(.*?)\1""",
@@ -122,4 +124,5 @@ def validate_generated_artifacts(files: Mapping[str, str]) -> list[str]:
                     f"'{reference.strip()}'."
                 )
 
+    issues.extend(scan_generated_secrets(files))
     return issues
