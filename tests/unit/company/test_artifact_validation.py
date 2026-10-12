@@ -74,3 +74,22 @@ def test_resolves_assets_relative_to_nested_stylesheets() -> None:
         "styles/app.css": "body { background: url('../images/grid.svg'); }",
         "images/grid.svg": '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
     }) == []
+
+
+def test_rejects_missing_srcset_and_css_import_assets() -> None:
+    issues = validate_generated_artifacts({
+        "index.html": '<img srcset="images/small.webp 1x, images/large.webp 2x">',
+        "style.css": '@import "theme.css"; .hero { background: url("hero.webp"); }',
+    })
+
+    assert any("images/small.webp" in issue for issue in issues)
+    assert any("images/large.webp" in issue for issue in issues)
+    assert any("theme.css" in issue for issue in issues)
+    assert any("hero.webp" in issue for issue in issues)
+
+
+def test_srcset_data_urls_do_not_create_false_missing_asset_errors() -> None:
+    assert validate_generated_artifacts({
+        "index.html": '<img srcset="data:image/gif;base64,AAAA 1x, small.webp 2x">',
+        "small.webp": "image-bytes-placeholder",
+    }) == []
