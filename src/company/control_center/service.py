@@ -31,6 +31,7 @@ from src.company.persistence import (
 from src.company.project_factory import ProjectFactory
 from src.company.project_generator import OllamaProjectGenerator
 from src.company.project_outputs import ProjectOutputManifest
+from src.config.settings import settings
 from src.company.generated_task_planning import build_generated_task_plan
 from src.company.research.engine import StaticResearchProvider
 from src.manager.models.contracts import Mission as ManagerMission
@@ -148,6 +149,19 @@ class CompanyControlCenter:
         self, submission: MissionSubmission, *, workspace_id: str | None = "00000000-0000-4000-8000-000000000001"
     ) -> MissionRecord:
         with self._lock:
+            try:
+                existing_jobs = self._job_store.list_all()
+            except SQLAlchemyError:
+                existing_jobs = list(self._jobs.values())
+            queued_count = sum(
+                job.status == MissionJobStatus.QUEUED for job in existing_jobs
+            )
+            if queued_count >= settings.factory_max_queued_missions:
+                raise RuntimeError(
+                    "Mission queue is full "
+                    f"({queued_count}/{settings.factory_max_queued_missions}). "
+                    "Run or delete queued missions before adding more."
+                )
             if (
                 self._orchestrator.state.status.value == "running"
                 and not self._continuous_mode
