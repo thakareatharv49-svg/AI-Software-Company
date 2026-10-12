@@ -65,5 +65,10 @@ class MissionPlan(BaseModel):
     security_status: str | None = None
     security_summary: str | None = None
     security_evidence: str | None = None
+    # Aggregated local-model usage from the generator, persisted for operations.
+    generation_model_calls: int | None = None
+    generation_duration_ms: int | None = None
+    generation_prompt_tokens: int | None = None
+    generation_output_tokens: int | None = None
     steps: list[PlannedStep]
 
