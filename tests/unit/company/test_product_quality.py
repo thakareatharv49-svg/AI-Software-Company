@@ -5,6 +5,7 @@ from src.company.product_quality import (
     find_missing_product_tests,
     find_uncovered_mission_features,
     find_unfinished_product_content,
+    find_weak_javascript_tests,
     find_weak_product_tests,
 )
 
