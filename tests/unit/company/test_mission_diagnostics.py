@@ -3,7 +3,6 @@ from datetime import UTC, datetime, timedelta
 from fastapi import HTTPException
 
 from src.company.control_center.routes import mission_diagnostics
-from src.company.mission_controller.models import MissionStage
 from src.company.mission_controller.planner import build_mission_plan
 from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission
