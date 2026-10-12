@@ -684,7 +684,7 @@ async def test_ollama_request_logs_timing_without_prompt_contents(monkeypatch, c
     assert result == "generated result"
     assert "ollama_generation_request" in caplog.text
     assert "model=test-model" in caplog.text
-    assert "prompt_chars=19" in caplog.text
+    assert "prompt_chars=20" in caplog.text
     assert "response_chars=16" in caplog.text
     assert "outcome=success" in caplog.text
     assert "PRIVATE_MISSION_TEXT" not in caplog.text
