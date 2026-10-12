@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import mimetypes
 import posixpath
 import re
@@ -51,6 +53,7 @@ class ProductPreview(BaseModel):
     revision: int
     total_files: int
     total_bytes: int
+    artifact_digest: str
     files: list[ProductPreviewFile]
 
 
@@ -151,6 +154,25 @@ def _workspace_files(mission_id: str) -> tuple[Path, dict[str, str]]:
     return root, files
 
 
+def _artifact_digest(files: dict[str, str]) -> str:
+    canonical = json.dumps(files, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _require_current_review_artifact(review: ProductReview, files: dict[str, str]) -> None:
+    current_digest = _artifact_digest(files)
+    if not review.artifact_digest:
+        raise HTTPException(
+            status_code=409,
+            detail="This review has no artifact fingerprint. Submit the current product for review again.",
+        )
+    if review.artifact_digest != current_digest:
+        raise HTTPException(
+            status_code=409,
+            detail="Product files changed after review submission. Re-run QA/security and submit the current revision again.",
+        )
+
+
 def _repository_name(name: str, mission_id: str) -> str:
     slug = re.sub(r'[^a-zA-Z0-9._-]+', '-', name.strip())
     slug = re.sub(r'-{2,}', '-', slug).strip('-._') or 'generated-project'
@@ -191,6 +213,7 @@ def preview_generated_product(
         revision=review.revision,
         total_files=len(preview_files),
         total_bytes=sum(item.size_bytes for item in preview_files),
+        artifact_digest=_artifact_digest(files),
         files=preview_files,
     )
 
@@ -313,8 +336,6 @@ def submit_product_for_review(
     job = _get_job(mission_id, center)
     if job.status != MissionJobStatus.COMPLETED:
         raise HTTPException(status_code=409, detail='Only a completed, QA-checked product can enter human review')
-    if not (PRODUCTS_ROOT / mission_id).is_dir():
-        raise HTTPException(status_code=409, detail='Generated product workspace is unavailable for review')
     plan = job.plan
     qa_evidence = plan.qa_evidence
     security_evidence = plan.security_evidence
@@ -322,6 +343,8 @@ def submit_product_for_review(
         raise HTTPException(status_code=409, detail='A successful factory QA run is required before review')
     if plan.security_status != 'approved' or not security_evidence:
         raise HTTPException(status_code=409, detail='A successful factory security review is required before human review')
+    _, product_files = _workspace_files(mission_id)
+    artifact_digest = _artifact_digest(product_files)
     review = _get_review(mission_id, center)
     try:
         updated = prepare_review(
@@ -331,6 +354,7 @@ def submit_product_for_review(
             security_passed=True,
             qa_evidence=qa_evidence,
             security_evidence=security_evidence,
+            artifact_digest=artifact_digest,
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -397,6 +421,8 @@ def approve_product(
     center: Annotated[CompanyControlCenter, Depends(get_control_center)],
 ) -> ProductReview:
     review = _get_review(mission_id, center)
+    _, product_files = _workspace_files(mission_id)
+    _require_current_review_artifact(review, product_files)
     try:
         updated = approve_review(review)
     except ValueError as exc:
@@ -420,6 +446,7 @@ async def publish_approved_product(
         raise HTTPException(status_code=503, detail='GitHub publishing is not configured')
 
     _, files = _workspace_files(mission_id)
+    _require_current_review_artifact(review, files)
     repository = GitHubRepository(
         owner=settings.github_repository_owner,
         name=_repository_name(job.mission.name, mission_id),

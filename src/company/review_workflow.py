@@ -54,6 +54,7 @@ class ProductReview(BaseModel):
     security_passed: bool = False
     qa_evidence: str = ''
     security_evidence: str = ''
+    artifact_digest: str | None = None
     approved_at: datetime | None = None
     published_at: datetime | None = None
     repository_url: str | None = None
@@ -96,6 +97,7 @@ def prepare_review(
     security_passed: bool,
     qa_evidence: str,
     security_evidence: str,
+    artifact_digest: str | None = None,
 ) -> ProductReview:
     if review.status not in {ReviewStatus.DRAFT, ReviewStatus.CHANGES_REQUESTED}:
         raise InvalidReviewTransition(f'Cannot submit for review from {review.status.value}')
@@ -116,6 +118,7 @@ def prepare_review(
         security_passed=True,
         qa_evidence=qa_evidence,
         security_evidence=security_evidence,
+        artifact_digest=artifact_digest,
         approved_at=None,
         published_at=None,
         repository_url=None,
@@ -149,6 +152,7 @@ def request_changes(review: ProductReview, message: str) -> ProductReview:
         security_passed=False,
         qa_evidence='',
         security_evidence='',
+        artifact_digest=None,
         approved_at=None,
         published_at=None,
         repository_url=None,
