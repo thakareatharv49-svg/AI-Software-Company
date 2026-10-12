@@ -489,3 +489,25 @@ def test_accepts_javascript_test_with_behavior_assertion() -> None:
     })
 
     assert issues == []
+
+
+def test_rejects_javascript_test_that_only_calls_product_code() -> None:
+    issues = find_weak_javascript_tests({
+        "src/records.test.js": (
+            "test('creates a record', () => { createRecord('Plan'); });"
+        ),
+    })
+
+    assert len(issues) == 1
+    assert "without an explicit assertion" in issues[0]
+
+
+def test_accepts_javascript_test_with_nested_behavior_assertion() -> None:
+    issues = find_weak_javascript_tests({
+        "src/records.test.js": (
+            "test('creates a record', () => { "
+            "expect(createRecord('Plan').title).toBe('Plan'); });"
+        ),
+    })
+
+    assert issues == []

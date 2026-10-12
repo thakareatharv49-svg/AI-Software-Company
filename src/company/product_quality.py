@@ -268,6 +268,14 @@ def find_weak_javascript_tests(files: Mapping[str, str]) -> list[str]:
         r"""(?:async\s+)?function\s*\(\s*\)\s*\{\s*\}\s*\)""",
         re.IGNORECASE | re.DOTALL,
     )
+    assertion_free_callback = re.compile(
+        r"""\b(?:test|it)\s*\(\s*(['"`])[^'"`]*\1\s*,\s*"""
+        r"""(?:async\s*)?\(\s*\)\s*=>\s*\{\s*"""
+        r"""(?!(?:expect|assert|should|verify|check)\b)"""
+        r"""(?:await\s+)?[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*"""
+        r"""\s*\([^{};]*\)\s*;?\s*\}\s*\)""",
+        re.IGNORECASE | re.DOTALL,
+    )
     tautologies = (
         re.compile(r"""\bexpect\(\s*(true|false|null|[-+]?\d+(?:\.\d+)?|(['"]).*?\2)\s*\)\s*\.\s*toBe\(\s*\1\s*\)""", re.DOTALL),
         re.compile(r"""\bassert\.(?:equal|strictEqual|deepEqual)\(\s*(true|false|null|[-+]?\d+(?:\.\d+)?|(['"]).*?\2)\s*,\s*\1\s*\)""", re.DOTALL),
@@ -286,6 +294,11 @@ def find_weak_javascript_tests(files: Mapping[str, str]) -> list[str]:
             issues.append(
                 f"Generated JavaScript test '{path}' contains an empty test body. "
                 "Exercise product behavior and assert the expected result."
+            )
+        elif assertion_free_callback.search(content):
+            issues.append(
+                f"Generated JavaScript test '{path}' calls code without an explicit assertion. "
+                "Assert the returned state, rendered output, or expected failure."
             )
         if any(pattern.search(content) for pattern in tautologies):
             issues.append(
