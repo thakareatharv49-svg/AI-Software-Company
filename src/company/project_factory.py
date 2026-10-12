@@ -48,6 +48,7 @@ class FactoryProject:
     stages_executed: int = 0
     attempts: int = 0
     last_error: str | None = None
+    retry_feedback: str | None = None
 
 
 @dataclass
@@ -309,6 +310,10 @@ class ProjectFactory:
                 step.status = "planned"
                 step.detail = None
 
+        if project.last_error:
+            # Give the next generation attempt the concrete reason the previous
+            # attempt failed, instead of repeating the same prompt unchanged.
+            project.retry_feedback = project.last_error[:2000]
         project.last_error = None
         self._last_autonomous_result = None
         self.orchestrator.stop()
@@ -372,6 +377,20 @@ class ProjectFactory:
                 )
             )
 
+            attempt_mission = project.mission
+            if project.retry_feedback:
+                attempt_mission = project.mission.model_copy(
+                    update={
+                        "objective": (
+                            f"{project.mission.objective.rstrip()}\n\n"
+                            "AUTOMATIC RECOVERY FEEDBACK FROM THE PREVIOUS ATTEMPT:\n"
+                            f"{project.retry_feedback}\n\n"
+                            "Correct the reported failure while preserving all original "
+                            "mission requirements. Do not omit requested features."
+                        )
+                    }
+                )
+
             if self.autonomous_runner is not None:
                 runner = self.autonomous_runner.run
                 try:
@@ -380,12 +399,12 @@ class ProjectFactory:
                     supports_progress = False
                 if supports_progress:
                     execution = runner(
-                        project.mission,
+                        attempt_mission,
                         project.plan,
                         on_progress=lambda _plan: self._persist_plan_progress(project),
                     )
                 else:
-                    execution = runner(project.mission, project.plan)
+                    execution = runner(attempt_mission, project.plan)
                 autonomous_result = await asyncio.wait_for(
                     execution,
                     timeout=self.execution_timeout_seconds,
@@ -435,7 +454,7 @@ class ProjectFactory:
             else:
                 results = await asyncio.wait_for(
                     self.pipeline.execute_mission(
-                        project.mission,
+                        attempt_mission,
                         project.plan,
                         max_stages=max_stages,
                     ),
