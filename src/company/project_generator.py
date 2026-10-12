@@ -1010,9 +1010,15 @@ Requirements:
             for phrase in (" no database ", " without a database ",
                            " without database ", " database-free ")
         )
+        # Match API as a standalone term. A substring check also matches ordinary
+        # words such as "capital" and "rapid", incorrectly forcing a backend onto
+        # otherwise frontend-only missions.
+        import re
+
+        mentions_api = re.search(r"\bapi\b", text) is not None
         return (
             any(marker in text for marker in backend_markers)
-            or ("api" in text and not api_is_excluded and "api-only" not in text)
+            or (mentions_api and not api_is_excluded and "api-only" not in text)
             or ("database" in text and not database_is_excluded)
         )
 
