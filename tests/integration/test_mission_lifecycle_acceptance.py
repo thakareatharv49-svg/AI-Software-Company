@@ -80,6 +80,9 @@ def test_queued_mission_can_be_deleted_without_touching_other_missions():
         assert deleted.status_code == 200
         assert deleted.json() == {"deleted": True, "mission_id": first_id}
         assert client.get(f"/api/missions/{first_id}/job").status_code == 404
-        assert client.get(f"/api/missions/{second_id}/job").json()["status"] == "queued"
+        kept_job = client.get(f"/api/missions/{second_id}/job")
+        assert kept_job.status_code == 200
+        assert kept_job.json()["id"] == second_id
+        assert kept_job.json()["status"] == "queued"
     finally:
         app.dependency_overrides.clear()
