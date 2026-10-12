@@ -32,6 +32,19 @@ class PlannedStep(BaseModel):
     detail: str | None = None
 
 
+class EngineeringTask(BaseModel):
+    """A small, traceable unit of product work within a mission."""
+
+    id: str
+    title: str
+    requirement: str
+    workstream: str
+    depends_on: list[str] = Field(default_factory=list)
+    agent_role: str
+    acceptance_check: str
+    status: str = "planned"
+
+
 class MissionPlan(BaseModel):
     mission_id: str
     name: str
@@ -45,16 +58,3 @@ class MissionPlan(BaseModel):
     engineering_tasks: list[EngineeringTask] = Field(default_factory=list)
     steps: list[PlannedStep]
 
-
-
-class EngineeringTask(BaseModel):
-    """A small, traceable unit of product work within a mission."""
-
-    id: str
-    title: str
-    requirement: str
-    workstream: str
-    depends_on: list[str] = Field(default_factory=list)
-    agent_role: str
-    acceptance_check: str
-    status: str = "planned"
