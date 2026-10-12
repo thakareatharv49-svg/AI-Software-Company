@@ -1068,3 +1068,44 @@ async def test_unsuccessful_executor_result_persists_stage_error_detail() -> Non
     assert first_step.detail == "model request timed out"
     assert first_step.attempts == 1
     assert orchestrator.state.status.value != "running"
+
+
+
+def test_factory_recovers_interrupted_running_projects_as_queued() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    mission = CompanyMission(name="Interrupted", objective="Resume after a crash")
+    plan = build_mission_plan(mission)
+    plan.steps[0].status = "completed"
+    plan.steps[0].detail = "Research completed"
+    plan.steps[1].status = "running"
+    plan.steps[1].detail = "Process exited unexpectedly"
+    saved = []
+
+    class Store:
+        def load_pending(self):
+            return [{
+                "mission": mission,
+                "plan": plan,
+                "status": "running",
+                "stages_executed": 1,
+            }]
+
+        def save(self, project):
+            saved.append(project.model_copy(deep=True))
+
+    factory = ProjectFactory(orchestrator, controller, pipeline, store=Store())
+
+    assert factory.restore() == 1
+    recovered = factory.queue[0]
+    assert recovered.status == "queued"
+    assert recovered.plan.steps[0].status == "completed"
+    assert recovered.plan.steps[0].detail == "Research completed"
+    assert recovered.plan.steps[1].status == "planned"
+    assert recovered.plan.steps[1].detail is None
+    assert saved and saved[-1].status == "queued"
