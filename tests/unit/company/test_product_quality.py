@@ -435,3 +435,36 @@ def test_accepts_javascript_test_that_checks_product_behavior() -> None:
     })
 
     assert issues == []
+
+
+
+def test_feature_traceability_normalizes_windows_paths_and_nested_js_tests() -> None:
+    objective = "Create, edit, delete, and search records with persistent storage."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            r"src\\features\\__tests__\\records.test.mjs": (
+                "test('create record', () => {}); "
+                "test('edit record', () => {}); "
+                "test('delete record', () => {}); "
+                "test('search record', () => {}); "
+                "test('storage persistence', () => {});"
+            ),
+        },
+    )
+
+    assert issues == []
+
+
+def test_feature_traceability_does_not_treat_source_helpers_as_tests() -> None:
+    objective = "Create and delete records."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "src/test_helpers.js": "function createRecord() {} function deleteRecord() {}",
+            "src/records.js": "export function createRecord() {} export function deleteRecord() {}",
+        },
+    )
+
+    assert any("create" in issue for issue in issues)
+    assert any("delete/remove" in issue for issue in issues)
