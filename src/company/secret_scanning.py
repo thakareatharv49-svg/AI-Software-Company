@@ -10,11 +10,15 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")),
     ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{20,}\b")),
     ("openai-key", re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{24,}\b")),
+    ("google-api-key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
+    ("stripe-secret-key", re.compile(r"\b(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{16,}\b")),
+    ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
+    ("bearer-token", re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/-]{20,}={0,2}")),
     (
         "credential-assignment",
         re.compile(
-            r"""(?i)\b(?:api[_-]?key|client[_-]?secret|password|passwd|secret|access[_-]?token)\b"""
-            r"""\s*[:=]\s*['"]?([A-Za-z0-9_./+=-]{12,})"""
+            r"""(?i)\b(?:api[_-]?key|client[_-]?secret|password|passwd|secret|token|auth[_-]?token|refresh[_-]?token|access[_-]?token|private[_-]?key|database[_-]?url|connection[_-]?string|authorization)\b"""
+            r"""\s*[:=]\s*['"]?([A-Za-z0-9_./:@+=-]{12,})"""
         ),
     ),
 )
