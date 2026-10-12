@@ -665,6 +665,14 @@ class CompanyExecutionPipeline:
                 return result
 
             except Exception as exc:
+                # Preserve source files created or repaired during this attempt
+                # before deciding whether to retry. A retry must not silently
+                # discard progress made in the shared project workspace.
+                self._preserve_workspace_progress(
+                    qa_request.working_directory,
+                    files,
+                    attempt=self.recovery.attempts(stage=self._classify_recovery_stage(exc)) + 1,
+                )
                 recovery = self.recovery.record_failure(
                     error=exc,
                     stage=self._classify_recovery_stage(exc),
@@ -702,6 +710,54 @@ class CompanyExecutionPipeline:
                         "repeated_failure": recovery.repeated_failure
                     },
                 )
+
+    def _preserve_workspace_progress(
+        self,
+        working_directory: str,
+        files: dict[str, str],
+        *,
+        attempt: int,
+    ) -> None:
+        """Merge recoverable workspace changes into the in-memory deliverable map."""
+        workspace_files: dict[str, str] = {}
+        try:
+            self._sync_generated_files_from_workspace(
+                working_directory,
+                workspace_files,
+            )
+        except (OSError, RuntimeError) as exc:
+            self._publish_event(
+                "autonomous.run.progress_preservation_failed",
+                payload={
+                    "attempt": attempt,
+                    "reason": str(exc)[:1000],
+                },
+            )
+            return
+
+        if not workspace_files:
+            return
+
+        changed_paths = [
+            path for path, content in workspace_files.items()
+            if files.get(path) != content
+        ]
+        if not changed_paths:
+            return
+
+        # Merge rather than replace: some generators keep initial artifacts in
+        # memory before they have materialized every file in the workspace.
+        # Existing workspace versions win, and newly created files are retained.
+        files.update(workspace_files)
+        self._publish_event(
+            "autonomous.run.progress_preserved",
+            payload={
+                "attempt": attempt,
+                "file_count": len(workspace_files),
+                "changed_file_count": len(changed_paths),
+                "changed_paths": sorted(changed_paths)[:100],
+            },
+        )
 
     @staticmethod
     def _classify_recovery_stage(error: Exception) -> str:
