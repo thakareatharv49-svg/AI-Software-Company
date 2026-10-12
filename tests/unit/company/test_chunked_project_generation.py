@@ -595,3 +595,50 @@ async def test_large_mission_rejects_invalid_compact_manifest(monkeypatch, tmp_p
             "Browser project platform",
             "Create a browser project platform with a dashboard and analytics.",
         )
+
+@pytest.mark.asyncio
+async def test_large_generation_keeps_file_context_bounded_and_dependency_first(
+    monkeypatch, tmp_path
+):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    responses = [
+        json.dumps({
+            "files": [
+                {"path": "index.html", "purpose": "App entry point"},
+                {"path": "style.css", "purpose": "Visual styling"},
+                {
+                    "path": "app.js",
+                    "purpose": "Interactive behavior",
+                    "depends_on": ["index.html"],
+                },
+                {"path": "tests/test_project.py", "purpose": "Behavior tests"},
+            ]
+        }),
+        json.dumps({"content": "<!doctype html><title>Context</title>"}),
+        json.dumps({"content": "body { color: black; }"}),
+        json.dumps({"content": "function runApp() { return true; }"}),
+        json.dumps({"content": "def test_app_contract():\n    assert True\n"}),
+    ]
+    payloads = []
+
+    async def fake_call(payload):
+        payloads.append(payload)
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    await generator._generate_large_mission(
+        "Context planner",
+        "Create, edit, delete and search records in a responsive browser app.",
+    )
+
+    file_prompts = [
+        payload["prompt"] for payload in payloads
+        if "File to generate: " in payload["prompt"]
+    ]
+    assert file_prompts
+    assert all(len(prompt) < 12_000 for prompt in file_prompts)
+    app_prompt = next(
+        prompt for prompt in file_prompts
+        if "File to generate: app.js" in prompt
+    )
+    assert "FILE: index.html" in app_prompt
