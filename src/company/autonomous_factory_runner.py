@@ -71,6 +71,14 @@ class FactoryAutonomousRunner:
                 f"{type(exc).__name__}: {exc}",
             )
             raise
+        plan = plan.model_copy(update=self._generation_metrics_updates(request))
+        if on_progress is not None:
+            # Preserve generation usage even if workspace validation fails later.
+            try:
+                on_progress(plan)
+            except Exception:
+                pass
+
         try:
             self._validate_generated_files(request.files)
             # Generated files are the most concrete architecture artifact available
@@ -165,6 +173,16 @@ class FactoryAutonomousRunner:
             # Completed workspaces are intentionally retained for the product
             # viewer. Failed attempts are also retained for diagnostics/retry.
             pass
+
+    @staticmethod
+    def _generation_metrics_updates(request) -> dict:
+        """Copy bounded model usage metrics into the durable mission plan."""
+        return {
+            "generation_model_calls": max(0, int(getattr(request, "generation_model_calls", 0) or 0)),
+            "generation_duration_ms": max(0, int(getattr(request, "generation_duration_ms", 0) or 0)),
+            "generation_prompt_tokens": max(0, int(getattr(request, "generation_prompt_tokens", 0) or 0)),
+            "generation_output_tokens": max(0, int(getattr(request, "generation_output_tokens", 0) or 0)),
+        }
 
     @staticmethod
     def _quality_evidence_updates(result: AutonomousProjectResult, qa_command: list[str]) -> dict:
