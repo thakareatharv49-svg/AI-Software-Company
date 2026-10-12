@@ -249,6 +249,8 @@ class CompanyControlCenter:
             self._factory.prioritize_mission(mission_id)
 
         async def runner() -> None:
+            if self._factory_paused:
+                return
             try:
                 # Keep the factory on the application's event loop. The control
                 # center, factory, orchestrator, event bus, and autonomous runner
@@ -297,16 +299,16 @@ class CompanyControlCenter:
 
     async def start_continuous_factory(self, max_retries: int = 2) -> None:
         """Process one queued project at a time until continuous mode is stopped."""
-        if self._factory_paused:
-            raise RuntimeError("Factory is emergency-paused; resume it before starting continuous mode")
         if max_retries < 0:
             raise ValueError("max_retries must be non-negative")
-        if self._continuous_mode and self._factory_task is not None and not self._factory_task.done():
-            return
-        if self._factory_task is not None and not self._factory_task.done():
-            raise RuntimeError("Factory is already running in one-shot mode")
-
-        self._continuous_mode = True
+        with self._lock:
+            if self._factory_paused:
+                raise RuntimeError("Factory is emergency-paused; resume it before starting continuous mode")
+            if self._continuous_mode and self._factory_task is not None and not self._factory_task.done():
+                return
+            if self._factory_task is not None and not self._factory_task.done():
+                raise RuntimeError("Factory is already running in one-shot mode")
+            self._continuous_mode = True
 
         async def continuous_runner() -> None:
             try:
@@ -355,7 +357,8 @@ class CompanyControlCenter:
         """Block new submissions and runs; let an already-running project finish."""
         with self._lock:
             self._factory_paused = True
-        was_continuous = self.stop_continuous_factory()
+            was_continuous = self._continuous_mode
+            self._continuous_mode = False
         jobs = self.mission_jobs()
         active = next(
             (job for job in jobs if job.status == MissionJobStatus.RUNNING), None
