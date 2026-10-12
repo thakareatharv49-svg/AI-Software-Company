@@ -127,6 +127,147 @@ class SandboxExecutor:
         """Use a worker thread for compatibility with Windows ASGI event loops."""
         return await asyncio.to_thread(self.execute_sync, request)
 
+    def _execute_container(self, request: SandboxRequest) -> SandboxResult:
+        """Run generated code with network, capability, filesystem, and resource limits."""
+        command = list(request.command)
+        executable = Path(command[0]).name.lower() if command else ""
+        aliases = {
+            "python.exe": "python",
+            "pytest.exe": "pytest",
+            "node.exe": "node",
+        }
+        if command and executable in aliases:
+            command[0] = aliases[executable]
+        request = request.model_copy(update={"command": command})
+        working_directory = self._validate(request)
+        mount_root = self.workspace or working_directory
+        try:
+            relative_workdir = working_directory.relative_to(mount_root).as_posix()
+        except ValueError as exc:
+            raise PermissionError("Working directory is outside the container mount") from exc
+        container_workdir = (
+            "/workspace" if relative_workdir == "." else "/workspace/" + relative_workdir
+        )
+        uid_gid = (
+            f"{os.getuid()}:{os.getgid()}" if os.name == "posix" else "0:0"
+        )
+        cid_fd, cid_path = tempfile.mkstemp(prefix="asc-sandbox-", suffix=".cid")
+        os.close(cid_fd)
+        os.unlink(cid_path)
+        docker_command = [
+            "docker", "run", "--rm", "--pull=never", "--cidfile", cid_path,
+            "--network=none", "--read-only", "--cap-drop=ALL",
+            "--security-opt=no-new-privileges", "--pids-limit=64",
+            "--memory=512m", "--cpus=1", "--ulimit", "nofile=128:128",
+            "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
+            "--mount", f"type=bind,source={mount_root},target=/workspace,rw",
+            "--workdir", container_workdir, "--user", uid_gid,
+            "--env", "PYTHONDONTWRITEBYTECODE=1",
+            "--env", "PYTHONNOUSERSITE=1", "--env", "HOME=/tmp",
+            "--env", "TMPDIR=/tmp", self.container_image, *request.command,
+        ]
+        started = time.perf_counter()
+        process: subprocess.Popen[bytes] | None = None
+        stdout_bytes = bytearray()
+        stderr_bytes = bytearray()
+        timed_out = False
+        popen_kwargs: dict[str, object] = {}
+        if os.name == "posix":
+            popen_kwargs["start_new_session"] = True
+        try:
+            process = subprocess.Popen(
+                docker_command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env={"PATH": os.environ.get("PATH", "")},
+                **popen_kwargs,
+            )
+            assert process.stdout is not None
+            assert process.stderr is not None
+            stdout_thread = threading.Thread(
+                target=self._read_bounded,
+                args=(process.stdout, stdout_bytes, request.limits.max_output_bytes),
+                daemon=True,
+            )
+            stderr_thread = threading.Thread(
+                target=self._read_bounded,
+                args=(process.stderr, stderr_bytes, request.limits.max_output_bytes),
+                daemon=True,
+            )
+            stdout_thread.start()
+            stderr_thread.start()
+            try:
+                process.wait(timeout=request.limits.timeout_seconds)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                self._terminate_process_tree(process)
+                process.wait()
+                self._stop_container(cid_path)
+            stdout_thread.join()
+            stderr_thread.join()
+        except FileNotFoundError:
+            return SandboxResult(
+                status=SandboxStatus.FAILED,
+                error="Docker is unavailable; isolated execution was refused",
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
+        finally:
+            try:
+                Path(cid_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        stdout = bytes(stdout_bytes).decode("utf-8", errors="replace")
+        stderr = bytes(stderr_bytes).decode("utf-8", errors="replace")
+        if timed_out:
+            return SandboxResult(
+                status=SandboxStatus.TIMEOUT,
+                duration_ms=duration_ms,
+                stdout=stdout,
+                stderr=stderr,
+                error="Container command timed out and was stopped",
+            )
+        assert process is not None
+        status = SandboxStatus.SUCCESS if process.returncode == 0 else SandboxStatus.FAILED
+        return SandboxResult(
+            status=status,
+            exit_code=process.returncode,
+            stdout=stdout,
+            stderr=stderr,
+            duration_ms=duration_ms,
+            error=None if process.returncode == 0 else "Container command failed",
+        )
+
+    @staticmethod
+    def _stop_container(cid_path: str) -> None:
+        """Stop a daemon-side container if its Docker client times out."""
+        try:
+            container_id = Path(cid_path).read_text(encoding="utf-8").strip()
+        except OSError:
+            return
+        if not container_id or not all(
+            char in "0123456789abcdef" for char in container_id.lower()
+        ):
+            return
+        for command in (
+            ["docker", "kill", container_id],
+            ["docker", "rm", "-f", container_id],
+        ):
+            try:
+                subprocess.run(
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                    check=False,
+                    env={"PATH": os.environ.get("PATH", "")},
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+
     def execute_sync(self, request: SandboxRequest) -> SandboxResult:
         if self.mode == "container":
             return self._execute_container(request)
