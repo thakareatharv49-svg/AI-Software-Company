@@ -578,6 +578,9 @@ async def test_test_file_prompt_prioritizes_implementation_over_large_stylesheet
     test_prompt = payloads[-1]["prompt"]
     assert "FILE: app.js" in test_prompt
     assert "function addNote(title)" in test_prompt
+    assert "actual implementation" in test_prompt
+    assert "complete mission-specific interaction" in test_prompt
+    assert "validation/error edge case" in test_prompt
 
 
 @pytest.mark.asyncio
