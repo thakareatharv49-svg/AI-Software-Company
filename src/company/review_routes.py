@@ -34,6 +34,9 @@ from src.github.automation.automation import GitHubAutomation
 from src.github.client.http import GitHubHttpClient
 from src.github.models.contracts import GitHubRepository
 from src.company.github_native.service import GitHubNativeService
+from src.security.models.contracts import SecurityFinding, SecurityScanRequest
+from src.security.models.enums import SecuritySeverity, SecurityStatus
+from src.security.scanning.scanner import SecurityScanner
 
 router = APIRouter(prefix='/api/missions', tags=['product-review'])
 PRODUCTS_ROOT = Path(__file__).resolve().parents[2] / 'generated-products'
@@ -54,6 +57,8 @@ class ProductPreview(BaseModel):
     total_files: int
     total_bytes: int
     artifact_digest: str
+    security_status: str = SecurityStatus.PASSED.value
+    security_findings: list[SecurityFinding] = Field(default_factory=list)
     files: list[ProductPreviewFile]
 
 
@@ -159,6 +164,36 @@ def _artifact_digest(files: dict[str, str]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+_SECURITY_SCANNER = SecurityScanner()
+
+
+def _scan_product_security(mission_id: str, files: dict[str, str]):
+    return _SECURITY_SCANNER.scan(
+        SecurityScanRequest(project_id=mission_id, files=files)
+    )
+
+
+def _assert_artifact_security(mission_id: str, files: dict[str, str]) -> None:
+    result = _scan_product_security(mission_id, files)
+    blocking = [
+        finding for finding in result.findings
+        if finding.severity in {SecuritySeverity.HIGH, SecuritySeverity.CRITICAL}
+    ]
+    if blocking:
+        safe_findings = [
+            f"{finding.rule} at {finding.path}:{finding.line or 1}"
+            for finding in blocking[:20]
+        ]
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Security scan blocked this artifact; fix findings and submit a new revision.",
+                "findings": safe_findings,
+                "total_blocking_findings": len(blocking),
+            },
+        )
+
+
 def _require_current_review_artifact(review: ProductReview, files: dict[str, str]) -> None:
     current_digest = _artifact_digest(files)
     if not review.artifact_digest:
@@ -198,6 +233,7 @@ def preview_generated_product(
         raise HTTPException(status_code=409, detail='Only completed products can be previewed')
     _, files = _workspace_files(mission_id)
     review = _get_review(mission_id, center)
+    security_scan = _scan_product_security(mission_id, files)
     preview_files = [
         ProductPreviewFile(
             path=path,
@@ -214,6 +250,8 @@ def preview_generated_product(
         total_files=len(preview_files),
         total_bytes=sum(item.size_bytes for item in preview_files),
         artifact_digest=_artifact_digest(files),
+        security_status=security_scan.status.value,
+        security_findings=security_scan.findings,
         files=preview_files,
     )
 
@@ -344,6 +382,7 @@ def submit_product_for_review(
     if plan.security_status != 'approved' or not security_evidence:
         raise HTTPException(status_code=409, detail='A successful factory security review is required before human review')
     _, product_files = _workspace_files(mission_id)
+    _assert_artifact_security(mission_id, product_files)
     artifact_digest = _artifact_digest(product_files)
     review = _get_review(mission_id, center)
     try:
@@ -423,6 +462,7 @@ def approve_product(
     review = _get_review(mission_id, center)
     _, product_files = _workspace_files(mission_id)
     _require_current_review_artifact(review, product_files)
+    _assert_artifact_security(mission_id, product_files)
     try:
         updated = approve_review(review)
     except ValueError as exc:
@@ -447,6 +487,7 @@ async def publish_approved_product(
 
     _, files = _workspace_files(mission_id)
     _require_current_review_artifact(review, files)
+    _assert_artifact_security(mission_id, files)
     repository = GitHubRepository(
         owner=settings.github_repository_owner,
         name=_repository_name(job.mission.name, mission_id),
