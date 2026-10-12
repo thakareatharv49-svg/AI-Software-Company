@@ -1,0 +1,5 @@
+title = "AI Software Company secret scan configuration"
+
+[[allowlists]]
+description = "Synthetic secret-pattern tests contain marker strings, never credentials."
+paths = ['''tests/test_secret_scanning\.py''']
