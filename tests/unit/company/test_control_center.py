@@ -373,3 +373,68 @@ def test_continuous_mode_accepts_new_mission_while_another_is_running() -> None:
 
     assert later.status == "queued"
     assert center.mission_job(later.mission.id) is not None
+
+
+def test_emergency_pause_blocks_new_work_and_resume_releases_queue() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    record = center.submit_mission(
+        MissionSubmission(name="Queued before pause", objective="Remain queued safely")
+    )
+
+    paused = center.pause_factory()
+    assert paused["paused"] is True
+    assert center.factory_paused() is True
+    assert paused["active_mission_id"] is None
+
+    with pytest.raises(RuntimeError, match="emergency-paused"):
+        center.submit_mission(
+            MissionSubmission(name="Blocked during pause", objective="Do not start")
+        )
+    with pytest.raises(RuntimeError, match="emergency-paused"):
+        center.enqueue_factory_mission(record.mission.id)
+
+    resumed = center.resume_factory()
+    assert resumed["paused"] is False
+    assert center.factory_paused() is False
+    assert center.submit_mission(
+        MissionSubmission(name="After resume", objective="Allowed again")
+    ).status == "queued"
+
+
+@pytest.mark.asyncio
+async def test_emergency_pause_blocks_factory_execution() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    record = center.submit_mission(
+        MissionSubmission(name="Must not execute", objective="Stay queued")
+    )
+    center.pause_factory()
+
+    with pytest.raises(RuntimeError, match="emergency-paused"):
+        await center.run_factory(max_projects=1, mission_id=record.mission.id)
+
+    assert center.mission_job(record.mission.id).status.value == "queued"
+
+
+def test_factory_pause_and_resume_api() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    app.dependency_overrides[get_control_center] = lambda: center
+    app.dependency_overrides[require_company_owner] = lambda: None
+    try:
+        client = TestClient(app)
+        paused = client.post("/api/factory/pause")
+        assert paused.status_code == 200
+        assert paused.json()["paused"] is True
+        assert client.get("/api/factory/status").json()["paused"] is True
+
+        blocked = client.post(
+            "/api/missions",
+            json={"name": "Paused", "objective": "Should be rejected"},
+        )
+        assert blocked.status_code == 409
+
+        resumed = client.post("/api/factory/resume")
+        assert resumed.status_code == 200
+        assert resumed.json()["paused"] is False
+        assert client.get("/api/factory/status").json()["paused"] is False
+    finally:
+        app.dependency_overrides.clear()
