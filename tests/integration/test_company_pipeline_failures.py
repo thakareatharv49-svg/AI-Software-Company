@@ -190,6 +190,9 @@ async def test_run_end_to_end_recovers_from_transient_failure(tmp_path: Path):
     ]
 
     assert result.project.status.value == "completed"
+    # Transient post-task failures must resume the same project and task plan.
+    assert len(pipeline.project_engine.list()) == 1
+    assert len(pipeline.manager.task_engine.list(project_id=result.project.id)) == 1
 
     assert len(failed_events) == 2
     assert [event.payload["attempt"] for event in failed_events] == [1, 2]
