@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -8,7 +7,6 @@ from fastapi import HTTPException
 
 from src.company.customer_project_routes import ProjectCreate, create_project
 from src.db.models.entitlement import WorkspaceEntitlementModel
-from src.db.models.project import ProjectModel
 from src.db.models.workspace import WorkspaceModel
 
 
