@@ -173,7 +173,11 @@ def _scan_product_security(mission_id: str, files: dict[str, str]):
     )
 
 
-def _assert_artifact_security(mission_id: str, files: dict[str, str]) -> None:
+def _assert_artifact_security(
+    mission_id: str,
+    files: dict[str, str],
+    center: CompanyControlCenter | None = None,
+) -> None:
     result = _scan_product_security(mission_id, files)
     blocking = [
         finding for finding in result.findings
@@ -184,6 +188,19 @@ def _assert_artifact_security(mission_id: str, files: dict[str, str]) -> None:
             f"{finding.rule} at {finding.path}:{finding.line or 1}"
             for finding in blocking[:20]
         ]
+        audit = getattr(center, "_audit", None)
+        if callable(audit):
+            audit(
+                mission_id,
+                "SECURITY_SCAN_BLOCKED",
+                "Generated artifact blocked by security scan",
+                status="blocked",
+                metadata={
+                    "finding_count": len(blocking),
+                    "rules": sorted({finding.rule for finding in blocking}),
+                    "paths": sorted({finding.path for finding in blocking})[:20],
+                },
+            )
         raise HTTPException(
             status_code=409,
             detail={
@@ -382,7 +399,7 @@ def submit_product_for_review(
     if plan.security_status != 'approved' or not security_evidence:
         raise HTTPException(status_code=409, detail='A successful factory security review is required before human review')
     _, product_files = _workspace_files(mission_id)
-    _assert_artifact_security(mission_id, product_files)
+    _assert_artifact_security(mission_id, product_files, center)
     artifact_digest = _artifact_digest(product_files)
     review = _get_review(mission_id, center)
     try:
@@ -487,7 +504,7 @@ async def publish_approved_product(
 
     _, files = _workspace_files(mission_id)
     _require_current_review_artifact(review, files)
-    _assert_artifact_security(mission_id, files)
+    _assert_artifact_security(mission_id, files, center)
     repository = GitHubRepository(
         owner=settings.github_repository_owner,
         name=_repository_name(job.mission.name, mission_id),
