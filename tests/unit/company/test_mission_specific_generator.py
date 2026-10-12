@@ -865,12 +865,12 @@ def test_large_mission_quality_gate_rejects_untraced_requested_workflow() -> Non
         files={
             "main.py": "def main():\n    return True\n",
             "tests/test_notes.py": (
-                "def test_create_note():\n    assert True\n"
-                "def test_edit_note():\n    assert True\n"
-                "def test_search_notes():\n    assert True\n"
-                "def test_pin_note():\n    assert True\n"
-                "def test_storage_persistence():\n    assert True\n"
-                "def test_input_validation():\n    assert True\n"
+                "def test_create_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_edit_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_search_notes():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_pin_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_storage_persistence():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_input_validation():\n    values = [1]\n    assert len(values) == 1\n"
             ),
         },
         test_command=["python", "-m", "pytest", "-q"],
@@ -895,13 +895,13 @@ def test_large_mission_quality_gate_accepts_traced_requested_workflows() -> None
         files={
             "main.py": "def main():\n    return True\n",
             "tests/test_notes.py": (
-                "def test_create_note():\n    assert True\n"
-                "def test_edit_note():\n    assert True\n"
-                "def test_delete_note():\n    assert True\n"
-                "def test_search_notes():\n    assert True\n"
-                "def test_pin_note():\n    assert True\n"
-                "def test_storage_persistence():\n    assert True\n"
-                "def test_input_validation():\n    assert True\n"
+                "def test_create_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_edit_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_delete_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_search_notes():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_pin_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_storage_persistence():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_input_validation():\n    values = [1]\n    assert len(values) == 1\n"
             ),
         },
         test_command=["python", "-m", "pytest", "-q"],
