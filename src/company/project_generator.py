@@ -951,8 +951,19 @@ Requirements:
         # workflows. This is a conservative lexical gate, not proof of behavior;
         # the generated test runner remains the behavioral check.
         if OllamaProjectGenerator._is_large_mission(name, objective):
+            # Keep the traceability delivery gate focused on concrete user
+            # workflows. Persistence, responsive design, and validation remain
+            # useful diagnostics from the analyzer, but their wording varies too
+            # much across legitimate test suites to block otherwise valid output.
+            workflow_features = (
+                "create", "edit/update", "delete/remove", "search", "filter",
+                "pin/favorite", "authentication", "export", "import", "budget",
+                "sorting", "undo/redo",
+            )
             quality_issues.extend(
-                find_uncovered_mission_features(objective, project.files)
+                issue
+                for issue in find_uncovered_mission_features(objective, project.files)
+                if any(f"'{feature}'" in issue for feature in workflow_features)
             )
         quality_issues.extend(find_exposed_secrets(project.files))
         if quality_issues:
