@@ -589,10 +589,10 @@ def test_feature_traceability_ignores_comments_and_helper_names_as_coverage() ->
         objective,
         {
             "tests/test_records.py": (
-                "# test_create_record and test_delete_record are planned here\\n"
-                "def create_record():\\n    return {}\\n"
-                "def delete_record():\\n    return True\\n"
-                "def test_records_are_available():\\n    assert True\\n"
+                "# test_create_record and test_delete_record are planned here\n"
+                "def create_record():\n    return {}\n"
+                "def delete_record():\n    return True\n"
+                "def test_records_are_available():\n    assert True\n"
             ),
         },
     )
@@ -607,7 +607,7 @@ def test_feature_traceability_accepts_named_javascript_test_titles() -> None:
         objective,
         {
             "src/records.spec.mjs": (
-                "test('creates a record', () => { expect(createRecord()).toBeTruthy(); });\\n"
+                "test('creates a record', () => { expect(createRecord()).toBeTruthy(); });\n"
                 "it('deletes a record', () => { expect(deleteRecord()).toBe(true); });"
             ),
         },
