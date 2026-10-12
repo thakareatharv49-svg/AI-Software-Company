@@ -160,7 +160,7 @@ class SandboxExecutor:
             "--security-opt=no-new-privileges", "--pids-limit=64",
             "--memory=512m", "--cpus=1", "--ulimit", "nofile=128:128",
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
-            "--mount", f"type=bind,source={mount_root},target=/workspace,rw",
+            "--mount", f"type=bind,source={mount_root},target=/workspace",
             "--workdir", container_workdir, "--user", uid_gid,
             "--env", "PYTHONDONTWRITEBYTECODE=1",
             "--env", "PYTHONNOUSERSITE=1", "--env", "HOME=/tmp",
