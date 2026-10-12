@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import PurePosixPath
+import posixpath
 import re
 from urllib.parse import unquote, urlsplit
 
@@ -34,7 +35,7 @@ def _local_asset_path(reference: str, owner_path: str) -> str | None:
         resolved = path.lstrip("/")
     else:
         resolved = str(PurePosixPath(owner_path).parent / path)
-    normalized = PurePosixPath(resolved).as_posix()
+    normalized = posixpath.normpath(resolved)
     if normalized.startswith("../") or normalized == "..":
         return None
     return normalized.casefold()
