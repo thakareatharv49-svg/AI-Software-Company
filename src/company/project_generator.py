@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -251,7 +252,7 @@ Rules:
             # Many natural-language missions say "Notes App" or "Finance App"
             # without the words "web" or "browser". Unless an explicit non-browser
             # deliverable above overrides it, treat an app request as browser-first.
-            " app", " apps", "notes app", "note taking app", "note-taking app",
+            "notes app", "note taking app", "note-taking app",
             "expense tracking app",
             "dashboard", "tracker", "planner", "storefront", "e-commerce",
             " ecommerce", "portfolio", "landing page", "management system",
@@ -263,7 +264,7 @@ Rules:
             "responsive app", "responsive application", "software product",
             "build a platform", "create a platform", "platform",
         )
-        return any(term in text for term in browser_terms)
+        return re.search(r"\\bapps?\\b", text) is not None or any(\n            term in text for term in browser_terms\n        )
 
     @staticmethod
     def _is_large_mission(name: str, objective: str) -> bool:
