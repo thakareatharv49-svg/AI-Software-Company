@@ -23,31 +23,34 @@ def _job(mission_id: str, workspace_id: str):
     )
 
 
-def test_customer_mission_list_filters_out_other_workspaces() -> None:
+@pytest.mark.asyncio
+async def test_customer_mission_list_filters_out_other_workspaces() -> None:
     own = _job("mission-own", "workspace-a")
     foreign = _job("mission-foreign", "workspace-b")
     center = SimpleNamespace(mission_jobs=lambda: [own, foreign])
     context = (SimpleNamespace(id="user-a"), SimpleNamespace(id="workspace-a"))
 
-    response = customer_factory_routes.list_customer_missions(context, center)
+    response = await customer_factory_routes.list_customer_missions(context, center)
 
     assert [item["id"] for item in response["items"]] == ["mission-own"]
 
 
-def test_customer_cannot_read_another_workspaces_mission() -> None:
+@pytest.mark.asyncio
+async def test_customer_cannot_read_another_workspaces_mission() -> None:
     foreign = _job("mission-foreign", "workspace-b")
     center = SimpleNamespace(mission_job=lambda _mission_id: foreign)
     context = (SimpleNamespace(id="user-a"), SimpleNamespace(id="workspace-a"))
 
     with pytest.raises(HTTPException) as exc:
-        customer_factory_routes.get_customer_mission(
+        await customer_factory_routes.get_customer_mission(
             "mission-foreign", context, center
         )
 
     assert exc.value.status_code == 404
 
 
-def test_customer_cannot_read_another_workspaces_outputs() -> None:
+@pytest.mark.asyncio
+async def test_customer_cannot_read_another_workspaces_outputs() -> None:
     foreign = _job("mission-foreign", "workspace-b")
     output_calls = []
     center = SimpleNamespace(
@@ -57,7 +60,7 @@ def test_customer_cannot_read_another_workspaces_outputs() -> None:
     context = (SimpleNamespace(id="user-a"), SimpleNamespace(id="workspace-a"))
 
     with pytest.raises(HTTPException) as exc:
-        customer_factory_routes.get_customer_mission_outputs(
+        await customer_factory_routes.get_customer_mission_outputs(
             "mission-foreign", context, center
         )
 
