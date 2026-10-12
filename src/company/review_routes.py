@@ -246,7 +246,7 @@ def live_product_preview_asset(
     job = _get_job(mission_id, center)
     if job.status != MissionJobStatus.COMPLETED:
         raise HTTPException(status_code=409, detail='Only completed products can be previewed')
-    normalized = asset_path.replace('\\\\', '/')
+    normalized = asset_path.replace(chr(92), '/')
     if (
         not normalized
         or normalized.startswith('/')
