@@ -44,9 +44,17 @@ class OllamaProjectGenerator:
         self.max_generated_project_files = configured_limit
 
     def _checkpoint(self, name: str, objective: str) -> GenerationCheckpointStore:
+        # Automatic retries append diagnostic feedback to the objective. Keep the
+        # original mission identity stable so interrupted large-project generation
+        # can resume compatible files instead of starting a second checkpoint.
+        # Owner-requested revisions intentionally remain distinct checkpoints.
+        checkpoint_objective = objective.split(
+            "\n\nAUTOMATIC RECOVERY FEEDBACK FROM THE PREVIOUS ATTEMPT:",
+            maxsplit=1,
+        )[0]
         return GenerationCheckpointStore(
             self.checkpoint_dir,
-            key=f"{name}\0{objective}",
+            key=f"{name}\0{checkpoint_objective}",
         )
 
     async def generate(self, name: str, objective: str) -> GeneratedProject:

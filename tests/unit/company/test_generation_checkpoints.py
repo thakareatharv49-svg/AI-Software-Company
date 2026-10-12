@@ -157,3 +157,29 @@ def test_checkpoint_invalidates_transitive_consumers_of_changed_dependency(tmp_p
     ]
 
     assert store.compatible_files(current_manifest) == {}
+
+
+def test_automatic_retry_feedback_reuses_original_mission_checkpoint(tmp_path) -> None:
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    objective = "Build a clinic management system with appointments and patient records"
+    retry_objective = (
+        objective
+        + "\n\nAUTOMATIC RECOVERY FEEDBACK FROM THE PREVIOUS ATTEMPT:\n"
+        + "QA failed: appointment validation is missing"
+    )
+
+    original = generator._checkpoint("Clinic Management System", objective)
+    retried = generator._checkpoint("Clinic Management System", retry_objective)
+
+    assert retried.key_hash == original.key_hash
+
+
+def test_owner_requested_revision_uses_a_distinct_checkpoint(tmp_path) -> None:
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    objective = "Build a clinic management system"
+    revision = objective + "\n\nOWNER-REQUESTED REVISION FEEDBACK:\nAdd billing"
+
+    original = generator._checkpoint("Clinic Management System", objective)
+    revised = generator._checkpoint("Clinic Management System", revision)
+
+    assert revised.key_hash != original.key_hash
