@@ -59,3 +59,12 @@ def test_explicit_frontend_only_exclusion_overrides_backend_terms():
         "Build a frontend-only expense tracker without a backend or API"
     )
 
+
+
+def test_appointment_api_is_not_misclassified_as_a_browser_app():
+    assert not OllamaProjectGenerator._is_browser_mission(
+        "Appointment Service API: Build a REST API for managing appointments"
+    )
+    assert OllamaProjectGenerator._is_browser_mission(
+        "Notes App: create and search notes in a browser"
+    )
