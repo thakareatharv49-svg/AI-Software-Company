@@ -363,6 +363,44 @@ async function renderReviewPanel(root, id, job) {
   }
 }
 
+function renderMissionDiagnostics(root, job) {
+  const plan = job && job.plan && typeof job.plan === "object" ? job.plan : {};
+  const hasDiagnostics = [
+    "generation_model_calls", "generation_duration_ms",
+    "generation_prompt_tokens", "generation_output_tokens",
+    "qa_status", "security_status"
+  ].some(key => plan[key] !== null && plan[key] !== undefined);
+  if (!hasDiagnostics) return;
+
+  const panel = document.createElement("section");
+  panel.className = "event";
+  const heading = document.createElement("h3");
+  heading.textContent = "Generation & QA diagnostics";
+  panel.append(heading);
+
+  const seconds = value => Number.isFinite(value) ? (value / 1000).toFixed(1) + " s" : "—";
+  const rows = [
+    ["Generation model calls", plan.generation_model_calls],
+    ["Generation duration", plan.generation_duration_ms == null ? null : seconds(plan.generation_duration_ms)],
+    ["Prompt tokens", plan.generation_prompt_tokens],
+    ["Generated tokens", plan.generation_output_tokens],
+    ["QA runner status", plan.qa_status],
+    ["QA exit code", plan.qa_exit_code],
+    ["QA duration", plan.qa_duration_ms == null ? null : seconds(plan.qa_duration_ms)],
+    ["QA command", Array.isArray(plan.qa_command) ? plan.qa_command.join(" ") : null],
+    ["Security review", plan.security_status],
+    ["Security summary", plan.security_summary]
+  ];
+  for (const [label, value] of rows) {
+    if (value === null || value === undefined || value === "") continue;
+    const row = document.createElement("p");
+    row.className = "muted";
+    row.textContent = label + ": " + String(value);
+    panel.append(row);
+  }
+  root.append(panel);
+}
+
 async function showMission(id) {
   selectedMissionId = id;
   const details = $("details");
@@ -502,6 +540,7 @@ async function showMission(id) {
       root.append(e);
     }
 
+    renderMissionDiagnostics(root, job);
     if (job.status === "completed") {
       await renderReviewPanel(root, id, job);
     }
