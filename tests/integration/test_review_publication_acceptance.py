@@ -100,9 +100,9 @@ async def test_publication_requires_approved_current_artifact_and_publishes_that
     published = await publish_approved_product(mission_id, center)
 
     assert published.status == ReviewStatus.PUBLISHED
-    assert published.repository_url == "https://github.com/test-owner/expense-tracker"
+    assert published.repository_url == "https://github.com/test-owner/Expense-Tracker-approved"
     assert len(calls) == 1
     owner, repository, branch, delivered_files, message = calls[0]
-    assert (owner, repository, branch) == ("test-owner", "expense-tracker", "main")
+    assert (owner, repository, branch) == ("test-owner", "Expense-Tracker-approved", "main")
     assert delivered_files == files
     assert "approved" in message
