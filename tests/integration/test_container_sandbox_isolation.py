@@ -20,7 +20,7 @@ def test_container_hides_host_secrets_and_has_no_network(tmp_path: Path, monkeyp
 
     code = (
         "import os, socket\n"
-        "print(\"EUID\", os.geteuid() if hasattr(os, \"geteuid\") else \"unavailable\")\\n"
+        "print(\"EUID\", os.geteuid() if hasattr(os, \"geteuid\") else \"unavailable\")\n"
         "try:\n"
         f" open({str(outside_secret)!r}, encoding='utf-8').read()\n"
         " print('HOST_FILE_VISIBLE')\n"
