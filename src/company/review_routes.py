@@ -336,8 +336,6 @@ def submit_product_for_review(
     job = _get_job(mission_id, center)
     if job.status != MissionJobStatus.COMPLETED:
         raise HTTPException(status_code=409, detail='Only a completed, QA-checked product can enter human review')
-    _, product_files = _workspace_files(mission_id)
-    artifact_digest = _artifact_digest(product_files)
     plan = job.plan
     qa_evidence = plan.qa_evidence
     security_evidence = plan.security_evidence
@@ -345,6 +343,8 @@ def submit_product_for_review(
         raise HTTPException(status_code=409, detail='A successful factory QA run is required before review')
     if plan.security_status != 'approved' or not security_evidence:
         raise HTTPException(status_code=409, detail='A successful factory security review is required before human review')
+    _, product_files = _workspace_files(mission_id)
+    artifact_digest = _artifact_digest(product_files)
     review = _get_review(mission_id, center)
     try:
         updated = prepare_review(
