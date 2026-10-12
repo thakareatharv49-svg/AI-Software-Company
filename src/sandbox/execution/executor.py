@@ -1,9 +1,11 @@
 import asyncio
+import io
 import os
 import signal
 import subprocess
 import sys
 import tempfile
+import tarfile
 import threading
 import time
 from pathlib import Path
@@ -109,6 +111,30 @@ class SandboxExecutor:
                 output.extend(chunk[:remaining])
 
     @staticmethod
+    def _workspace_archive(root: Path, max_bytes: int = 512 * 1024 * 1024) -> bytes:
+        """Create a bounded archive of regular workspace files, rejecting symlinks."""
+        root = root.resolve()
+        archive = io.BytesIO()
+        total_bytes = 0
+        with tarfile.open(fileobj=archive, mode="w") as tar:
+            for path in sorted(root.rglob("*")):
+                if path.is_symlink():
+                    raise PermissionError("Sandbox workspace contains a symbolic link")
+                resolved = path.resolve()
+                try:
+                    relative = resolved.relative_to(root)
+                except ValueError as exc:
+                    raise PermissionError("Workspace entry escapes the sandbox root") from exc
+                if path.is_file():
+                    total_bytes += path.stat().st_size
+                    if total_bytes > max_bytes:
+                        raise ValueError("Sandbox workspace exceeds the 512 MiB staging limit")
+                elif not path.is_dir():
+                    raise PermissionError("Sandbox workspace contains a special file")
+                tar.add(path, arcname=relative.as_posix(), recursive=False)
+        return archive.getvalue()
+
+    @staticmethod
     def _terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
         """Kill the POSIX process group; fall back to terminating the direct child."""
         if process.poll() is not None:
@@ -197,29 +223,19 @@ class SandboxExecutor:
                     duration_ms=int((time.perf_counter() - started) * 1000),
                 )
             container_id = Path(cid_path).read_text(encoding="utf-8").strip()
-            source_path = str(mount_root) + os.sep + "."
-            copied = subprocess.run(
-                ["docker", "cp", "--archive", source_path, f"{container_id}:/tmp/"],
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-                env=cli_env,
-            )
-            if copied.returncode != 0:
+            try:
+                workspace_archive = self._workspace_archive(mount_root)
+            except (OSError, ValueError, PermissionError) as exc:
                 return SandboxResult(
                     status=SandboxStatus.FAILED,
-                    stderr=(copied.stderr or copied.stdout or "")[:2000],
-                    error="Could not stage the project into the bounded sandbox workspace",
+                    error=f"Workspace staging refused: {type(exc).__name__}",
                     duration_ms=int((time.perf_counter() - started) * 1000),
                 )
             staged = subprocess.run(
-                ["docker", "exec", container_id, "cp", "-a", "/tmp/.", "/workspace/"],
-                stdin=subprocess.DEVNULL,
+                ["docker", "exec", "-i", container_id, "tar", "-x", "-C", "/workspace"],
+                input=workspace_archive,
                 capture_output=True,
-                text=True,
-                timeout=30,
+                timeout=120,
                 check=False,
                 env=cli_env,
             )
@@ -227,7 +243,7 @@ class SandboxExecutor:
                 return SandboxResult(
                     status=SandboxStatus.FAILED,
                     stderr=(staged.stderr or staged.stdout or "")[:2000],
-                    error="Could not copy staged project into the bounded sandbox workspace",
+                    error="Could not stage project into the bounded sandbox workspace",
                     duration_ms=int((time.perf_counter() - started) * 1000),
                 )
 
