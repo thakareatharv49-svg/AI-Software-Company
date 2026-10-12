@@ -202,7 +202,9 @@ class MissionExecutionPipeline:
         if not result.success:
             step.status = "failed"
             step.detail = (
-                f"Failed after {max_attempts} attempt(s): {last_error}"
+                last_error
+                if max_attempts == 1
+                else f"Failed after {max_attempts} attempt(s): {last_error}"
             )
             self.orchestrator.block(step.detail)
             self.orchestrator.events.publish(
