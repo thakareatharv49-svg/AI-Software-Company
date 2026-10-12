@@ -132,6 +132,10 @@ class MissionExecutionPipeline:
                         "mission_objective": mission.objective,
                         "constraints": mission.constraints,
                         "acceptance_criteria": plan.acceptance_criteria,
+                        "engineering_tasks": [
+                            task.model_dump(mode="json")
+                            for task in plan.engineering_tasks
+                        ],
                         "assigned_specialist": step.agent_role,
                         "dependencies": step.depends_on,
                         "stage": step.stage.value,

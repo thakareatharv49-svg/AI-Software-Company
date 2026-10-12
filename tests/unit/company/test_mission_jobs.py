@@ -146,3 +146,31 @@ def test_mission_plan_captures_acceptance_criteria_and_specialist_dependencies()
     assert steps["github"].depends_on == ["qa", "security"]
     assert steps["execution"].agent_role == "software_engineer"
     assert steps["qa"].agent_role == "test_engineer"
+
+
+
+def test_large_mission_breaks_each_acceptance_criterion_into_traceable_tasks() -> None:
+    mission = CompanyMission(
+        name="Project Hub",
+        objective="Create projects. Assign tasks; track progress.",
+        constraints=["Keep user data private"],
+    )
+    plan = build_mission_plan(mission)
+
+    assert len(plan.acceptance_criteria) == 4
+    assert len(plan.engineering_tasks) == len(plan.acceptance_criteria) * 3
+    tasks = {task.id: task for task in plan.engineering_tasks}
+
+    for index, requirement in enumerate(plan.acceptance_criteria, start=1):
+        prefix = f"req-{index:03d}"
+        design = tasks[f"{prefix}-design"]
+        implementation = tasks[f"{prefix}-implementation"]
+        verification = tasks[f"{prefix}-verification"]
+
+        assert design.requirement == requirement
+        assert design.depends_on == []
+        assert implementation.depends_on == [design.id]
+        assert verification.depends_on == [implementation.id]
+        assert verification.agent_role == "test_engineer"
+        assert requirement in verification.acceptance_check
+        assert {design.status, implementation.status, verification.status} == {"planned"}
