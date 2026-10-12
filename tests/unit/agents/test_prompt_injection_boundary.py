@@ -81,3 +81,35 @@ def test_tool_call_count_is_bounded_before_execution() -> None:
         )
 
     assert tool_executor.calls == []
+
+
+def test_oversized_untrusted_context_is_rejected_before_tool_side_effects() -> None:
+    tool_executor = CountingToolExecutor()
+    executor = AgentExecutor(runtime=object(), tool_executor=tool_executor)
+    request = AgentRequest(
+        task_id="oversized-context",
+        instruction="Process repository data",
+        context={
+            "tool_name": "echo",
+            "tool_arguments": {"text": "x" * executor.MAX_CONTEXT_BYTES},
+        },
+    )
+
+    result = asyncio.run(executor.execute(_context(), request))
+
+    assert result.success is False
+    assert result.error == "Context exceeds the allowed size"
+    assert tool_executor.calls == []
+
+
+def test_oversized_instruction_is_rejected_before_runtime_call() -> None:
+    executor = AgentExecutor(runtime=object())
+    request = AgentRequest(
+        task_id="oversized-instruction",
+        instruction="x" * (executor.MAX_INSTRUCTION_BYTES + 1),
+    )
+
+    result = asyncio.run(executor.execute(_context(), request))
+
+    assert result.success is False
+    assert result.error == "Instruction exceeds the allowed size"

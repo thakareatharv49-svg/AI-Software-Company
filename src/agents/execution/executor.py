@@ -14,6 +14,8 @@ from src.tools.models.contracts import ToolRequest
 class AgentExecutor:
     MAX_TOOL_CALLS_PER_RESPONSE = 10
     MAX_TOOL_ARGUMENT_BYTES = 16_384
+    MAX_INSTRUCTION_BYTES = 16_384
+    MAX_CONTEXT_BYTES = 65_536
 
     def __init__(
         self,
@@ -46,6 +48,38 @@ class AgentExecutor:
                 agent_name=context.agent.name,
                 success=False,
                 error="Instruction cannot be empty",
+            )
+
+        if len(instruction.encode("utf-8")) > self.MAX_INSTRUCTION_BYTES:
+            return AgentResult(
+                task_id=request.task_id,
+                agent_name=context.agent.name,
+                success=False,
+                error="Instruction exceeds the allowed size",
+            )
+
+        try:
+            context_size = len(
+                json.dumps(
+                    request.context,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    default=str,
+                ).encode("utf-8")
+            )
+        except (TypeError, ValueError):
+            return AgentResult(
+                task_id=request.task_id,
+                agent_name=context.agent.name,
+                success=False,
+                error="Context must be serializable",
+            )
+        if context_size > self.MAX_CONTEXT_BYTES:
+            return AgentResult(
+                task_id=request.task_id,
+                agent_name=context.agent.name,
+                success=False,
+                error="Context exceeds the allowed size",
             )
 
         tool_result = self._execute_requested_tool(
