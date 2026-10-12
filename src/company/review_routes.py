@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -194,17 +194,18 @@ def preview_generated_product(
 
 
 _PREVIEW_CSP = (
-    "sandbox allow-scripts; default-src 'self' data: blob:; "
-    "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; "
+    "sandbox allow-scripts; default-src 'none'; "
+    "script-src {origin} 'unsafe-inline'; style-src {origin} 'unsafe-inline'; "
+    "img-src {origin} data: blob:; font-src {origin} data:; connect-src 'none'; "
     "frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
 )
 
 
-def _preview_headers() -> dict[str, str]:
+def _preview_headers(request: Request) -> dict[str, str]:
     """Headers for an untrusted generated page served in a browser sandbox."""
+    origin = str(request.base_url).rstrip('/')
     return {
-        "Content-Security-Policy": _PREVIEW_CSP,
+        "Content-Security-Policy": _PREVIEW_CSP.format(origin=origin),
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "no-referrer",
         "Cache-Control": "no-store",
@@ -212,9 +213,10 @@ def _preview_headers() -> dict[str, str]:
     }
 
 
-@router.get('/{mission_id}/review/live-preview', response_class=HTMLResponse)
+@router.get('/{mission_id}/review/live-preview/', response_class=HTMLResponse)
 def live_product_preview(
     mission_id: str,
+    request: Request,
     center: Annotated[CompanyControlCenter, Depends(get_control_center)],
 ) -> HTMLResponse:
     """Render a generated static web app under a restrictive browser CSP sandbox."""
@@ -228,13 +230,14 @@ def live_product_preview(
             status_code=422,
             detail='Live preview requires a root index.html entry point',
         )
-    return HTMLResponse(content=html, headers=_preview_headers())
+    return HTMLResponse(content=html, headers=_preview_headers(request))
 
 
 @router.get('/{mission_id}/review/live-preview/{asset_path:path}')
 def live_product_preview_asset(
     mission_id: str,
     asset_path: str,
+    request: Request,
     center: Annotated[CompanyControlCenter, Depends(get_control_center)],
 ) -> Response:
     """Serve a safe text asset to the isolated preview without exposing host files."""
@@ -255,7 +258,7 @@ def live_product_preview_asset(
     if content is None:
         raise HTTPException(status_code=404, detail='Preview asset not found')
     media_type = mimetypes.guess_type(normalized)[0] or 'text/plain'
-    return Response(content=content, media_type=media_type, headers=_preview_headers())
+    return Response(content=content, media_type=media_type, headers=_preview_headers(request))
 
 
 @router.post('/{mission_id}/review/submit', response_model=ProductReview)
