@@ -1851,6 +1851,13 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
         started_at = time.perf_counter()
         outcome = "error"
         response_chars = 0
+        server_metrics: dict[str, int | None] = {
+            "ollama_load_ms": None,
+            "prompt_eval_ms": None,
+            "generation_ms": None,
+            "prompt_tokens": None,
+            "generated_tokens": None,
+        }
         try:
             try:
                 async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
@@ -1860,6 +1867,23 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
                     )
                     response.raise_for_status()
                     data = response.json()
+                    if isinstance(data, dict):
+                        # Ollama reports phase durations in nanoseconds. Keep only
+                        # numeric aggregates; never log prompts or generated text.
+                        for source_key, log_key in (
+                            ("load_duration", "ollama_load_ms"),
+                            ("prompt_eval_duration", "prompt_eval_ms"),
+                            ("eval_duration", "generation_ms"),
+                            ("prompt_eval_count", "prompt_tokens"),
+                            ("eval_count", "generated_tokens"),
+                        ):
+                            value = data.get(source_key)
+                            if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+                                server_metrics[log_key] = (
+                                    round(value / 1_000_000)
+                                    if source_key.endswith("_duration")
+                                    else int(value)
+                                )
             except httpx.TimeoutException as exc:
                 raise RuntimeError(
                     "Ollama project generation timed out after "
@@ -1896,12 +1920,19 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
             # without leaking mission content into application logs.
             logger.info(
                 "ollama_generation_request model=%s duration_seconds=%.3f "
-                "prompt_chars=%d response_chars=%d outcome=%s",
+                "prompt_chars=%d response_chars=%d outcome=%s "
+                "ollama_load_ms=%s prompt_eval_ms=%s generation_ms=%s "
+                "prompt_tokens=%s generated_tokens=%s",
                 model,
                 time.perf_counter() - started_at,
                 prompt_chars,
                 response_chars,
                 outcome,
+                server_metrics["ollama_load_ms"],
+                server_metrics["prompt_eval_ms"],
+                server_metrics["generation_ms"],
+                server_metrics["prompt_tokens"],
+                server_metrics["generated_tokens"],
             )
 
     def _parse(self, response: str) -> GeneratedProject:
