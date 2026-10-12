@@ -146,14 +146,20 @@ def test_live_preview_supports_nested_frontend_and_shared_assets(monkeypatch):
     monkeypatch.setattr(review_routes, "_workspace_files", lambda mission_id: (None, files))
 
     response = review_routes.live_product_preview("mission-123", _request(), None)
-    assert response.status_code == 200
-    assert "style.css" in response.body.decode()
+    assert response.status_code == 307
+    assert response.headers["location"].endswith("/live-preview/frontend/")
+
+    nested_page = review_routes.live_product_preview_asset(
+        "mission-123", "frontend/", _request(), None
+    )
+    assert nested_page.status_code == 200
+    assert "style.css" in nested_page.body.decode()
 
     nested_asset = review_routes.live_product_preview_asset(
-        "mission-123", "style.css", _request(), None
+        "mission-123", "frontend/style.css", _request(), None
     )
     shared_asset = review_routes.live_product_preview_asset(
-        "mission-123", "../shared.js", _request(), None
+        "mission-123", "shared.js", _request(), None
     )
     assert nested_asset.body.decode() == "body { color: navy; }"
     assert shared_asset.body.decode() == "console.log('shared');"
