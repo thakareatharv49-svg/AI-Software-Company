@@ -1,10 +1,13 @@
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     app_name: str = "AI Software Developer"
-    environment: str = "development"
+    environment: str = Field(
+        default="development",
+        validation_alias=AliasChoices("ENVIRONMENT", "COMPANY_ENV"),
+    )
     debug: bool = True
     log_level: str = "INFO"
     # Explicit opt-in for a single-user local instance; never enabled by default.
@@ -17,6 +20,10 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
     ollama_timeout: float = 600.0
+
+    # Untrusted generated code must use the isolated backend outside development.
+    sandbox_mode: str = "host"
+    sandbox_container_image: str = "ai-software-company-sandbox:latest"
 
     # Hard cap protects local model context, disk usage, and generation time.
     factory_max_generated_project_files: int = Field(default=40, ge=4, le=200)
@@ -60,6 +67,14 @@ class Settings(BaseSettings):
             raise ValueError("NEXORA_HQ_STATUS_TOKEN must contain at least 32 characters")
         return value
 
+    @field_validator("sandbox_mode")
+    @classmethod
+    def validate_sandbox_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"host", "container"}:
+            raise ValueError("SANDBOX_MODE must be 'host' or 'container'")
+        return normalized
+
     @model_validator(mode="after")
     def validate_production_cookie_security(self) -> "Settings":
         if self.environment.strip().lower() in {"production", "prod", "staging"}:
@@ -71,12 +86,17 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "PUBLIC_BASE_URL must use HTTPS outside development"
                 )
+            if self.sandbox_mode != "container":
+                raise ValueError(
+                    "SANDBOX_MODE must be container outside development"
+                )
         return self
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
 
