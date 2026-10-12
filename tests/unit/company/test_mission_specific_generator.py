@@ -851,3 +851,60 @@ def test_simple_single_workflow_stays_on_small_mission_path() -> None:
         "Unit Converter",
         "Build a simple unit converter.",
     )
+
+
+
+def test_large_mission_quality_gate_rejects_untraced_requested_workflow() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    objective = (
+        "Create, edit, delete, search and pin notes with persistent local storage "
+        "and input validation."
+    )
+    project = GeneratedProject(
+        files={
+            "main.py": "def main():\n    return True\n",
+            "tests/test_notes.py": (
+                "def test_create_note():\n    assert True\n"
+                "def test_edit_note():\n    assert True\n"
+                "def test_search_notes():\n    assert True\n"
+                "def test_pin_note():\n    assert True\n"
+                "def test_storage_persistence():\n    assert True\n"
+                "def test_input_validation():\n    assert True\n"
+            ),
+        },
+        test_command=["python", "-m", "pytest", "-q"],
+    )
+
+    try:
+        OllamaProjectGenerator._validate_mission_output("Notes Manager", objective, project)
+    except RuntimeError as exc:
+        assert "delete/remove" in str(exc)
+    else:
+        raise AssertionError("Large missions must trace requested delete behavior in tests")
+
+
+def test_large_mission_quality_gate_accepts_traced_requested_workflows() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    objective = (
+        "Create, edit, delete, search and pin notes with persistent local storage "
+        "and input validation."
+    )
+    project = GeneratedProject(
+        files={
+            "main.py": "def main():\n    return True\n",
+            "tests/test_notes.py": (
+                "def test_create_note():\n    assert True\n"
+                "def test_edit_note():\n    assert True\n"
+                "def test_delete_note():\n    assert True\n"
+                "def test_search_notes():\n    assert True\n"
+                "def test_pin_note():\n    assert True\n"
+                "def test_storage_persistence():\n    assert True\n"
+                "def test_input_validation():\n    assert True\n"
+            ),
+        },
+        test_command=["python", "-m", "pytest", "-q"],
+    )
+
+    OllamaProjectGenerator._validate_mission_output("Notes Manager", objective, project)
