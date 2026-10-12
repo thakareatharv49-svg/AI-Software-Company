@@ -391,10 +391,10 @@ def test_accepts_test_traceability_for_requested_product_workflows() -> None:
         objective,
         {
             "tests/test_notes.py": (
-                "def test_create_note(): pass\\n"
+                "def test_create_note(): pass\n"
                 "def test_update_note(): pass\n"
                 "def test_delete_note(): pass\n"
-                "def test_search_notes(): pass\\n"
+                "def test_search_notes(): pass\n"
                 "def test_localstorage_persistence(): pass\n"
                 "def test_validation_rejects_invalid_note(): pass\n"
             ),
