@@ -343,7 +343,7 @@ def find_uncovered_mission_features(
     )
 
     def is_test_path(path: str) -> bool:
-        normalized = path.replace("\\\\", "/").casefold()
+        normalized = path.replace("\\", "/").casefold()
         filename = normalized.rsplit("/", 1)[-1]
         in_test_directory = (
             normalized.startswith(("tests/", "__tests__/"))
@@ -359,11 +359,11 @@ def find_uncovered_mission_features(
 
     test_cases: list[str] = []
     python_test_name = re.compile(
-        r"^\\s*(?:async\\s+)?def\\s+(test_[A-Za-z0-9_]+)\\s*\\(",
+        r"^\s*(?:async\s+)?def\s+(test_[A-Za-z0-9_]+)\s*\(",
         re.MULTILINE,
     )
     javascript_test_title = re.compile(
-        r"""\\b(?:test|it)\\s*\\(\\s*(['"`])([^'"`]+)\\1""",
+        r"""\b(?:test|it)\s*\(\s*(['"`])([^'"`]+)\1""",
         re.IGNORECASE,
     )
     for path, content in files.items():
