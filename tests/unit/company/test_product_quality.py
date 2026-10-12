@@ -372,8 +372,8 @@ def test_detects_requested_features_missing_from_generated_tests() -> None:
         objective,
         {
             "tests/test_notes.py": (
-                "def test_create_note(): pass\\n"
-                "def test_search_notes(): pass\\n"
+                "def test_create_note(): pass\n"
+                "def test_search_notes(): pass\n"
             ),
         },
     )
@@ -391,12 +391,12 @@ def test_accepts_test_traceability_for_requested_product_workflows() -> None:
         objective,
         {
             "tests/test_notes.py": (
-                "def test_create_note(): pass\\n"
-                "def test_update_note(): pass\\n"
-                "def test_delete_note(): pass\\n"
-                "def test_search_notes(): pass\\n"
-                "def test_localstorage_persistence(): pass\\n"
-                "def test_validation_rejects_invalid_note(): pass\\n"
+                "def test_create_note(): pass\n"
+                "def test_update_note(): pass\n"
+                "def test_delete_note(): pass\n"
+                "def test_search_notes(): pass\n"
+                "def test_localstorage_persistence(): pass\n"
+                "def test_validation_rejects_invalid_note(): pass\n"
             ),
         },
     )
@@ -461,7 +461,7 @@ def test_feature_traceability_does_not_treat_source_helpers_as_tests() -> None:
     issues = find_uncovered_mission_features(
         objective,
         {
-            "src/test_helpers.js": "function createRecord() {} function deleteRecord() {}",
+            "tests/test_records.py": "def createRecord(): pass; def deleteRecord(): pass",
             "src/records.js": "export function createRecord() {} export function deleteRecord() {}",
         },
     )
@@ -576,6 +576,39 @@ def test_feature_traceability_accepts_covered_extended_workflows() -> None:
                 "def test_responsive_mobile_layout(): pass\n"
                 "def test_notifications(): pass\n"
                 "def test_undo_last_change(): pass\n"
+            ),
+        },
+    )
+
+    assert issues == []
+
+
+def test_feature_traceability_ignores_comments_and_helper_names_as_coverage() -> None:
+    objective = "Create and delete records."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "tests/test_records.py": (
+                "# test_create_record and test_delete_record are planned here\n"
+                "def create_record():\n    return {}\n"
+                "def delete_record():\n    return True\n"
+                "def test_records_are_available():\n    assert True\n"
+            ),
+        },
+    )
+
+    assert any("create" in issue for issue in issues)
+    assert any("delete/remove" in issue for issue in issues)
+
+
+def test_feature_traceability_accepts_named_javascript_test_titles() -> None:
+    objective = "Create and delete records."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "src/records.spec.mjs": (
+                "test('creates a record', () => { expect(createRecord()).toBeTruthy(); });\n"
+                "it('deletes a record', () => { expect(deleteRecord()).toBe(true); });"
             ),
         },
     )

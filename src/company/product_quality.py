@@ -235,9 +235,9 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
 # Objective keywords are mapped to common implementation/test vocabulary. This is a
 # traceability guard, not a substitute for executing tests or reviewing behavior.
 _MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
-    ("create", {"create", "add", "insert", "crud"}, {"create", "add", "insert", "crud"}),
+    ("create", {"create", "creates", "add", "insert", "crud"}, {"create", "creates", "add", "insert", "crud"}),
     ("edit/update", {"edit", "update", "modify", "crud"}, {"edit", "update", "modify", "crud"}),
-    ("delete/remove", {"delete", "remove", "destroy", "crud"}, {"delete", "remove", "destroy", "crud"}),
+    ("delete/remove", {"delete", "deletes", "remove", "destroy", "crud"}, {"delete", "deletes", "remove", "destroy", "crud"}),
     ("search", {"search", "find", "query"}, {"search", "find", "query"}),
     ("filter", {"filter"}, {"filter"}),
     ("pin/favorite", {"pin", "favorite", "favourite", "star"}, {"pin", "favorite", "favourite", "star"}),
@@ -322,10 +322,12 @@ def find_uncovered_mission_features(
     objective: str,
     files: Mapping[str, str],
 ) -> list[str]:
-    """Find explicit mission features with no lexical trace in generated tests.
+    """Require each requested workflow to appear in an actual test case name/title.
 
-    The check intentionally limits itself to concrete workflow features. It does
-    not claim that a keyword proves behavior; generated tests still run separately.
+    This is a lightweight traceability guard, not proof that a test behaves
+    correctly. The separate weak-test checks and test runner validate test bodies.
+    Restricting evidence to test names/titles avoids counting comments, imports,
+    fixtures, or unrelated helper functions as coverage for a mission feature.
     """
     def words(text: str) -> set[str]:
         return set(re.findall(r"[a-z]+", text.casefold()))
@@ -350,29 +352,47 @@ def find_uncovered_mission_features(
         )
         return (
             in_test_directory
-            or filename.startswith("test_")
+            or (filename.startswith("test_") and filename.endswith(".py"))
             or filename.endswith("_test.py")
             or filename.endswith(javascript_test_suffixes)
         )
 
-    test_content = " ".join(
-        content for path, content in files.items() if is_test_path(path)
+    test_cases: list[str] = []
+    saw_test_path = False
+    python_test_name = re.compile(
+        r"\b(?:async\s+)?def\s+(test_[A-Za-z0-9_]+)\s*\(",
     )
-    if not test_content:
-        return []  # Missing-test policy reports this separately.
+    javascript_test_title = re.compile(
+        r"""\b(?:test|it)\s*\(\s*(['\"`])([^'\"`]+)\1""",
+        re.IGNORECASE,
+    )
+    for path, content in files.items():
+        if not is_test_path(path):
+            continue
+        saw_test_path = True
+        python_content = re.sub(r"(?m)#.*$", "", content)
+        test_cases.extend(
+            match.group(1) for match in python_test_name.finditer(python_content)
+        )
+        test_cases.extend(match.group(2) for match in javascript_test_title.finditer(content))
 
-    test_words = words(test_content)
+    # If no test module exists at all, let the dedicated missing-test gate
+    # report that primary problem. If a test module exists but names no cases,
+    # continue so requested features are reported as uncovered.
+    if not test_cases and not saw_test_path:
+        return []
+
     issues: list[str] = []
     for feature, objective_aliases, test_aliases in _MISSION_FEATURES:
         if not objective_words.intersection(objective_aliases):
             continue
-        if not test_words.intersection(test_aliases):
+        has_named_case = any(words(case).intersection(test_aliases) for case in test_cases)
+        if not has_named_case:
             issues.append(
-                f"Mission explicitly requests '{feature}', but generated tests contain "
-                "no corresponding feature reference. Add a behavioral test for this workflow."
+                f"Mission explicitly requests '{feature}', but no generated test case "
+                "name or title identifies this workflow. Add a clearly named behavioral test."
             )
     return issues
-
 
 def find_missing_product_tests(files: Mapping[str, str]) -> list[str]:
     """Require at least one conventional automated test module for broad projects.
@@ -437,3 +457,36 @@ def find_exposed_secrets(files: Mapping[str, str]) -> list[str]:
                     "Remove the credential and load secrets from environment/configuration."
                 )
     return issues
+
+
+def test_feature_traceability_ignores_comments_and_helper_names_as_coverage() -> None:
+    objective = "Create and delete records."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "tests/test_records.py": (
+                "# test_create_record and test_delete_record are planned here\\n"
+                "def create_record():\\n    return {}\\n"
+                "def delete_record():\\n    return True\\n"
+                "def test_records_are_available():\\n    assert True\\n"
+            ),
+        },
+    )
+
+    assert any("create" in issue for issue in issues)
+    assert any("delete/remove" in issue for issue in issues)
+
+
+def test_feature_traceability_accepts_named_javascript_test_titles() -> None:
+    objective = "Create and delete records."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "src/records.spec.mjs": (
+                "test('creates a record', () => { expect(createRecord()).toBeTruthy(); });\\n"
+                "it('deletes a record', () => { expect(deleteRecord()).toBe(true); });"
+            ),
+        },
+    )
+
+    assert issues == []
