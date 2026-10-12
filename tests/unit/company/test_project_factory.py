@@ -1097,7 +1097,7 @@ def test_factory_recovers_interrupted_running_projects_as_queued() -> None:
             }]
 
         def save(self, project):
-            saved.append(project.model_copy(deep=True))
+            saved.append((project.status, [step.status for step in project.plan.steps]))
 
     factory = ProjectFactory(orchestrator, controller, pipeline, store=Store())
 
@@ -1108,4 +1108,4 @@ def test_factory_recovers_interrupted_running_projects_as_queued() -> None:
     assert recovered.plan.steps[0].detail == "Research completed"
     assert recovered.plan.steps[1].status == "planned"
     assert recovered.plan.steps[1].detail is None
-    assert saved and saved[-1].status == "queued"
+    assert saved and saved[-1][0] == "queued"
