@@ -48,15 +48,16 @@ class AutonomousProjectRequest:
     tasks: tuple[TaskPlanItem, ...]
     qa_request: QATestRequest
     files: dict[str, str]
-    generation_model_calls: int = 0
-    generation_duration_ms: int = 0
-    generation_prompt_tokens: int = 0
-    generation_output_tokens: int = 0
     agent_executor: Callable[..., Any] | None = None
     repair_agent_executor: Callable[..., Any] | None = None
     github_repository: GitHubRepository | None = None
     pull_request_head: str | None = None
     stage_callback: Callable[[str, str, str], None] | None = None
+    # Keep new optional telemetry fields last to preserve legacy positional callers.
+    generation_model_calls: int = 0
+    generation_duration_ms: int = 0
+    generation_prompt_tokens: int = 0
+    generation_output_tokens: int = 0
 
     @classmethod
     def model_construct(cls, **values: object) -> AutonomousProjectRequest:
