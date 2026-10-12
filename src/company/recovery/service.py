@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import re
 
 
 @dataclass(slots=True, frozen=True)
@@ -10,6 +11,7 @@ class RecoveryResult:
     stage: str | None = None
     error_type: str = "Exception"
     error_message: str = ""
+    repeated_failure: bool = False
 
 
 class RecoveryService:
@@ -21,6 +23,7 @@ class RecoveryService:
         self.max_attempts = max_attempts
         self._attempts: dict[str, int] = {}
         self._failures: list[RecoveryResult] = []
+        self._last_error_signature: dict[str, tuple[str, str]] = {}
 
     @staticmethod
     def _key(project_id: str | None, stage: str | None = None) -> str:
@@ -38,16 +41,31 @@ class RecoveryService:
         attempt = self._attempts.get(key, 0) + 1
         self._attempts[key] = attempt
 
-        retryable = attempt < self.max_attempts
-        action = "retry" if retryable else "block"
+        error_type = type(error).__name__
+        error_message = str(error)[:2000]
+        normalized_message = re.sub(
+            r"for project [^:]+:",
+            "for project <id>:",
+            error_message,
+            flags=re.IGNORECASE,
+        )
+        signature = (error_type, " ".join(normalized_message.casefold().split()))
+        repeated_failure = self._last_error_signature.get(key) == signature
+        self._last_error_signature[key] = signature
+        retryable = attempt < self.max_attempts and not repeated_failure
+        if repeated_failure:
+            action = "block_repeated_failure"
+        else:
+            action = "retry" if retryable else "block"
         result = RecoveryResult(
             project_id=project_id,
             action=action,
             retryable=retryable,
             attempt=attempt,
             stage=stage,
-            error_type=type(error).__name__,
-            error_message=str(error)[:2000],
+            error_type=error_type,
+            error_message=error_message,
+            repeated_failure=repeated_failure,
         )
         self._failures.append(result)
         return result
@@ -59,7 +77,9 @@ class RecoveryService:
     ) -> None:
         """Reset one stage's budget, or all tracked stages for a project."""
         if stage is not None:
-            self._attempts.pop(self._key(project_id, stage), None)
+            key = self._key(project_id, stage)
+            self._attempts.pop(key, None)
+            self._last_error_signature.pop(key, None)
             return
 
         project = project_id or "__global__"
@@ -67,6 +87,7 @@ class RecoveryService:
         for key in list(self._attempts):
             if key.startswith(prefix):
                 self._attempts.pop(key, None)
+                self._last_error_signature.pop(key, None)
 
     def failures(self) -> list[RecoveryResult]:
         return list(self._failures)
