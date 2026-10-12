@@ -15,6 +15,14 @@ _CSS_URL = re.compile(
     r"""url\(\s*(['"]?)(.*?)\1\s*\)""",
     re.IGNORECASE | re.DOTALL,
 )
+_CSS_IMPORT = re.compile(
+    r"""@import\s+(?:url\(\s*)?(['"])(.*?)\1\s*\)?""",
+    re.IGNORECASE | re.DOTALL,
+)
+_SRCSET = re.compile(
+    r"""\bsrcset\s*=\s*(['"])(.*?)\1""",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _local_asset_path(reference: str, owner_path: str) -> str | None:
@@ -93,8 +101,17 @@ def validate_generated_artifacts(files: Mapping[str, str]) -> list[str]:
         references: list[str] = []
         if suffix in {".html", ".htm"}:
             references.extend(match.group(2) for match in _HTML_REFERENCE.finditer(content))
+            for match in _SRCSET.finditer(content):
+                # A srcset is a comma-separated list of URL + optional descriptor.
+                # Data URLs contain commas, so ignore them instead of splitting
+                # their payload into false file references.
+                for candidate in match.group(2).split(","):
+                    candidate = candidate.strip()
+                    if candidate and not candidate.casefold().startswith("data:"):
+                        references.append(candidate.split()[0])
         elif suffix == ".css":
             references.extend(match.group(2) for match in _CSS_URL.finditer(content))
+            references.extend(match.group(2) for match in _CSS_IMPORT.finditer(content))
 
         for reference in references:
             target = _local_asset_path(reference, path.replace("\\", "/"))
