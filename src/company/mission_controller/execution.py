@@ -22,6 +22,7 @@ class MissionExecutionPipeline:
         executor: AgentExecutor,
         registry: AgentRegistry,
     ) -> None:
+        self.max_repair_attempts = 2
         self.orchestrator = orchestrator
         self.executor = executor
         self.registry = registry
@@ -116,43 +117,98 @@ class MissionExecutionPipeline:
             )
         )
 
-        step.attempts += 1
-        try:
-            result = await self.executor.execute(
-                AgentExecutionContext(
-                    agent=agent,
-                    allowed_permissions=frozenset(agent.permissions),
-                ),
-                AgentRequest(
+        result: AgentResult | None = None
+        last_error = ""
+        max_attempts = self.max_repair_attempts + 1
+        for attempt in range(1, max_attempts + 1):
+            step.attempts += 1
+            repair_instruction = step.objective
+            if attempt > 1:
+                repair_instruction = (
+                    f"{step.objective}\n\n"
+                    "AUTOMATED REPAIR RETRY: The previous attempt failed. "
+                    "Diagnose the specific failure, make the smallest safe "
+                    "correction available to you, and verify the correction. "
+                    "Do not claim a check passed unless you actually verified it.\n"
+                    f"Previous failure: {last_error}\n"
+                    f"Repair attempt: {attempt - 1} of {self.max_repair_attempts}"
+                )
+
+            try:
+                result = await self.executor.execute(
+                    AgentExecutionContext(
+                        agent=agent,
+                        allowed_permissions=frozenset(agent.permissions),
+                    ),
+                    AgentRequest(
+                        task_id=task_id,
+                        instruction=repair_instruction,
+                        context={
+                            "mission_id": mission.id,
+                            "mission_name": mission.name,
+                            "mission_objective": mission.objective,
+                            "constraints": mission.constraints,
+                            "acceptance_criteria": plan.acceptance_criteria,
+                            "engineering_tasks": [
+                                task.model_dump(mode="json")
+                                for task in plan.engineering_tasks
+                            ],
+                            "assigned_specialist": step.agent_role,
+                            "dependencies": step.depends_on,
+                            "stage": step.stage.value,
+                            "repair_attempt": attempt - 1,
+                            "repair_attempt_limit": self.max_repair_attempts,
+                            "previous_failure": last_error or None,
+                            "qa_expectations": (
+                                [
+                                    "Report the exact checks performed.",
+                                    "Distinguish passed, failed, and unrun checks.",
+                                    "For every failure, include a reproducible diagnosis and proposed correction.",
+                                    "Do not report success when required checks were not run.",
+                                ]
+                                if step.stage == MissionStage.QA
+                                else []
+                            ),
+                        },
+                    ),
+                )
+            except Exception as exc:
+                error = f"{type(exc).__name__}: {exc}"
+                result = AgentResult(
                     task_id=task_id,
-                    instruction=step.objective,
-                    context={
-                        "mission_id": mission.id,
-                        "mission_name": mission.name,
-                        "mission_objective": mission.objective,
-                        "constraints": mission.constraints,
-                        "acceptance_criteria": plan.acceptance_criteria,
-                        "engineering_tasks": [
-                            task.model_dump(mode="json")
-                            for task in plan.engineering_tasks
-                        ],
-                        "assigned_specialist": step.agent_role,
-                        "dependencies": step.depends_on,
-                        "stage": step.stage.value,
-                    },
-                ),
-            )
-        except Exception as exc:
-            # Runtime/provider errors must become an explicit failed stage rather
-            # than leaving the plan permanently marked as "running".
-            error = f"{type(exc).__name__}: {exc}"
+                    agent_name=agent_name,
+                    success=False,
+                    error=error,
+                )
+
+            if result.success:
+                break
+
+            last_error = result.error or "Agent execution failed without an error detail"
+            if attempt < max_attempts:
+                self.orchestrator.events.publish(
+                    CompanyEvent(
+                        event_type="STAGE_REPAIR_STARTED",
+                        message=(
+                            f"Repair retry {attempt}/{self.max_repair_attempts} "
+                            f"for stage: {step.stage.value}: {last_error}"
+                        ),
+                        project_id=self.orchestrator.state.current_project_id,
+                        task_id=task_id,
+                    )
+                )
+
+        assert result is not None
+        if not result.success:
             step.status = "failed"
-            step.detail = error
-            self.orchestrator.block(error)
+            step.detail = (
+                f"Failed after {max_attempts} attempt(s): {last_error}"
+            )
+            self.orchestrator.block(step.detail)
             self.orchestrator.events.publish(
                 CompanyEvent(
                     event_type="STAGE_FAILED",
-                    message=f"Stage failed: {step.stage.value}: {error}",
+                    message=f"Stage failed: {step.stage.value}: {step.detail}",
                     project_id=self.orchestrator.state.current_project_id,
                     task_id=task_id,
                 )
@@ -161,22 +217,8 @@ class MissionExecutionPipeline:
                 task_id=task_id,
                 agent_name=agent_name,
                 success=False,
-                error=error,
+                error=step.detail,
             )
-
-        if not result.success:
-            step.status = "failed"
-            step.detail = result.error or "Agent execution failed"
-            self.orchestrator.block(step.detail)
-            self.orchestrator.events.publish(
-                CompanyEvent(
-                    event_type="STAGE_FAILED",
-                    message=f"Stage failed: {step.stage.value}: {result.error}",
-                    project_id=self.orchestrator.state.current_project_id,
-                    task_id=task_id,
-                )
-            )
-            return result
 
         step.status = "completed"
         self.orchestrator.complete_task()
