@@ -204,6 +204,8 @@ _PREVIEW_CSP = (
 def _preview_headers(request: Request) -> dict[str, str]:
     """Headers for an untrusted generated page served in a browser sandbox."""
     origin = str(request.base_url).rstrip('/')
+    if not re.fullmatch(r'https?://[A-Za-z0-9.\\-\\[\\]:]+', origin):
+        raise HTTPException(status_code=400, detail='Invalid preview host')
     return {
         "Content-Security-Policy": _PREVIEW_CSP.format(origin=origin),
         "X-Content-Type-Options": "nosniff",
