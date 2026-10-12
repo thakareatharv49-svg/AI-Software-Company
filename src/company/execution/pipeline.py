@@ -245,14 +245,39 @@ class CompanyExecutionPipeline:
                     "command": ["python", "-m", "pytest", "-q"],
                 }
             )
+            product_test_debug = await self.debugger.run(
+                product_test_request,
+                repair=repair_callback,
+            )
+            if product_test_debug.status == DebugStatus.BLOCKED:
+                self.project_engine.transition(
+                    project.id,
+                    ProjectStatus.DEBUGGING,
+                )
+                self._publish_event(
+                    "qa.generated_product_tests.repair_blocked",
+                    project_id=project.id,
+                    payload={
+                        "framework": "pytest",
+                        "attempts": len(product_test_debug.attempts),
+                        "error": product_test_debug.final_error,
+                    },
+                )
+                raise RuntimeError(
+                    f"Generated product tests failed for project {project.id}: "
+                    f"{product_test_debug.final_error}"
+                )
+            # Re-run after repair to verify the exact final workspace state.
             product_test_result = await self.qa_runner.run(product_test_request)
             self._publish_event(
                 "qa.generated_product_tests.completed",
                 project_id=project.id,
                 payload={
+                    "framework": "pytest",
                     "status": product_test_result.status.value,
                     "exit_code": product_test_result.exit_code,
                     "duration_ms": product_test_result.duration_ms,
+                    "repair_attempts": len(product_test_debug.attempts),
                 },
             )
             if product_test_result.status != QATestStatus.PASSED:
@@ -282,6 +307,29 @@ class CompanyExecutionPipeline:
             javascript_test_request = qa_request.model_copy(
                 update={"command": ["node", "--test"]}
             )
+            javascript_test_debug = await self.debugger.run(
+                javascript_test_request,
+                repair=repair_callback,
+            )
+            if javascript_test_debug.status == DebugStatus.BLOCKED:
+                self.project_engine.transition(
+                    project.id,
+                    ProjectStatus.DEBUGGING,
+                )
+                self._publish_event(
+                    "qa.generated_product_tests.repair_blocked",
+                    project_id=project.id,
+                    payload={
+                        "framework": "node:test",
+                        "attempts": len(javascript_test_debug.attempts),
+                        "error": javascript_test_debug.final_error,
+                    },
+                )
+                raise RuntimeError(
+                    f"Generated JavaScript product tests failed for project {project.id}: "
+                    f"{javascript_test_debug.final_error}"
+                )
+            # Re-run after repair to verify the exact final workspace state.
             javascript_test_result = await self.qa_runner.run(javascript_test_request)
             self._publish_event(
                 "qa.generated_product_tests.completed",
@@ -291,6 +339,7 @@ class CompanyExecutionPipeline:
                     "status": javascript_test_result.status.value,
                     "exit_code": javascript_test_result.exit_code,
                     "duration_ms": javascript_test_result.duration_ms,
+                    "repair_attempts": len(javascript_test_debug.attempts),
                 },
             )
             if javascript_test_result.status != QATestStatus.PASSED:
