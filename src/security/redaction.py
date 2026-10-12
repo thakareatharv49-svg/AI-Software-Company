@@ -52,7 +52,14 @@ def redact_sensitive_value(value: Any) -> Any:
         return redact_sensitive_text(value)
     if isinstance(value, dict):
         return {
-            key: redact_sensitive_value(item)
+            key: (
+                "[REDACTED]"
+                if re.search(
+                    r"(?i)(password|passwd|secret|token|api[_-]?key|authorization|private[_-]?key|database[_-]?url|connection[_-]?string|credential)",
+                    str(key),
+                )
+                else redact_sensitive_value(item)
+            )
             for key, item in value.items()
         }
     if isinstance(value, list):
