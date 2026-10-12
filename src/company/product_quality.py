@@ -282,15 +282,23 @@ def find_weak_javascript_tests(files: Mapping[str, str]) -> list[str]:
         re.compile(r"""\bexpect\(\s*(true|false|null|[-+]?\d+(?:\.\d+)?|(['"]).*?\2)\s*\)\s*\.\s*toBe\(\s*\1\s*\)""", re.DOTALL),
         re.compile(r"""\bassert\.(?:equal|strictEqual|deepEqual)\(\s*(true|false|null|[-+]?\d+(?:\.\d+)?|(['"]).*?\2)\s*,\s*\1\s*\)""", re.DOTALL),
     )
+    javascript_extensions = (".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts")
+    javascript_test_suffixes = tuple(
+        f"{kind}{extension}"
+        for extension in javascript_extensions
+        for kind in (".test", ".spec", "_test")
+    )
     for path, content in files.items():
         normalized = path.replace("\\", "/").casefold()
         filename = normalized.rsplit("/", 1)[-1]
         is_test = (
-            normalized.startswith("tests/")
-            or filename.endswith((".test.js", ".spec.js", ".test.ts", ".spec.ts",
-                                  ".test.jsx", ".spec.jsx", ".test.tsx", ".spec.tsx"))
+            normalized.startswith(("tests/", "__tests__/"))
+            or "/tests/" in normalized
+            or "/__tests__/" in normalized
+            or filename.startswith("test_")
+            or filename.endswith(javascript_test_suffixes)
         )
-        if not is_test or not filename.endswith((".js", ".jsx", ".ts", ".tsx")):
+        if not is_test or not filename.endswith(javascript_extensions):
             continue
         if empty_test.search(content) or empty_function_test.search(content):
             issues.append(
