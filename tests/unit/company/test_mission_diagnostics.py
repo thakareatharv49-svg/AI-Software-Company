@@ -47,7 +47,7 @@ def test_diagnostics_flags_old_running_mission_without_claiming_certainty():
     assert result["recommended_action"] == "inspect_audit_and_worker_before_retrying"
     assert result["current_stage"] == job.plan.steps[0].stage.value
     assert result["failure_detail"] is None
-    assert "may also delay updates" in result["message"]
+    assert "can also delay updates" in result["message"]
 
 
 def test_diagnostics_marks_recent_running_mission_active():
