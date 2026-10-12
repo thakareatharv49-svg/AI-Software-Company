@@ -1,3 +1,4 @@
+from src.company.execution.pipeline import CompanyExecutionPipeline
 from src.company.recovery.service import RecoveryService
 
 
@@ -86,3 +87,12 @@ def test_recovery_reset_allows_retrying_a_failure_after_inputs_change() -> None:
     assert fresh.attempt == 1
     assert fresh.retryable
     assert not fresh.repeated_failure
+
+def test_pipeline_classifies_failures_into_recovery_stages() -> None:
+    classify = CompanyExecutionPipeline._classify_recovery_stage
+
+    assert classify(RuntimeError("QA failed: assertion mismatch")) == "qa"
+    assert classify(RuntimeError("Code review failed: unsafe input")) == "security"
+    assert classify(RuntimeError("Generated artifacts failed validation")) == "artifacts"
+    assert classify(RuntimeError("GitHub rate limit exceeded")) == "github"
+    assert classify(RuntimeError("agent execution crashed")) == "execution"
