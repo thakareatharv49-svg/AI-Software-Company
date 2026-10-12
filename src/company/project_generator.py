@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 class GeneratedProject:
     files: dict[str, str]
     test_command: list[str]
+    model_calls: int = 0
+    duration_ms: int = 0
+    prompt_tokens: int = 0
+    generated_tokens: int = 0
 
 
 MAX_GENERATED_PROJECT_FILES = 40
@@ -52,6 +56,8 @@ class OllamaProjectGenerator:
         self._generation_lock = asyncio.Lock()
         self._generation_deadline: float | None = None
         self._generation_model_calls = 0
+        self._generation_prompt_tokens = 0
+        self._generation_output_tokens = 0
 
     def _checkpoint(self, name: str, objective: str) -> GenerationCheckpointStore:
         # Automatic retries append diagnostic feedback to the objective. Keep the
@@ -70,10 +76,22 @@ class OllamaProjectGenerator:
     async def generate(self, name: str, objective: str) -> GeneratedProject:
         """Run one mission under a shared wall-clock and model-call budget."""
         async with self._generation_lock:
-            self._generation_deadline = time.monotonic() + settings.factory_max_generation_seconds
+            started = time.monotonic()
+            self._generation_deadline = started + settings.factory_max_generation_seconds
             self._generation_model_calls = 0
+            self._generation_prompt_tokens = 0
+            self._generation_output_tokens = 0
             try:
-                return await self._generate_with_budget(name, objective)
+                generated = await self._generate_with_budget(name, objective)
+                # Preserve the generated artifact object's identity for validators
+                # and callers that intentionally share the same result instance.
+                object.__setattr__(generated, "model_calls", self._generation_model_calls)
+                object.__setattr__(
+                    generated, "duration_ms", int((time.monotonic() - started) * 1000)
+                )
+                object.__setattr__(generated, "prompt_tokens", self._generation_prompt_tokens)
+                object.__setattr__(generated, "generated_tokens", self._generation_output_tokens)
+                return generated
             finally:
                 self._generation_deadline = None
 
@@ -1998,6 +2016,10 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
                 raise RuntimeError(
                     f"Ollama returned a non-JSON API response for model '{model}'"
                 ) from exc
+
+            if self._generation_deadline is not None:
+                self._generation_prompt_tokens += int(server_metrics["prompt_tokens"] or 0)
+                self._generation_output_tokens += int(server_metrics["generated_tokens"] or 0)
 
             result = data.get("response")
             if not isinstance(result, str) or not result.strip():
