@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -8,6 +10,7 @@ import pytest
 from src.agents.models.contracts import AgentDefinition, AgentResult
 from src.agents.models.enums import AgentPermission
 from src.agents.registry.registry import AgentRegistry
+from src.company.artifact_validation import validate_generated_artifacts
 from src.company.execution.pipeline import CompanyExecutionPipeline
 from src.company.project_generator import OllamaProjectGenerator
 from src.manager.manager import MasterManager
@@ -50,6 +53,38 @@ async def test_multi_feature_expense_app_completes_factory_lifecycle(
         marker in generated.files["index.html"].casefold()
         for marker in ("expense tracker", "finwise")
     )
+
+    # A successful lifecycle must produce a self-contained browser artifact,
+    # not just a directory of files that happen to exist.
+    assert validate_generated_artifacts(generated.files) == []
+    app_source = generated.files["app.js"]
+    for feature in (
+        "localStorage",
+        "search",
+        "delete",
+        "edit",
+        "budget",
+        "category-filter",
+        "confirm(",
+    ):
+        assert feature.casefold() in app_source.casefold(), (
+            f"The generated Expense Tracker is missing its {feature!r} workflow."
+        )
+
+    node = shutil.which("node")
+    if node:
+        syntax = subprocess.run(
+            [node, "--check", "-"],
+            input=app_source,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        assert syntax.returncode == 0, (
+            "Generated Expense Tracker JavaScript failed syntax validation: "
+            f"{syntax.stderr or syntax.stdout}"
+        )
 
     # Materialize the deliverable exactly as a product workspace would.
     for relative_path, file_content in generated.files.items():
@@ -103,6 +138,9 @@ async def test_multi_feature_expense_app_completes_factory_lifecycle(
 
     assert result.project.status.value == "completed"
     assert result.qa_result.status.value == "passed"
+    assert result.qa_result.exit_code == 0
+    assert result.qa_result.stdout.strip(), "QA must retain evidence from the executed test command."
+    assert result.qa_result.duration_ms is not None
     assert result.review_result.status.value == "approved"
     assert result.browser_preview is True
     assert result.memory_id
