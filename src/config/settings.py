@@ -20,6 +20,10 @@ class Settings(BaseSettings):
 
     # Hard cap protects local model context, disk usage, and generation time.
     factory_max_generated_project_files: int = Field(default=40, ge=4, le=200)
+    # Bound total generation time across all model calls, retries, and repair attempts.
+    factory_max_generation_seconds: int = Field(default=1800, ge=60, le=7200)
+    # Bound model-call amplification when a large project repeatedly needs repair.
+    factory_max_generation_model_calls: int = Field(default=50, ge=1, le=200)
     # Bound parallel agent work to avoid overwhelming local models and services.
     factory_max_parallel_tasks: int = Field(default=2, ge=1, le=8)
     # Retry transient agent failures, but always cap the number of attempts.

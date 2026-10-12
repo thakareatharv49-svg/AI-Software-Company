@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import ast
 import json
 import logging
@@ -48,6 +49,9 @@ class OllamaProjectGenerator:
         if not 4 <= configured_limit <= 200:
             raise ValueError("max_generated_project_files must be between 4 and 200")
         self.max_generated_project_files = configured_limit
+        self._generation_lock = asyncio.Lock()
+        self._generation_deadline: float | None = None
+        self._generation_model_calls = 0
 
     def _checkpoint(self, name: str, objective: str) -> GenerationCheckpointStore:
         # Automatic retries append diagnostic feedback to the objective. Keep the
@@ -64,6 +68,16 @@ class OllamaProjectGenerator:
         )
 
     async def generate(self, name: str, objective: str) -> GeneratedProject:
+        """Run one mission under a shared wall-clock and model-call budget."""
+        async with self._generation_lock:
+            self._generation_deadline = time.monotonic() + settings.factory_max_generation_seconds
+            self._generation_model_calls = 0
+            try:
+                return await self._generate_with_budget(name, objective)
+            finally:
+                self._generation_deadline = None
+
+    async def _generate_with_budget(self, name: str, objective: str) -> GeneratedProject:
         prompt = f"""Build a distinct, complete, runnable software product for this mission. Treat the mission objective as the source of truth; do not default to a calculator, Tic-Tac-Toe, todo list, or generic landing page unless that exact product is requested.
 
 Project name: {name}
@@ -1908,6 +1922,22 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
         raise RuntimeError("Ollama repair failed and no deterministic repair is available")
 
     async def _call(self, payload: dict) -> str:
+        request_timeout = settings.ollama_timeout
+        if self._generation_deadline is not None:
+            remaining = self._generation_deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError(
+                    "Project generation exceeded its hard time budget "
+                    f"of {settings.factory_max_generation_seconds}s."
+                )
+            if self._generation_model_calls >= settings.factory_max_generation_model_calls:
+                raise RuntimeError(
+                    "Project generation reached its hard model-call limit "
+                    f"of {settings.factory_max_generation_model_calls}."
+                )
+            self._generation_model_calls += 1
+            request_timeout = min(request_timeout, remaining)
+
         model = str(payload.get("model", settings.ollama_model))
         prompt = payload.get("prompt", "")
         prompt_chars = len(prompt) if isinstance(prompt, str) else 0
@@ -1923,7 +1953,7 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
         }
         try:
             try:
-                async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
+                async with httpx.AsyncClient(timeout=request_timeout) as client:
                     response = await client.post(
                         f"{settings.ollama_base_url.rstrip('/')}/api/generate",
                         json=payload,
@@ -1950,8 +1980,9 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
             except httpx.TimeoutException as exc:
                 raise RuntimeError(
                     "Ollama project generation timed out after "
-                    f"{settings.ollama_timeout:g}s for model '{model}'. "
-                    "Increase OLLAMA_TIMEOUT or use a faster/smaller mission."
+                    f"{request_timeout:g}s for model '{model}'. "
+                    "The per-project generation deadline may have been reached; "
+                    "otherwise increase OLLAMA_TIMEOUT or use a faster/smaller mission."
                 ) from exc
             except httpx.HTTPStatusError as exc:
                 body = exc.response.text[:500].replace("\\n", " ")
