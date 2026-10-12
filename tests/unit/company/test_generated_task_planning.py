@@ -106,6 +106,8 @@ def test_root_level_backend_modules_get_a_separate_integration_package() -> None
             "app.js": "const items = [];",
             "server.py": "def list_items(): return []",
             "models.py": "class Item: pass",
+            "app.py": "def create_app(): return None",
+            "auth.py": "def authenticate(): return False",
             "tests/test_inventory.py": (
                 "def test_item_count():\\n"
                 "    items = [1, 2]\\n"
@@ -117,6 +119,9 @@ def test_root_level_backend_modules_get_a_separate_integration_package() -> None
     titles = [task.title for task in tasks]
     assert "Integrate Inventory: frontend" in titles
     assert "Integrate Inventory: backend" in titles
+    backend_task = next(task for task in tasks if task.title == "Integrate Inventory: backend")
+    for module in ("server.py", "models.py", "app.py", "auth.py"):
+        assert module in backend_task.description
     qa_task = tasks[-1]
     assert qa_task.title == "Validate Inventory quality and tests"
     assert qa_task.dependencies == tuple(range(len(tasks) - 1))

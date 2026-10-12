@@ -18,10 +18,10 @@ def _subsystem_for_path(path: str) -> str:
     # Generators frequently emit small Python services at the repository root
     # instead of placing them under src/. Keep those services distinct from the
     # browser shell so the factory creates an integration work package for them.
-    if len(parts) == 1 and filename in {
-        "api.py", "server.py", "database.py", "db.py", "models.py",
-        "routes.py", "schemas.py", "services.py",
-    }:
+    if len(parts) == 1 and PurePosixPath(filename).suffix == ".py":
+        # Flat generators often put APIs, models, and entry points in root-level
+        # modules with arbitrary names (app.py, main.py, auth.py). Keep all
+        # root-level Python source in a backend work package, not the shell.
         return "backend"
     # Flat browser assets need their own work package, separate from root-level Python services.
     if len(parts) == 1 and PurePosixPath(filename).suffix in {".html", ".css", ".js"}:
