@@ -56,5 +56,14 @@ class MissionPlan(BaseModel):
     # Feature-level work items make large missions actionable without replacing
     # the existing lifecycle stages that coordinate the company.
     engineering_tasks: list[EngineeringTask] = Field(default_factory=list)
+    # Server-generated provenance from the actual QA runner and security reviewer.
+    qa_status: str | None = None
+    qa_exit_code: int | None = None
+    qa_duration_ms: int | None = None
+    qa_command: list[str] = Field(default_factory=list)
+    qa_evidence: str | None = None
+    security_status: str | None = None
+    security_summary: str | None = None
+    security_evidence: str | None = None
     steps: list[PlannedStep]
 
