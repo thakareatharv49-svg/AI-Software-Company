@@ -118,3 +118,19 @@ def test_live_preview_does_not_trust_host_header_for_csp_origin(monkeypatch):
     assert response.status_code == 200
     assert "http://testserver" in policy
     assert "example.com; script-src *" not in policy
+
+
+def test_workspace_preview_supports_legacy_product_root(tmp_path, monkeypatch):
+    current = tmp_path / "generated-products"
+    legacy = tmp_path / "legacy-products"
+    workspace = legacy / "legacy-mission"
+    workspace.mkdir(parents=True)
+    (workspace / "index.html").write_text("<h1>Legacy</h1>", encoding="utf-8")
+
+    monkeypatch.setattr(review_routes, "PRODUCTS_ROOT", current)
+    monkeypatch.setattr(review_routes, "LEGACY_PRODUCTS_ROOT", legacy)
+
+    root, files = review_routes._workspace_files("legacy-mission")
+
+    assert root == workspace
+    assert files == {"index.html": "<h1>Legacy</h1>"}

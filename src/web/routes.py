@@ -1,8 +1,8 @@
-import re
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from src.security.authorization import require_company_owner
 
 router = APIRouter(tags=["web"])
@@ -39,82 +39,42 @@ def _find_product_entrypoint(root: Path) -> tuple[Path, Path] | None:
 
 
 @router.get("/product/{mission_id}", include_in_schema=False, dependencies=[Depends(require_company_owner)])
-async def completed_product(mission_id: str) -> HTMLResponse:
-    """Open the generated product browser entry point."""
-    if not mission_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in mission_id):
+async def completed_product(mission_id: str) -> RedirectResponse:
+    """Open completed products only through the secret-filtered browser sandbox."""
+    if not mission_id or any(
+        char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+        for char in mission_id
+    ):
         raise HTTPException(status_code=404, detail="Product not found")
-    candidates = (
-        ((PRODUCTS_DIR / mission_id).resolve(), PRODUCTS_DIR.resolve()),
-        ((LEGACY_PRODUCTS_DIR / mission_id).resolve(), LEGACY_PRODUCTS_DIR.resolve()),
+    return RedirectResponse(
+        url=f"/api/missions/{mission_id}/review/live-preview/",
+        status_code=307,
+        headers={"Cache-Control": "no-store"},
     )
-    root = None
-    index = None
-    asset_root = None
-    for candidate, base in candidates:
-        try:
-            candidate.relative_to(base)
-        except ValueError:
-            continue
-        if not candidate.is_dir():
-            continue
-        entrypoint = _find_product_entrypoint(candidate)
-        if entrypoint is not None:
-            index, asset_root = entrypoint
-            root = candidate
-            break
-    if root is None or index is None or asset_root is None:
-        if any(candidate.is_dir() for candidate, _ in candidates):
-            raise HTTPException(
-                status_code=404,
-                detail="This product has no browser preview (expected index.html in the product root, frontend, public, dist, or build folder)",
-            )
-        raise HTTPException(status_code=404, detail="Product not found")
 
-    # Product URLs have no trailing slash. Without a base URL, relative assets
-    # such as style.css and app.js resolve under /product/ instead of this
-    # mission asset route, leaving generated apps unstyled and nonfunctional.
-    html = index.read_text(encoding="utf-8")
-    asset_prefix = asset_root.relative_to(root).as_posix()
-    base_path = f"/product/{mission_id}/"
-    if asset_prefix != ".":
-        base_path += asset_prefix.rstrip("/") + "/"
-    base_tag = f'<base href="{base_path}">'
-    head_pattern = r"(<head(?:\s[^>]*)?>)"
-    if re.search(head_pattern, html, flags=re.IGNORECASE):
-        html = re.sub(
-            head_pattern,
-            lambda match: match.group(1) + base_tag,
-            html,
-            count=1,
-            flags=re.IGNORECASE,
-        )
-    else:
-        html = base_tag + html
-    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 @router.get("/product/{mission_id}/{file_path:path}", include_in_schema=False, dependencies=[Depends(require_company_owner)])
-async def completed_product_asset(mission_id: str, file_path: str) -> FileResponse:
-    """Serve browser assets belonging to a generated product."""
-    if not mission_id or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for char in mission_id):
-        raise HTTPException(status_code=404, detail="Product not found")
-    target = None
-    for candidate, base in (
-        ((PRODUCTS_DIR / mission_id).resolve(), PRODUCTS_DIR.resolve()),
-        ((LEGACY_PRODUCTS_DIR / mission_id).resolve(), LEGACY_PRODUCTS_DIR.resolve()),
+async def completed_product_asset(mission_id: str, file_path: str) -> RedirectResponse:
+    """Route legacy asset URLs through the filtered preview asset handler."""
+    if not mission_id or any(
+        char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+        for char in mission_id
     ):
-        try:
-            candidate.relative_to(base)
-            candidate_target = (candidate / file_path).resolve()
-            candidate_target.relative_to(candidate)
-        except ValueError:
-            continue
-        if candidate.is_dir() and candidate_target.is_file():
-            target = candidate_target
-            break
-    if target is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    normalized = file_path.replace(chr(92), "/")
+    if (
+        not normalized
+        or normalized.startswith("/")
+        or any(part in {"", ".", ".."} for part in normalized.split("/"))
+        or (len(normalized) >= 2 and normalized[1] == ":")
+        or chr(0) in normalized
+    ):
         raise HTTPException(status_code=404, detail="Product file not found")
-    return FileResponse(target, headers={"Cache-Control": "no-store"})
-
+    return RedirectResponse(
+        url=f"/api/missions/{mission_id}/review/live-preview/{quote(normalized, safe='/')}",
+        status_code=307,
+        headers={"Cache-Control": "no-store"},
+    )
 
 @router.get("/api/products", dependencies=[Depends(require_company_owner)])
 async def completed_products() -> JSONResponse:

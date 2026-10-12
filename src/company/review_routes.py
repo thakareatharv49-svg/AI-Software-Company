@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import mimetypes
 import re
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -32,6 +33,7 @@ from src.company.github_native.service import GitHubNativeService
 
 router = APIRouter(prefix='/api/missions', tags=['product-review'])
 PRODUCTS_ROOT = Path(__file__).resolve().parents[2] / 'generated-products'
+LEGACY_PRODUCTS_ROOT = Path(tempfile.gettempdir()) / 'ai-software-company-workspaces'
 
 
 class ProductPreviewFile(BaseModel):
@@ -99,12 +101,17 @@ def _get_review(mission_id: str, center: CompanyControlCenter) -> ProductReview:
 def _workspace_files(mission_id: str) -> tuple[Path, dict[str, str]]:
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', mission_id):
         raise HTTPException(status_code=404, detail='Product workspace not found')
-    root = (PRODUCTS_ROOT / mission_id).resolve()
-    try:
-        root.relative_to(PRODUCTS_ROOT.resolve())
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail='Product workspace not found') from exc
-    if not root.is_dir():
+    root = None
+    for base in (PRODUCTS_ROOT, LEGACY_PRODUCTS_ROOT):
+        candidate = (base / mission_id).resolve()
+        try:
+            candidate.relative_to(base.resolve())
+        except ValueError:
+            continue
+        if candidate.is_dir():
+            root = candidate
+            break
+    if root is None:
         raise HTTPException(status_code=404, detail='Generated product workspace not found')
 
     ignored = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', '.pytest_cache'}
@@ -246,7 +253,7 @@ def live_product_preview_asset(
         or normalized.startswith('/')
         or any(part in {'', '.', '..'} for part in normalized.split('/'))
         or (len(normalized) >= 2 and normalized[1] == ':')
-        or '\\x00' in normalized
+        or chr(0) in normalized
     ):
         raise HTTPException(status_code=404, detail='Preview asset not found')
     _, files = _workspace_files(mission_id)
