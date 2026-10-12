@@ -631,7 +631,7 @@ class CompanyExecutionPipeline:
                         "stage": recovery.stage,
                         "error_type": recovery.error_type,
                         "error_message": recovery.error_message,
-                        "repeated_failure": recovery.repeated_failure
+                        "repeated_failure": recovery.repeated_failure,
                     },
                 )
 
