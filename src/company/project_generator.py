@@ -264,7 +264,9 @@ Rules:
             "responsive app", "responsive application", "software product",
             "build a platform", "create a platform", "platform",
         )
-        return re.search(r"\\bapps?\\b", text) is not None or any(\n            term in text for term in browser_terms\n        )
+        return re.search(r"\bapps?\b", text) is not None or any(
+            term in text for term in browser_terms
+        )
 
     @staticmethod
     def _is_large_mission(name: str, objective: str) -> bool:
