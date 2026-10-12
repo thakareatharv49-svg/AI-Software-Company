@@ -369,3 +369,57 @@ def test_workspace_sync_refuses_missing_workspace(tmp_path: Path):
             str(tmp_path / "missing"),
             {"app.js": "source"},
         )
+
+
+@pytest.mark.asyncio
+async def test_generated_python_tests_use_debugger_repair_path(tmp_path: Path):
+    pipeline = build_pipeline()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    test_source = "def test_generated_feature():\\n    assert 2 + 2 == 4\\n"
+    (test_dir / "test_product.py").write_text(test_source, encoding="utf-8")
+    (tmp_path / "index.html").write_text(
+        "<!doctype html><html><body><main>Product</main></body></html>\\n",
+        encoding="utf-8",
+    )
+
+    calls = []
+    original_run = pipeline.debugger.run
+
+    async def observe_debugger(request, repair=None):
+        calls.append((list(request.command), repair is not None))
+        return await original_run(request, repair=repair)
+
+    pipeline.debugger.run = observe_debugger
+
+    result = await pipeline.execute(
+        project_request=ProjectCreateRequest(
+            name="Generated Test Repair",
+            description="Verify generated product tests enter the repair workflow",
+            objective="Verify generated Python test suites are debugged before delivery",
+        ),
+        mission=Mission(
+            name="Generated Test Repair Mission",
+            objective="Verify generated test repair",
+            project_id="temporary",
+        ),
+        tasks=[
+            TaskPlanItem(
+                title="Implement feature",
+                description="Implement and validate feature",
+                priority="high",
+            )
+        ],
+        qa_request=QATestRequest(
+            command=["python", "-c", "print('smoke test passed')"],
+            working_directory=str(tmp_path),
+        ),
+        files={
+            "index.html": "<!doctype html><html><body><main>Product</main></body></html>\\n",
+            "tests/test_product.py": test_source,
+        },
+        agent_executor=FakeAgentExecutor(),
+    )
+
+    assert result.project.status.value == "completed"
+    assert (["python", "-m", "pytest", "-q"], True) in calls
