@@ -1,6 +1,4 @@
 from types import SimpleNamespace
-
-import pytest
 from fastapi import HTTPException
 
 from src.company import review_routes
