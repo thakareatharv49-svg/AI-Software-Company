@@ -13,6 +13,7 @@ from src.company.control_center.service import CompanyControlCenter
 from src.company.customer_entitlements import PLAN_LIMITS, resolve_limits
 from src.db.models.entitlement import WorkspaceEntitlementModel
 from src.db.models.project import ProjectModel
+from src.db.models.workspace import WorkspaceModel
 from src.db.session import get_db
 from src.security.customer_authorization import require_customer_workspace
 
@@ -69,6 +70,17 @@ async def create_project(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, object]:
     _, workspace = context
+    # Serialize project-limit checks per workspace. Without this row lock,
+    # concurrent requests can both observe free capacity and exceed the plan.
+    workspace_result = await db.execute(
+        select(WorkspaceModel)
+        .where(WorkspaceModel.id == workspace.id)
+        .with_for_update()
+    )
+    if workspace_result.scalar_one_or_none() is None:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
     result = await db.execute(select(WorkspaceEntitlementModel).where(
         WorkspaceEntitlementModel.workspace_id == workspace.id
     ))
