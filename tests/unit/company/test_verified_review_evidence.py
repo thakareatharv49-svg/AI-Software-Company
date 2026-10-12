@@ -45,6 +45,7 @@ def _completed_job(plan):
 def test_review_submission_rejects_missing_factory_evidence(tmp_path, monkeypatch):
     products = tmp_path / "generated-products"
     (products / "mission-123").mkdir(parents=True)
+    (products / "mission-123" / "index.html").write_text("<main>Reviewable product</main>", encoding="utf-8")
     monkeypatch.setattr(review_routes, "PRODUCTS_ROOT", products)
     monkeypatch.setattr(
         review_routes,
