@@ -160,3 +160,68 @@ def build_mission_plan(mission: CompanyMission) -> MissionPlan:
             for stage in MissionStage
         ],
     )
+
+def validate_mission_plan(plan: MissionPlan) -> list[str]:
+    """Return actionable structural errors in a plan's stage and task DAGs."""
+    issues: list[str] = []
+    stage_names = [step.stage.value for step in plan.steps]
+    known_stages = set(stage_names)
+    if len(stage_names) != len(known_stages):
+        issues.append("Mission plan contains duplicate lifecycle stages.")
+    for step in plan.steps:
+        for dependency in step.depends_on:
+            if dependency not in known_stages:
+                issues.append(
+                    f"Stage '{step.stage.value}' depends on unknown stage '{dependency}'."
+                )
+            elif dependency == step.stage.value:
+                issues.append(f"Stage '{step.stage.value}' cannot depend on itself.")
+
+    task_ids = [task.id for task in plan.engineering_tasks]
+    known_tasks = set(task_ids)
+    if len(task_ids) != len(known_tasks):
+        issues.append("Engineering task IDs must be unique.")
+    for task in plan.engineering_tasks:
+        for dependency in task.depends_on:
+            if dependency not in known_tasks:
+                issues.append(
+                    f"Task '{task.id}' depends on unknown task '{dependency}'."
+                )
+            elif dependency == task.id:
+                issues.append(f"Task '{task.id}' cannot depend on itself.")
+
+    def find_cycles(nodes: list[str], dependencies: dict[str, list[str]], label: str) -> None:
+        visiting: set[str] = set()
+        visited: set[str] = set()
+
+        def visit(node: str) -> None:
+            if node in visited:
+                return
+            if node in visiting:
+                issues.append(f"{label} dependency graph contains a cycle at '{node}'.")
+                return
+            visiting.add(node)
+            for dependency in dependencies.get(node, []):
+                if dependency in dependencies:
+                    visit(dependency)
+            visiting.remove(node)
+            visited.add(node)
+
+        for node in nodes:
+            visit(node)
+
+    find_cycles(
+        stage_names,
+        {step.stage.value: step.depends_on for step in plan.steps},
+        "Lifecycle stage",
+    )
+    find_cycles(
+        task_ids,
+        {task.id: task.depends_on for task in plan.engineering_tasks},
+        "Engineering task",
+    )
+    if not plan.acceptance_criteria:
+        issues.append("Mission plan must contain at least one acceptance criterion.")
+    if not plan.engineering_tasks:
+        issues.append("Mission plan must contain at least one engineering task.")
+    return list(dict.fromkeys(issues))
