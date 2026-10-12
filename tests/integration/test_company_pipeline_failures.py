@@ -423,3 +423,59 @@ async def test_generated_python_tests_use_debugger_repair_path(tmp_path: Path):
 
     assert result.project.status.value == "completed"
     assert (["python", "-m", "pytest", "-q"], True) in calls
+
+
+
+def test_recovery_preserves_workspace_progress_before_retry(tmp_path: Path):
+    pipeline = build_pipeline()
+    pipeline.event_service.clear()
+    (tmp_path / "app.py").write_text("value = 2\\n", encoding="utf-8")
+    (tmp_path / "new_feature.py").write_text(
+        "def feature():\\n    return True\\n",
+        encoding="utf-8",
+    )
+    files = {
+        "app.py": "value = 1\\n",
+        "initial_artifact.py": "def initial():\\n    return True\\n",
+    }
+
+    pipeline._preserve_workspace_progress(
+        str(tmp_path),
+        files,
+        attempt=1,
+    )
+
+    assert files["app.py"] == "value = 2\\n"
+    assert files["new_feature.py"] == "def feature():\\n    return True\\n"
+    # Keep in-memory artifacts that have not yet been written to disk.
+    assert files["initial_artifact.py"] == "def initial():\\n    return True\\n"
+    events = [
+        event
+        for event in pipeline.event_service.list_events()
+        if event.event_type == "autonomous.run.progress_preserved"
+    ]
+    assert len(events) == 1
+    assert events[0].payload["attempt"] == 1
+    assert events[0].payload["changed_file_count"] == 2
+
+
+def test_recovery_progress_preservation_does_not_hide_missing_workspace(
+    tmp_path: Path,
+):
+    pipeline = build_pipeline()
+    pipeline.event_service.clear()
+    files = {"app.py": "original"}
+    pipeline._preserve_workspace_progress(
+        str(tmp_path / "missing"),
+        files,
+        attempt=2,
+    )
+
+    assert files == {"app.py": "original"}
+    events = [
+        event
+        for event in pipeline.event_service.list_events()
+        if event.event_type == "autonomous.run.progress_preservation_failed"
+    ]
+    assert len(events) == 1
+    assert events[0].payload["attempt"] == 2
