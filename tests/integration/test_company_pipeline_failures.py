@@ -429,14 +429,14 @@ async def test_generated_python_tests_use_debugger_repair_path(tmp_path: Path):
 def test_recovery_preserves_workspace_progress_before_retry(tmp_path: Path):
     pipeline = build_pipeline()
     pipeline.event_service.clear()
-    (tmp_path / "app.py").write_text("value = 2\\n", encoding="utf-8")
+    (tmp_path / "app.py").write_text("value = 2\n", encoding="utf-8")
     (tmp_path / "new_feature.py").write_text(
-        "def feature():\\n    return True\\n",
+        "def feature():\n    return True\n",
         encoding="utf-8",
     )
     files = {
-        "app.py": "value = 1\\n",
-        "initial_artifact.py": "def initial():\\n    return True\\n",
+        "app.py": "value = 1\n",
+        "initial_artifact.py": "def initial():\n    return True\n",
     }
 
     pipeline._preserve_workspace_progress(
@@ -445,10 +445,10 @@ def test_recovery_preserves_workspace_progress_before_retry(tmp_path: Path):
         attempt=1,
     )
 
-    assert files["app.py"] == "value = 2\\n"
-    assert files["new_feature.py"] == "def feature():\\n    return True\\n"
+    assert files["app.py"] == "value = 2\n"
+    assert files["new_feature.py"] == "def feature():\n    return True\n"
     # Keep in-memory artifacts that have not yet been written to disk.
-    assert files["initial_artifact.py"] == "def initial():\\n    return True\\n"
+    assert files["initial_artifact.py"] == "def initial():\n    return True\n"
     events = [
         event
         for event in pipeline.event_service.list_events()
