@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,6 +59,19 @@ class Settings(BaseSettings):
         if value and len(value) < 32:
             raise ValueError("NEXORA_HQ_STATUS_TOKEN must contain at least 32 characters")
         return value
+
+    @model_validator(mode="after")
+    def validate_production_cookie_security(self) -> "Settings":
+        if self.environment.strip().lower() in {"production", "prod", "staging"}:
+            if not self.session_cookie_secure:
+                raise ValueError(
+                    "SESSION_COOKIE_SECURE must be true outside development"
+                )
+            if not self.public_base_url.strip().lower().startswith("https://"):
+                raise ValueError(
+                    "PUBLIC_BASE_URL must use HTTPS outside development"
+                )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",
