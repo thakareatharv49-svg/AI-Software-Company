@@ -26,7 +26,10 @@ class MissionExecutionPipeline:
         self.executor = executor
         self.registry = registry
 
-    def register_default_agents(self) -> None:
+    def register_default_agents(self, plan: MissionPlan | None = None) -> None:
+        planned_roles = {
+            step.stage: step.agent_role for step in plan.steps
+        } if plan is not None else {}
         for stage, name in _STAGE_AGENTS.items():
             try:
                 self.registry.get(name)
@@ -34,11 +37,25 @@ class MissionExecutionPipeline:
                 self.registry.register(
                     AgentDefinition(
                         name=name,
-                        role=f"{stage.value} specialist",
+                        role=planned_roles.get(stage, f"{stage.value} specialist"),
                         description=f"Executes the {stage.value} mission stage.",
                         capabilities=[stage.value],
                     )
                 )
+
+    @staticmethod
+    def _next_ready_step(plan: MissionPlan):
+        completed = {
+            step.stage.value for step in plan.steps if step.status == "completed"
+        }
+        return next(
+            (
+                step for step in plan.steps
+                if step.status == "planned"
+                and set(step.depends_on).issubset(completed)
+            ),
+            None,
+        )
 
     async def execute_next(
         self,
@@ -53,9 +70,27 @@ class MissionExecutionPipeline:
                 error="Company must be running before executing a stage",
             )
 
-        self.register_default_agents()
+        self.register_default_agents(plan)
 
-        step = next((item for item in plan.steps if item.status == "planned"), None)
+        step = self._next_ready_step(plan)
+        if step is None and any(item.status == "planned" for item in plan.steps):
+            completed = {
+                item.stage.value for item in plan.steps if item.status == "completed"
+            }
+            unresolved = [
+                f"{item.stage.value} requires {', '.join(item.depends_on)}"
+                for item in plan.steps
+                if item.status == "planned"
+                and not set(item.depends_on).issubset(completed)
+            ]
+            error = "Mission plan has no dependency-ready stage: " + "; ".join(unresolved)
+            self.orchestrator.block(error)
+            return AgentResult(
+                task_id=self.orchestrator.state.current_task_id or "",
+                agent_name="mission-controller",
+                success=False,
+                error=error,
+            )
         if step is None:
             return AgentResult(
                 task_id=self.orchestrator.state.current_task_id or "",
@@ -96,6 +131,9 @@ class MissionExecutionPipeline:
                         "mission_name": mission.name,
                         "mission_objective": mission.objective,
                         "constraints": mission.constraints,
+                        "acceptance_criteria": plan.acceptance_criteria,
+                        "assigned_specialist": step.agent_role,
+                        "dependencies": step.depends_on,
                         "stage": step.stage.value,
                     },
                 ),
@@ -147,7 +185,16 @@ class MissionExecutionPipeline:
             )
         )
 
-        next_step = next((item for item in plan.steps if item.status == "planned"), None)
+        next_step = self._next_ready_step(plan)
+        if next_step is None and any(item.status == "planned" for item in plan.steps):
+            error = "Mission plan has remaining stages with unresolved dependencies"
+            self.orchestrator.block(error)
+            return AgentResult(
+                task_id=task_id,
+                agent_name=agent_name,
+                success=False,
+                error=error,
+            )
         if next_step is None:
             self.orchestrator.complete_project()
             self.orchestrator.events.publish(

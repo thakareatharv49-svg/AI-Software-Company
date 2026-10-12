@@ -111,3 +111,29 @@ async def test_failed_stage_blocks_company() -> None:
         event.event_type == "STAGE_FAILED"
         for event in orchestrator.events.list_events()
     )
+
+
+
+@pytest.mark.asyncio
+async def test_execution_selects_only_dependency_ready_stages_and_uses_specialist_roles() -> None:
+    orchestrator = CompanyOrchestrator()
+    mission = CompanyMission(name="Build X", objective="Create X")
+    controller = MissionController(orchestrator)
+    plan, _ = controller.start(mission)
+    # Put a dependent stage first to prove the scheduler uses prerequisites,
+    # not just the stage list position.
+    plan.steps[0], plan.steps[1] = plan.steps[1], plan.steps[0]
+
+    registry = AgentRegistry()
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        registry,
+    )
+
+    result = await pipeline.execute_next(mission, plan)
+
+    assert result.success is True
+    assert result.task_id == f"task:{mission.id}:research"
+    assert next(step for step in plan.steps if step.stage.value == "research").status == "completed"
+    assert registry.get("research-agent").role == "research_analyst"
