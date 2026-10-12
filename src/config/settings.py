@@ -1,10 +1,13 @@
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     app_name: str = "AI Software Developer"
-    environment: str = "development"
+    environment: str = Field(
+        default="development",
+        validation_alias=AliasChoices("ENVIRONMENT", "COMPANY_ENV"),
+    )
     debug: bool = True
     log_level: str = "INFO"
     # Explicit opt-in for a single-user local instance; never enabled by default.
@@ -93,6 +96,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
 
