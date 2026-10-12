@@ -232,6 +232,63 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
 
 
 
+# Objective keywords are mapped to common implementation/test vocabulary. This is a
+# traceability guard, not a substitute for executing tests or reviewing behavior.
+_MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
+    ("create", {"create", "add", "insert", "crud"}, {"create", "add", "insert", "crud"}),
+    ("edit/update", {"edit", "update", "modify", "crud"}, {"edit", "update", "modify", "crud"}),
+    ("delete/remove", {"delete", "remove", "destroy", "crud"}, {"delete", "remove", "destroy", "crud"}),
+    ("search", {"search", "find", "query"}, {"search", "find", "query"}),
+    ("filter", {"filter"}, {"filter"}),
+    ("pin/favorite", {"pin", "favorite", "favourite", "star"}, {"pin", "favorite", "favourite", "star"}),
+    ("persistence", {"persist", "persistent", "localstorage", "storage", "save", "load", "database"}, {"persist", "persistent", "localstorage", "storage", "save", "load", "database"}),
+    ("authentication", {"authentication", "auth", "login", "signin"}, {"authentication", "auth", "login", "signin"}),
+    ("export", {"export", "download"}, {"export", "download"}),
+    ("import", {"import", "upload"}, {"import", "upload"}),
+    ("budget", {"budget"}, {"budget"}),
+    ("validation", {"validation", "validate", "validates", "invalid", "reject"}, {"validation", "validate", "validates", "invalid", "reject"}),
+)
+
+
+def find_uncovered_mission_features(
+    objective: str,
+    files: Mapping[str, str],
+) -> list[str]:
+    """Find explicit mission features with no lexical trace in generated tests.
+
+    The check intentionally limits itself to concrete workflow features. It does
+    not claim that a keyword proves behavior; generated tests still run separately.
+    """
+    def words(text: str) -> set[str]:
+        return set(re.findall(r"[a-z]+", text.casefold()))
+
+    objective_words = words(objective)
+    test_content = " ".join(
+        content
+        for path, content in files.items()
+        if (
+            path.replace("\\\\", "/").casefold().startswith("tests/")
+            or path.casefold().rsplit("/", 1)[-1].startswith("test_")
+            or path.casefold().endswith("_test.py")
+            or path.casefold().endswith((".test.js", ".spec.js", ".test.ts", ".spec.ts"))
+        )
+    )
+    if not test_content:
+        return []  # Missing-test policy reports this separately.
+
+    test_words = words(test_content)
+    issues: list[str] = []
+    for feature, objective_aliases, test_aliases in _MISSION_FEATURES:
+        if not objective_words.intersection(objective_aliases):
+            continue
+        if not test_words.intersection(test_aliases):
+            issues.append(
+                f"Mission explicitly requests '{feature}', but generated tests contain "
+                "no corresponding feature reference. Add a behavioral test for this workflow."
+            )
+    return issues
+
+
 def find_missing_product_tests(files: Mapping[str, str]) -> list[str]:
     """Require at least one conventional automated test module for broad projects."""
     test_modules = [
