@@ -480,6 +480,31 @@ def test_rejects_empty_javascript_test_using_function_callback() -> None:
     assert "empty test body" in issues[0]
 
 
+def test_rejects_empty_modern_javascript_test_modules() -> None:
+    issues = find_weak_javascript_tests({
+        "src/features/records.test.mjs": "test('creates a record', () => {});",
+        "src/features/auth.spec.cjs": "it('rejects invalid login', function () {});",
+    })
+
+    assert len(issues) == 2
+    assert all("empty test body" in issue for issue in issues)
+
+
+def test_accepts_behavior_assertions_in_modern_javascript_test_modules() -> None:
+    issues = find_weak_javascript_tests({
+        "src/features/records.test.mjs": (
+            "test('creates a record', () => { "
+            "expect(createRecord('Plan').title).toBe('Plan'); });"
+        ),
+        "src/features/auth.spec.cjs": (
+            "it('rejects invalid login', () => { "
+            "assert.equal(validateLogin(''), false); });"
+        ),
+    })
+
+    assert issues == []
+
+
 def test_accepts_javascript_test_with_behavior_assertion() -> None:
     issues = find_weak_javascript_tests({
         "src/records.test.js": (
