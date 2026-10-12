@@ -753,33 +753,56 @@ Rules:
             # later files consistent without allowing a large source file to exhaust
             # the model context window.
             existing_context_parts: list[str] = []
-            remaining_context_chars = 6_000
+            # Keep each per-file request lean; model prompt processing grows with
+            # every repeated source excerpt across a large manifest.
+            remaining_context_chars = 4_000
             context_files = list(files.items())
-            current_basename = path.casefold().rsplit("/", 1)[-1]
+            current_path = path.casefold()
+            current_basename = current_path.rsplit("/", 1)[-1]
             generating_tests = (
-                path.casefold().startswith("tests/")
+                current_path.startswith("tests/")
                 or current_basename.startswith("test_")
                 or current_basename.endswith("_test.py")
             )
-            if generating_tests:
-                def context_priority(item: tuple[str, str]) -> tuple[int, str]:
-                    existing_path = item[0].casefold()
-                    basename = existing_path.rsplit("/", 1)[-1]
-                    is_test = (
-                        existing_path.startswith("tests/")
-                        or basename.startswith("test_")
-                        or basename.endswith("_test.py")
-                    )
-                    if is_test:
-                        return (3, existing_path)
-                    if existing_path.endswith((".py", ".js", ".mjs", ".cjs")):
-                        return (0, existing_path)
-                    if existing_path.endswith((".html", ".htm")):
-                        return (1, existing_path)
-                    if existing_path.endswith(".css"):
-                        return (2, existing_path)
-                    return (2, existing_path)
-                context_files.sort(key=context_priority)
+            direct_dependencies = {
+                dependency.casefold()
+                for dependency in manifest_dependencies.get(path, [])
+            }
+            browser_assets = {"index.html", "style.css", "app.js"}
+
+            def context_priority(item: tuple[str, str]) -> tuple[int, int, str]:
+                existing_path = item[0].casefold()
+                basename = existing_path.rsplit("/", 1)[-1]
+                is_test = (
+                    existing_path.startswith("tests/")
+                    or basename.startswith("test_")
+                    or basename.endswith("_test.py")
+                )
+                is_source = existing_path.endswith((".py", ".js", ".mjs", ".cjs"))
+                is_markup = existing_path.endswith((".html", ".htm"))
+                is_style = existing_path.endswith(".css")
+                if existing_path in direct_dependencies:
+                    return (0, 0, existing_path)
+                if generating_tests:
+                    # Tests need implementation contracts first, not other tests.
+                    if is_source:
+                        return (1, 0, existing_path)
+                    if is_markup:
+                        return (2, 0, existing_path)
+                    if is_style:
+                        return (3, 0, existing_path)
+                    return (4 if is_test else 3, 0, existing_path)
+                if browser_mission and basename in browser_assets:
+                    return (1, 0, existing_path)
+                if is_source:
+                    return (2, 0, existing_path)
+                if is_markup:
+                    return (3, 0, existing_path)
+                if is_style:
+                    return (4, 0, existing_path)
+                return (5 if is_test else 4, 0, existing_path)
+
+            context_files.sort(key=context_priority)
             for existing_path, existing_content in context_files:
                 header = f"FILE: {existing_path}\n"
                 if remaining_context_chars <= len(header) + 80:
