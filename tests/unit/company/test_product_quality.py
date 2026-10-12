@@ -581,3 +581,36 @@ def test_feature_traceability_accepts_covered_extended_workflows() -> None:
     )
 
     assert issues == []
+
+
+def test_feature_traceability_ignores_comments_and_helper_names_as_coverage() -> None:
+    objective = "Create and delete records."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "tests/test_records.py": (
+                "# test_create_record and test_delete_record are planned here\\n"
+                "def create_record():\\n    return {}\\n"
+                "def delete_record():\\n    return True\\n"
+                "def test_records_are_available():\\n    assert True\\n"
+            ),
+        },
+    )
+
+    assert any("create" in issue for issue in issues)
+    assert any("delete/remove" in issue for issue in issues)
+
+
+def test_feature_traceability_accepts_named_javascript_test_titles() -> None:
+    objective = "Create and delete records."
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "src/records.spec.mjs": (
+                "test('creates a record', () => { expect(createRecord()).toBeTruthy(); });\\n"
+                "it('deletes a record', () => { expect(deleteRecord()).toBe(true); });"
+            ),
+        },
+    )
+
+    assert issues == []
