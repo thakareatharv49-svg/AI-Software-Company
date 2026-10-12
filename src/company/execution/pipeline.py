@@ -110,6 +110,7 @@ class CompanyExecutionPipeline:
         self.quality_gate = ProductionQualityGate()
         self.observability = ObservabilityService()
         self._active_run_id: str | None = None
+        self._active_project_id: str | None = None
 
     def _publish_event(
         self,
@@ -148,9 +149,23 @@ class CompanyExecutionPipeline:
         repair_agent_executor: Callable | AgentExecutor | None = None,
         github_repository: GitHubRepository | None = None,
         pull_request_head: str | None = None,
+        resume_project_id: str | None = None,
     ) -> PipelineResult:
         self._active_generated_files = files
-        project = self.project_engine.create(project_request)
+        if resume_project_id is None:
+            project = self.project_engine.create(project_request)
+            self._active_project_id = project.id
+        else:
+            project = self.project_engine.get(resume_project_id)
+            self._active_project_id = project.id
+            if project.status == ProjectStatus.BLOCKED:
+                project = self.project_engine.transition(
+                    project.id, ProjectStatus.DEVELOPMENT
+                )
+            elif project.status in {ProjectStatus.SECURITY, ProjectStatus.REVIEW}:
+                project = self.project_engine.transition(
+                    project.id, ProjectStatus.DEBUGGING
+                )
 
         self._publish_event(
             "project.execution.started",
@@ -160,11 +175,26 @@ class CompanyExecutionPipeline:
                 "objective": project.objective,
             },
         )
-        project = self._transition_to_development(project)
+        if resume_project_id is None:
+            project = self._transition_to_development(project)
         mission = replace(mission, project_id=project.id)
 
         self.manager.start_mission(mission)
-        task_ids = self.manager.create_plan(tasks)
+        existing_tasks = self.manager.task_engine.list(project_id=project.id)
+        if existing_tasks and [task.title for task in existing_tasks] == [
+            item.title.strip() for item in tasks
+        ]:
+            task_ids = [task.id for task in existing_tasks]
+            # A failed or interrupted task can be retried in place. This keeps
+            # completed dependencies and task history instead of duplicating the plan.
+            for task in existing_tasks:
+                if task.status.value == "in_progress":
+                    self.manager.task_engine.fail(task.id, "Interrupted by a prior pipeline attempt")
+                current = self.manager.task_engine.get(task.id)
+                if current.status.value == "failed":
+                    self.manager.task_engine.retry(task.id)
+        else:
+            task_ids = self.manager.create_plan(tasks)
 
         executor = self._build_executor(agent_executor)
         await self._execute_tasks(executor)
@@ -628,6 +658,8 @@ class CompanyExecutionPipeline:
         """
 
         self._active_run_id = self.observability.create_run_id()
+        self._active_project_id = None
+        resume_project_id: str | None = None
 
         # Publishing is deliberately decoupled from project generation. A due
         # GitHub publish is retried once per factory run; a rate limit never
@@ -649,9 +681,11 @@ class CompanyExecutionPipeline:
                     repair_agent_executor=repair_agent_executor,
                     github_repository=github_repository,
                     pull_request_head=pull_request_head,
+                    resume_project_id=resume_project_id,
                 )
 
                 self.recovery.reset()
+                self._active_project_id = None
 
                 self._publish_event(
                     "autonomous.run.completed",
@@ -668,6 +702,8 @@ class CompanyExecutionPipeline:
                 # Preserve source files created or repaired during this attempt
                 # before deciding whether to retry. A retry must not silently
                 # discard progress made in the shared project workspace.
+                if self._active_project_id is not None:
+                    resume_project_id = self._active_project_id
                 self._preserve_workspace_progress(
                     qa_request.working_directory,
                     files,
