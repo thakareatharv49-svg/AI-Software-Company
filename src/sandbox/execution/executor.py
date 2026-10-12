@@ -197,7 +197,7 @@ class SandboxExecutor:
                     duration_ms=int((time.perf_counter() - started) * 1000),
                 )
             container_id = Path(cid_path).read_text(encoding="utf-8").strip()
-            source_path = str(mount_root / ".")
+            source_path = str(mount_root) + os.sep + "."
             copied = subprocess.run(
                 ["docker", "cp", "--archive", source_path, f"{container_id}:/workspace/"],
                 stdin=subprocess.DEVNULL,
