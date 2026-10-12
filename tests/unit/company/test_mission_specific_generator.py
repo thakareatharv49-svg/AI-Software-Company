@@ -763,17 +763,17 @@ def test_backend_validation_accepts_express_server_in_generic_entrypoint() -> No
         GeneratedProject(
             files={
                 "index.js": (
-                    "const express = require('express');\\n"
-                    "const app = express();\\n"
-                    "app.get('/appointments', (_req, res) => res.json([]));\\n"
-                    "app.listen(3000);\\n"
+                    "const express = require('express');\n"
+                    "const app = express();\n"
+                    "app.get('/appointments', (_req, res) => res.json([]));\n"
+                    "app.listen(3000);\n"
                 ),
                 "tests/test_api.py": (
-                    "from pathlib import Path\\n\\n"
-                    "def test_appointment_api_has_route():\\n"
-                    "    source = (Path(__file__).resolve().parents[1] / 'index.js').read_text()\\n"
-                    "    assert 'express()' in source\\n"
-                    "    assert \"app.get('/appointments'\" in source\\n"
+                    "from pathlib import Path\n\n"
+                    "def test_appointment_api_has_route():\n"
+                    "    source = (Path(__file__).resolve().parents[1] / 'index.js').read_text()\n"
+                    "    assert 'express()' in source\n"
+                    "    assert \"app.get('/appointments'\" in source\n"
                 ),
             },
             test_command=["python", "-m", "pytest", "-q"],
