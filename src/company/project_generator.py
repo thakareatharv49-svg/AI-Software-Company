@@ -571,7 +571,7 @@ Rules:
                 manifest_prompt
                 + "\n\nCorrective retry: the previous plan exceeded the safe "
                 f"{self.max_generated_project_files}-file limit once mandatory browser assets and tests are included. Return a "
-                "compact revised plan with no more than 32 planned files, include "
+                f"compact revised plan with no more than {self.max_generated_project_files} files total, including required browser assets and tests; include "
                 "index.html, style.css, app.js, and tests/test_project.py for browser "
                 "apps, and combine related implementation into fewer files. Preserve "
                 "all mission-critical workflows; do not split features into tiny modules."
