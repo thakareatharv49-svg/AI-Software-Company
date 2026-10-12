@@ -46,6 +46,7 @@ class AutonomousDebugger:
                         else DebugStatus.RESOLVED
                     ),
                     attempts=attempts,
+                    test_result=result,
                 )
 
             error = result.stderr or result.stdout or "QA test failed"
@@ -72,6 +73,7 @@ class AutonomousDebugger:
                     status=DebugStatus.BLOCKED,
                     attempts=attempts,
                     final_error=error,
+                    test_result=result,
                 )
 
             if repair is None:
