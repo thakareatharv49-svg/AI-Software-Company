@@ -62,9 +62,11 @@ def test_recovery_stops_repeating_the_same_failure_before_budget_exhaustion() ->
 
     first = recovery.record_failure(
         RuntimeError("QA failed for project project-a: missing app.js"),
+        stage="qa",
     )
     repeated = recovery.record_failure(
         RuntimeError("QA failed for project project-b: missing app.js"),
+        stage="qa",
     )
 
     assert first.retryable
@@ -77,12 +79,12 @@ def test_recovery_stops_repeating_the_same_failure_before_budget_exhaustion() ->
 
 def test_recovery_reset_allows_retrying_a_failure_after_inputs_change() -> None:
     recovery = RecoveryService(max_attempts=3)
-    recovery.record_failure(RuntimeError("artifact missing"))
-    repeated = recovery.record_failure(RuntimeError("artifact missing"))
+    recovery.record_failure(RuntimeError("artifact missing"), stage="artifacts")
+    repeated = recovery.record_failure(RuntimeError("artifact missing"), stage="artifacts")
     assert repeated.repeated_failure
 
     recovery.reset()
-    fresh = recovery.record_failure(RuntimeError("artifact missing"))
+    fresh = recovery.record_failure(RuntimeError("artifact missing"), stage="artifacts")
 
     assert fresh.attempt == 1
     assert fresh.retryable
