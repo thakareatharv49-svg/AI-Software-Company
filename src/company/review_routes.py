@@ -32,6 +32,22 @@ router = APIRouter(prefix='/api/missions', tags=['product-review'])
 PRODUCTS_ROOT = Path(__file__).resolve().parents[2] / 'generated-products'
 
 
+class ProductPreviewFile(BaseModel):
+    path: str
+    content: str
+    size_bytes: int
+
+
+class ProductPreview(BaseModel):
+    mission_id: str
+    mission_name: str
+    review_status: str
+    revision: int
+    total_files: int
+    total_bytes: int
+    files: list[ProductPreviewFile]
+
+
 class SubmitReviewRequest(BaseModel):
     requirements: list[Requirement] = Field(min_length=1, max_length=200)
 
@@ -132,6 +148,36 @@ def get_product_review(
     center: Annotated[CompanyControlCenter, Depends(get_control_center)],
 ) -> ProductReview:
     return _get_review(mission_id, center)
+
+
+@router.get('/{mission_id}/review/preview', response_model=ProductPreview)
+def preview_generated_product(
+    mission_id: str,
+    center: Annotated[CompanyControlCenter, Depends(get_control_center)],
+) -> ProductPreview:
+    """Return a bounded, secret-filtered source preview before approval or publication."""
+    job = _get_job(mission_id, center)
+    if job.status != MissionJobStatus.COMPLETED:
+        raise HTTPException(status_code=409, detail='Only completed products can be previewed')
+    _, files = _workspace_files(mission_id)
+    review = _get_review(mission_id, center)
+    preview_files = [
+        ProductPreviewFile(
+            path=path,
+            content=content,
+            size_bytes=len(content.encode('utf-8')),
+        )
+        for path, content in files.items()
+    ]
+    return ProductPreview(
+        mission_id=mission_id,
+        mission_name=job.mission.name,
+        review_status=review.status.value,
+        revision=review.revision,
+        total_files=len(preview_files),
+        total_bytes=sum(item.size_bytes for item in preview_files),
+        files=preview_files,
+    )
 
 
 @router.post('/{mission_id}/review/submit', response_model=ProductReview)
