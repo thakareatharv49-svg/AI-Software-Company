@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from src.company.generation_checkpoints import GenerationCheckpointStore
@@ -83,13 +83,15 @@ class OllamaProjectGenerator:
             self._generation_output_tokens = 0
             try:
                 generated = await self._generate_with_budget(name, objective)
-                return replace(
-                    generated,
-                    model_calls=self._generation_model_calls,
-                    duration_ms=int((time.monotonic() - started) * 1000),
-                    prompt_tokens=self._generation_prompt_tokens,
-                    generated_tokens=self._generation_output_tokens,
+                # Preserve the generated artifact object's identity for validators
+                # and callers that intentionally share the same result instance.
+                object.__setattr__(generated, "model_calls", self._generation_model_calls)
+                object.__setattr__(
+                    generated, "duration_ms", int((time.monotonic() - started) * 1000)
                 )
+                object.__setattr__(generated, "prompt_tokens", self._generation_prompt_tokens)
+                object.__setattr__(generated, "generated_tokens", self._generation_output_tokens)
+                return generated
             finally:
                 self._generation_deadline = None
 
