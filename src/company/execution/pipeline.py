@@ -693,7 +693,7 @@ class CompanyExecutionPipeline:
                     resume_project_id=resume_project_id,
                 )
 
-                self.recovery.reset()
+                self.recovery.reset(project_id=result.project.id)
                 self._active_project_id = None
 
                 self._publish_event(
@@ -716,10 +716,14 @@ class CompanyExecutionPipeline:
                 self._preserve_workspace_progress(
                     qa_request.working_directory,
                     files,
-                    attempt=self.recovery.attempts(stage=self._classify_recovery_stage(exc)) + 1,
+                    attempt=self.recovery.attempts(
+                        project_id=self._active_project_id,
+                        stage=self._classify_recovery_stage(exc),
+                    ) + 1,
                 )
                 recovery = self.recovery.record_failure(
                     error=exc,
+                    project_id=self._active_project_id,
                     stage=self._classify_recovery_stage(exc),
                 )
 
@@ -741,7 +745,7 @@ class CompanyExecutionPipeline:
                 )
 
                 if not recovery.retryable:
-                    self.recovery.reset()
+                    self.recovery.reset(project_id=self._active_project_id)
                     raise
 
                 self._publish_event(
