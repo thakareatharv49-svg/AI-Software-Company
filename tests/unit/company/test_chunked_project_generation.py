@@ -34,7 +34,7 @@ async def test_large_mission_generates_each_file_independently(monkeypatch) -> N
         json.dumps({"content": "<!doctype html><html><head><title>Notes</title></head><body><script src=\"app.js\"></script><link rel=\"stylesheet\" href=\"style.css\"></body></html>"}),
         json.dumps({"content": "body { font-family: sans-serif; }"}),
         json.dumps({"content": "function addNote(text) { return { text }; }"}),
-        json.dumps({"content": "def add_note(text):\n    return {\"text\": text}\n\ndef test_add_note_preserves_content():\n    assert add_note(\"Plan\")[\"text\"] == \"Plan\"\n"}),
+        json.dumps({"content": "def add_note(text):\n    return {\"text\": text}\n\ndef test_create_task():\n    assert add_note(\"Plan\")[\"text\"] == \"Plan\"\n\ndef test_edit_task():\n    task = add_note(\"Plan\")\n    task[\"text\"] = \"Updated\"\n    assert task[\"text\"] == \"Updated\"\n\ndef test_delete_task():\n    tasks = [add_note(\"Plan\")]\n    tasks.remove(tasks[0])\n    assert tasks == []\n\ndef test_search_tasks():\n    tasks = [add_note(\"Plan\")]\n    assert [task for task in tasks if \"Plan\" in task[\"text\"]] == tasks\n"}),
     ]
     payloads = []
 
