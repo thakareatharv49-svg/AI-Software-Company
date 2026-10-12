@@ -5,6 +5,7 @@ from src.agents.execution.context import AgentExecutionContext
 from src.agents.models.contracts import AgentRequest, AgentResult
 from src.agents.models.enums import AgentStatus
 from src.runtime.models.messages import ModelRequest
+from src.security.redaction import redact_sensitive_text
 from src.runtime.service import AIRuntime
 from src.tools.execution.executor import ToolExecutor
 from src.tools.models.contracts import ToolRequest
@@ -111,7 +112,7 @@ class AgentExecutor:
                 task_id=request.task_id,
                 agent_name=context.agent.name,
                 success=False,
-                error=str(exc),
+                error=redact_sensitive_text(str(exc)),
                 duration_ms=int(
                     (perf_counter() - started) * 1000
                 ),
