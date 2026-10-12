@@ -29,3 +29,32 @@ def test_complex_product_categories_use_modular_generation(name, objective):
 )
 def test_small_missions_keep_the_single_pass_path(name, objective):
     assert not OllamaProjectGenerator._is_large_mission(name, objective)
+
+@pytest.mark.parametrize(
+    "objective",
+    [
+        "Build a capital gains tax calculator with charts",
+        "Create a rapid personal finance dashboard",
+    ],
+)
+def test_unrelated_words_do_not_trigger_backend_requirement(objective):
+    assert not OllamaProjectGenerator._mission_requires_backend(objective)
+
+
+@pytest.mark.parametrize(
+    "objective",
+    [
+        "Build a web app with a REST API",
+        "Create an API endpoint for expense records",
+        "Build a database-backed inventory app",
+    ],
+)
+def test_explicit_server_capabilities_require_backend(objective):
+    assert OllamaProjectGenerator._mission_requires_backend(objective)
+
+
+def test_explicit_frontend_only_exclusion_overrides_backend_terms():
+    assert not OllamaProjectGenerator._mission_requires_backend(
+        "Build a frontend-only expense tracker without a backend or API"
+    )
+
