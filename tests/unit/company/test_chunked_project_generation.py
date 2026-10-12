@@ -72,6 +72,53 @@ async def test_large_mission_generates_each_file_independently(monkeypatch) -> N
 
 
 @pytest.mark.asyncio
+async def test_repair_targets_diagnosed_file_and_preserves_other_modules(monkeypatch):
+    generator = OllamaProjectGenerator()
+    original_files = {
+        "index.html": "<!doctype html><script src='app.js'></script>",
+        "app.js": "function broken( {",
+        "style.css": "body { color: black; }",
+        "tests/test_project.py": "def test_smoke():\n    assert True\n",
+    }
+    prompts = []
+
+    async def fake_call(payload):
+        prompts.append(payload["prompt"])
+        return json.dumps({
+            "files": {"app.js": "function fixed() { return true; }"},
+            "test_command": ["python", "-m", "pytest", "-q"],
+        })
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    repaired = await generator.repair(
+        original_files,
+        "Generated JavaScript has a syntax error in 'app.js': unexpected token",
+    )
+
+    assert repaired.files["app.js"] == "function fixed() { return true; }"
+    assert repaired.files["index.html"] == original_files["index.html"]
+    assert repaired.files["style.css"] == original_files["style.css"]
+    assert repaired.files["tests/test_project.py"] == original_files["tests/test_project.py"]
+    assert "TARGETED REPAIR" in prompts[0]
+    assert "FILE: app.js" in prompts[0]
+    assert "FILE: index.html" not in prompts[0]
+    assert "FILE: style.css" not in prompts[0]
+
+
+def test_targeted_repair_paths_only_returns_existing_diagnosed_files():
+    files = {
+        "app.js": "broken",
+        "index.html": "entry",
+        "tests/test_project.py": "tests",
+    }
+
+    assert OllamaProjectGenerator._targeted_repair_paths(
+        files,
+        "Syntax error in 'app.js'; missing 'unknown.css'",
+    ) == ["app.js"]
+
+
+@pytest.mark.asyncio
 async def test_large_mission_rejects_unsafe_manifest_paths(monkeypatch) -> None:
     generator = OllamaProjectGenerator()
 
