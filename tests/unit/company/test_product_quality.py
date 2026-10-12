@@ -312,6 +312,27 @@ def test_accepts_project_with_a_test_module() -> None:
 
 
 
+def test_accepts_javascript_and_typescript_test_conventions() -> None:
+    issues = find_missing_product_tests({
+        "src/app.js": "export function addItem(items, item) { return [...items, item]; }",
+        "src/app.test.js": "import { expect, test } from 'vitest';",
+        "src/components/Notes.spec.tsx": "import { describe, it } from 'vitest';",
+    })
+
+    assert issues == []
+
+
+def test_does_not_treat_javascript_source_or_docs_as_tests() -> None:
+    issues = find_missing_product_tests({
+        "src/test_helpers.js": "export const testMode = false;",
+        "docs/testing.md": "Use app.test.js for tests.",
+        "app.js": "function start() {}",
+    })
+
+    assert len(issues) == 1
+    assert "no automated test files" in issues[0]
+
+
 def test_detects_high_confidence_credentials_in_shipped_source() -> None:
     issues = find_exposed_secrets({
         "app.py": "GITHUB_TOKEN = 'ghp_abcdefghijklmnopqrstuvwxyz1234567890'",
