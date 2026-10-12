@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Untrusted generated code must use the isolated backend outside development.
     sandbox_mode: str = "host"
     sandbox_container_image: str = "ai-software-company-sandbox:latest"
+    factory_start_paused: bool = False
 
     # Hard cap protects local model context, disk usage, and generation time.
     factory_max_generated_project_files: int = Field(default=40, ge=4, le=200)
