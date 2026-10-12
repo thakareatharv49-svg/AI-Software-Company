@@ -980,6 +980,12 @@ Requirements:
                 "from tornado.web import",
                 "new koa(",
                 "koa(",
+                # Modern JavaScript runtimes and frameworks often expose server
+                # creation through these APIs rather than app.listen().
+                "hono()",
+                "nestfactory.create(",
+                "bun.serve(",
+                "deno.serve(",
             )
             backend_files = []
             for path, content in project.files.items():
