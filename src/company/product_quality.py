@@ -363,7 +363,7 @@ def find_uncovered_mission_features(
         re.MULTILINE,
     )
     javascript_test_title = re.compile(
-        r"""\b(?:test|it)\s*\(\s*(['"`])([^'"`]+)\1""",
+        r"""\b(?:test|it)\s*\(\s*(['\"`])([^'\"`]+)\1""",
         re.IGNORECASE,
     )
     for path, content in files.items():
