@@ -46,6 +46,7 @@ def test_unrelated_words_do_not_trigger_backend_requirement(objective):
     [
         "Build a web app with a REST API",
         "Create an API endpoint for expense records",
+        "Build an API-only service for appointment management",
         "Build a database-backed inventory app",
     ],
 )
