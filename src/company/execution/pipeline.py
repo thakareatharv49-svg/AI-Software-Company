@@ -813,10 +813,20 @@ class CompanyExecutionPipeline:
         return False
 
     @staticmethod
+    @staticmethod
     def _has_generated_javascript_tests(files: dict[str, str]) -> bool:
-        """Detect Node test suites regardless of whether they live in tests/ or src/."""
+        """Detect Node test suites regardless of directory or module format."""
         return any(
-            path.replace("\\", "/").casefold().endswith((".test.js", ".spec.js"))
+            path.replace("\\", "/").casefold().endswith(
+                (
+                    ".test.js",
+                    ".spec.js",
+                    ".test.cjs",
+                    ".spec.cjs",
+                    ".test.mjs",
+                    ".spec.mjs",
+                )
+            )
             for path in files
         )
 
