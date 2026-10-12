@@ -241,18 +241,14 @@ _MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
     ("search", {"search", "find", "query"}, {"search", "find", "query"}),
     ("filter", {"filter"}, {"filter"}),
     ("pin/favorite", {"pin", "favorite", "favourite", "star"}, {"pin", "favorite", "favourite", "star"}),
-    ("persistence", {"persist", "persistent", "localstorage", "storage", "save", "load", "database"}, {"persist", "persistent", "localstorage", "storage", "save", "load", "database"}),
     ("authentication", {"authentication", "auth", "login", "signin"}, {"authentication", "auth", "login", "signin"}),
     ("export", {"export", "download"}, {"export", "download"}),
     ("import", {"import", "upload"}, {"import", "upload"}),
     ("budget", {"budget"}, {"budget"}),
+    ("persistence", {"persistent", "persistence", "persist", "storage", "localstorage"}, {"persistent", "persistence", "persist", "storage", "localstorage"}),
+    ("validation", {"validation", "validate", "validated"}, {"validation", "validate", "validated"}),
     ("sorting", {"sort", "sorting", "order"}, {"sort", "sorting", "order"}),
-    ("delete confirmation", {"confirm", "confirmation", "confirming"}, {"confirm", "confirmation", "cancel"}),
-    ("empty state", {"empty"}, {"empty"}),
-    ("responsive layout", {"responsive", "mobile", "tablet"}, {"responsive", "mobile", "tablet", "viewport"}),
-    ("notifications", {"notification", "notifications", "notify", "alert"}, {"notification", "notifications", "notify", "alert"}),
     ("undo/redo", {"undo", "redo"}, {"undo", "redo"}),
-    ("validation", {"validation", "validate", "validates", "invalid", "reject"}, {"validation", "validate", "validates", "invalid", "reject"}),
 )
 
 

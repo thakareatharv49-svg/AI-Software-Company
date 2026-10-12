@@ -438,8 +438,14 @@ def test_failed_large_mission_repair_clears_stale_checkpoint(tmp_path) -> None:
         "tests/test_project.py": (
             "def normalize_query(value):\n"
             "    return value.strip().lower()\n\n"
-            "def test_normalize_query_trims_and_lowercases():\n"
+            "def create_task(title):\n    return {'title': title}\n\n"
+            "def edit_task(task, title):\n    task['title'] = title\n    return task\n\n"
+            "def delete_task(tasks, task):\n    tasks.remove(task)\n    return tasks\n\n"
+            "def test_search_query_normalizes():\n"
             "    assert normalize_query('  Math  ') == 'math'\n"
+            "def test_create_task():\n    assert create_task('Math')['title'] == 'Math'\n"
+            "def test_edit_task():\n    assert edit_task({'title': 'Math'}, 'Science')['title'] == 'Science'\n"
+            "def test_delete_task():\n    assert delete_task([1, 2], 1) == [2]\n"
         ),
     }
     checkpoint.save(manifest=manifest, files=files)
@@ -851,3 +857,60 @@ def test_simple_single_workflow_stays_on_small_mission_path() -> None:
         "Unit Converter",
         "Build a simple unit converter.",
     )
+
+
+
+def test_large_mission_quality_gate_rejects_untraced_requested_workflow() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    objective = (
+        "Create, edit, delete, search and pin notes with persistent local storage "
+        "and input validation."
+    )
+    project = GeneratedProject(
+        files={
+            "main.py": "def main():\n    return True\n",
+            "tests/test_notes.py": (
+                "def test_create_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_edit_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_search_notes():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_pin_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_storage_persistence():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_input_validation():\n    values = [1]\n    assert len(values) == 1\n"
+            ),
+        },
+        test_command=["python", "-m", "pytest", "-q"],
+    )
+
+    try:
+        OllamaProjectGenerator._validate_mission_output("Notes Manager", objective, project)
+    except RuntimeError as exc:
+        assert "delete/remove" in str(exc)
+    else:
+        raise AssertionError("Large missions must trace requested delete behavior in tests")
+
+
+def test_large_mission_quality_gate_accepts_traced_requested_workflows() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    objective = (
+        "Create, edit, delete, search and pin notes with persistent local storage "
+        "and input validation."
+    )
+    project = GeneratedProject(
+        files={
+            "main.py": "def main():\n    return True\n",
+            "tests/test_notes.py": (
+                "def test_create_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_edit_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_delete_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_search_notes():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_pin_note():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_storage_persistence():\n    values = [1]\n    assert len(values) == 1\n"
+                "def test_input_validation():\n    values = [1]\n    assert len(values) == 1\n"
+            ),
+        },
+        test_command=["python", "-m", "pytest", "-q"],
+    )
+
+    OllamaProjectGenerator._validate_mission_output("Notes Manager", objective, project)

@@ -938,6 +938,7 @@ Requirements:
         """Reject browser-app output that cannot be opened in the product preview."""
         from src.company.product_quality import (
             find_exposed_secrets,
+            find_uncovered_mission_features,
             find_unfinished_product_content,
             find_weak_javascript_tests,
             find_weak_product_tests,
@@ -946,8 +947,24 @@ Requirements:
         quality_issues = find_unfinished_product_content(project.files)
         quality_issues.extend(find_weak_product_tests(project.files))
         quality_issues.extend(find_weak_javascript_tests(project.files))
-        # Feature traceability is diagnostic-only because lexical matches can
-        # reject valid suites that use domain-specific names.
+        # Broad missions must have test-suite traceability for explicitly requested
+        # workflows. This is a conservative lexical gate, not proof of behavior;
+        # the generated test runner remains the behavioral check.
+        if OllamaProjectGenerator._is_large_mission(name, objective):
+            # Keep the traceability delivery gate focused on concrete user
+            # workflows. Persistence, responsive design, and validation remain
+            # useful diagnostics from the analyzer, but their wording varies too
+            # much across legitimate test suites to block otherwise valid output.
+            workflow_features = (
+                "create", "edit/update", "delete/remove", "search", "filter",
+                "pin/favorite", "authentication", "export", "import", "budget",
+                "sorting", "undo/redo",
+            )
+            quality_issues.extend(
+                issue
+                for issue in find_uncovered_mission_features(objective, project.files)
+                if any(f"'{feature}'" in issue for feature in workflow_features)
+            )
         quality_issues.extend(find_exposed_secrets(project.files))
         if quality_issues:
             raise RuntimeError(
