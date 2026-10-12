@@ -337,15 +337,15 @@ async def test_run_end_to_end_creates_observability_audit_trail(tmp_path: Path):
 def test_workspace_sync_delivers_repaired_and_new_files_without_stale_files(tmp_path: Path):
     from src.company.execution.pipeline import CompanyExecutionPipeline
 
-    (tmp_path / "app.js").write_text("const value = 2;\\n", encoding="utf-8")
-    (tmp_path / "index.html").write_text("<main>Repaired</main>\\n", encoding="utf-8")
+    (tmp_path / "app.js").write_text("const value = 2;\n", encoding="utf-8")
+    (tmp_path / "index.html").write_text("<main>Repaired</main>\n", encoding="utf-8")
     (tmp_path / ".pytest_cache").mkdir()
     (tmp_path / ".pytest_cache" / "cache.json").write_text("{}", encoding="utf-8")
     (tmp_path / "node_modules").mkdir()
     (tmp_path / "node_modules" / "dependency.js").write_text("ignored()", encoding="utf-8")
 
     files = {
-        "app.js": "const value = 1;\\n",
+        "app.js": "const value = 1;\n",
         "deleted.js": "stale content",
     }
 
@@ -354,8 +354,8 @@ def test_workspace_sync_delivers_repaired_and_new_files_without_stale_files(tmp_
         files,
     )
 
-    assert files["app.js"] == "const value = 2;\\n"
-    assert files["index.html"] == "<main>Repaired</main>\\n"
+    assert files["app.js"] == "const value = 2;\n"
+    assert files["index.html"] == "<main>Repaired</main>\n"
     assert "deleted.js" not in files
     assert not any(".pytest_cache" in path for path in files)
     assert not any("node_modules" in path for path in files)
@@ -376,10 +376,10 @@ async def test_generated_python_tests_use_debugger_repair_path(tmp_path: Path):
     pipeline = build_pipeline()
     test_dir = tmp_path / "tests"
     test_dir.mkdir()
-    test_source = "def test_generated_feature():\\n    assert 2 + 2 == 4\\n"
+    test_source = "def test_generated_feature():\n    assert 2 + 2 == 4\n"
     (test_dir / "test_product.py").write_text(test_source, encoding="utf-8")
     (tmp_path / "index.html").write_text(
-        "<!doctype html><html><body><main>Product</main></body></html>\\n",
+        "<!doctype html><html><body><main>Product</main></body></html>\n",
         encoding="utf-8",
     )
 
@@ -415,7 +415,7 @@ async def test_generated_python_tests_use_debugger_repair_path(tmp_path: Path):
             working_directory=str(tmp_path),
         ),
         files={
-            "index.html": "<!doctype html><html><body><main>Product</main></body></html>\\n",
+            "index.html": "<!doctype html><html><body><main>Product</main></body></html>\n",
             "tests/test_product.py": test_source,
         },
         agent_executor=FakeAgentExecutor(),
