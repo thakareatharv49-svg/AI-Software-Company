@@ -106,12 +106,15 @@ def test_live_preview_asset_serves_only_workspace_text_and_rejects_traversal(mon
     assert missing.value.status_code == 404
 
 
-def test_live_preview_rejects_untrusted_host_header(monkeypatch):
+def test_live_preview_does_not_trust_host_header_for_csp_origin(monkeypatch):
     monkeypatch.setattr(review_routes, "_get_job", lambda mission_id, center: _completed_job())
     monkeypatch.setattr(review_routes, "_workspace_files", lambda mission_id: (None, {"index.html": "<h1>ok</h1>"}))
 
-    with pytest.raises(HTTPException) as invalid:
-        review_routes.live_product_preview(
-            "mission-123", _request(b"example.com; script-src *"), None
-        )
-    assert invalid.value.status_code == 400
+    response = review_routes.live_product_preview(
+        "mission-123", _request(b"example.com; script-src *"), None
+    )
+
+    policy = response.headers["content-security-policy"]
+    assert response.status_code == 200
+    assert "http://testserver" in policy
+    assert "example.com; script-src *" not in policy
