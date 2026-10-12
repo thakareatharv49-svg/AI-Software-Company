@@ -807,3 +807,22 @@ def test_backend_validation_accepts_modern_server_framework_signatures() -> None
                 test_command=["python", "-m", "pytest", "-q"],
             ),
         )
+
+
+
+def test_normalize_test_command_accepts_node_builtin_test_runner() -> None:
+    assert OllamaProjectGenerator._normalize_test_command(["node", "--test"]) == [
+        "node", "--test"
+    ]
+    assert OllamaProjectGenerator._normalize_test_command(["node.exe", "--test"]) == [
+        "node.exe", "--test"
+    ]
+
+
+def test_normalize_test_command_rejects_arbitrary_node_commands() -> None:
+    assert OllamaProjectGenerator._normalize_test_command(
+        ["node", "-e", "process.exit(0)"]
+    ) == ["python", "-m", "pytest", "-q"]
+    assert OllamaProjectGenerator._normalize_test_command(
+        ["npm", "test"]
+    ) == ["python", "-m", "pytest", "-q"]
