@@ -105,7 +105,8 @@ def test_generated_python_test_discovery_includes_root_and_source_tests() -> Non
     assert detect({"test_app.py": "def test_app(): pass"})
     assert detect({"src/test_service.py": "def test_service(): pass"})
     assert detect({"src/service_test.py": "def test_service(): pass"})
-    assert detect({"tests/custom_suite.py": "def suite(): pass"})
+    assert detect({"tests/test_custom_suite.py": "def test_suite(): pass"})
+    assert not detect({"tests/custom_suite.py": "def suite(): pass"})
     assert not detect({"src/service.py": "def service(): pass"})
 
 
@@ -125,3 +126,14 @@ def test_generated_javascript_test_discovery_supports_common_node_module_formats
     assert detect({"tests/ui.test.js": "test('works', () => {})"})
     assert not detect({"src/app.cjs": "module.exports = {}"})
     assert not detect({"src/app.mjs": "export const value = 1"})
+
+
+def test_generated_javascript_test_paths_are_explicit_and_stably_ordered() -> None:
+    paths = CompanyExecutionPipeline._generated_javascript_test_paths
+
+    assert paths({
+        "specs/api.spec.js": "test('api', () => {})",
+        "tests/ui.test.cjs": "test('ui', () => {})",
+        "src/app.mjs": "export const app = true",
+        "tests/model.test.js": "test('model', () => {})",
+    }) == ["specs/api.spec.js", "tests/model.test.js", "tests/ui.test.cjs"]
