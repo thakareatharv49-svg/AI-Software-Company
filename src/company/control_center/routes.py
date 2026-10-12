@@ -103,6 +103,95 @@ def mission_audit(
     return center.audit(mission_id, event_type=event_type, status=status)
 
 
+@router.get("/missions/{mission_id}/diagnostics")
+def mission_diagnostics(
+    mission_id: str,
+    center: CompanyControlCenter = ControlCenter,
+) -> dict[str, object]:
+    """Explain a mission's persisted progress and flag unusually long inactivity."""
+    from datetime import UTC, datetime
+
+    job = center.mission_job(mission_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Mission job not found")
+
+    now = datetime.now(UTC)
+    updated_at = job.updated_at
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=UTC)
+    idle_seconds = max(0, int((now - updated_at).total_seconds()))
+    status_value = job.status.value
+    running_steps = [
+        step for step in job.plan.steps
+        if str(getattr(step.status, "value", step.status)).casefold() == "running"
+    ]
+    failed_steps = [
+        step for step in job.plan.steps
+        if str(getattr(step.status, "value", step.status)).casefold() == "failed"
+    ]
+
+    diagnosis = "healthy"
+    message = "Mission has recent persisted activity."
+    recommended_action = "continue_monitoring"
+    if status_value == MissionJobStatus.QUEUED.value:
+        if idle_seconds >= 300:
+            diagnosis = "waiting_for_worker"
+            message = "Mission has been queued for at least five minutes without a status update."
+            recommended_action = "start_or_check_factory_worker"
+        else:
+            diagnosis = "queued"
+            message = "Mission is waiting in the factory queue."
+            recommended_action = "wait_or_start_factory"
+    elif status_value == MissionJobStatus.RUNNING.value and idle_seconds >= 2100:
+        diagnosis = "possibly_stalled"
+        message = (
+            "No persisted mission update for over 35 minutes. This may be a stalled "
+            "worker; a long model call or external process can also delay updates."
+        )
+        recommended_action = "inspect_audit_and_worker_before_retrying"
+    elif status_value == MissionJobStatus.RUNNING.value:
+        diagnosis = "active"
+        message = "Mission is running within the expected progress window."
+        recommended_action = "continue_monitoring"
+    elif status_value == MissionJobStatus.BLOCKED.value:
+        diagnosis = "blocked"
+        message = job.message
+        recommended_action = "review_failure_details_then_retry"
+    elif status_value == MissionJobStatus.FAILED.value:
+        diagnosis = "failed"
+        message = job.message
+        recommended_action = "review_failure_details_then_retry"
+    elif status_value == MissionJobStatus.CANCELLED.value:
+        diagnosis = "cancelled"
+        message = job.message
+        recommended_action = "submit_or_queue_a_new_mission"
+    elif status_value == MissionJobStatus.COMPLETED.value:
+        diagnosis = "completed"
+        message = "Mission completed."
+        recommended_action = "review_product"
+
+    current_step = running_steps[0] if running_steps else None
+    failed_step = failed_steps[-1] if failed_steps else None
+    return {
+        "mission_id": job.id,
+        "status": status_value,
+        "diagnosis": diagnosis,
+        "message": message,
+        "recommended_action": recommended_action,
+        "idle_seconds": idle_seconds,
+        "last_updated_at": job.updated_at.isoformat(),
+        "current_stage": current_step.stage.value if current_step else None,
+        "current_stage_detail": current_step.detail if current_step else None,
+        "failed_stage": failed_step.stage.value if failed_step else None,
+        "failure_detail": failed_step.detail if failed_step else (
+            job.message if status_value in {
+                MissionJobStatus.FAILED.value, MissionJobStatus.BLOCKED.value
+            } else None
+        ),
+        "attempts": job.attempts,
+    }
+
+
 @router.get("/missions/{mission_id}/job", response_model=MissionJob)
 def mission_job(
     mission_id: str,

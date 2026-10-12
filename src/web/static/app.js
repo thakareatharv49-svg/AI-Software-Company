@@ -401,6 +401,41 @@ function renderMissionDiagnostics(root, job) {
   root.append(panel);
 }
 
+function renderStallDiagnostics(root, diagnostics) {
+  if (!diagnostics || typeof diagnostics !== "object") return;
+  const panel = document.createElement("section");
+  panel.className = "event";
+  const heading = document.createElement("h3");
+  heading.textContent = "Mission health";
+  const status = document.createElement("p");
+  status.className = "muted";
+  status.textContent = (diagnostics.diagnosis || "unknown").replaceAll("_", " ")
+    + " · no persisted update for " + Math.floor(Number(diagnostics.idle_seconds || 0) / 60) + " min";
+  const message = document.createElement("p");
+  message.textContent = diagnostics.message || "";
+  panel.append(heading, status, message);
+  if (diagnostics.current_stage) {
+    const stage = document.createElement("p");
+    stage.className = "muted";
+    stage.textContent = "Current stage: " + diagnostics.current_stage
+      + (diagnostics.current_stage_detail ? " · " + diagnostics.current_stage_detail : "");
+    panel.append(stage);
+  }
+  if (diagnostics.failed_stage || diagnostics.failure_detail) {
+    const failure = document.createElement("p");
+    failure.className = "muted";
+    failure.textContent = "Failure: " + (diagnostics.failed_stage || "mission")
+      + (diagnostics.failure_detail ? " · " + diagnostics.failure_detail : "");
+    panel.append(failure);
+  }
+  const action = document.createElement("p");
+  action.className = "muted";
+  action.textContent = "Recommended next step: "
+    + String(diagnostics.recommended_action || "inspect_mission").replaceAll("_", " ");
+  panel.append(action);
+  root.append(panel);
+}
+
 async function showMission(id) {
   selectedMissionId = id;
   const details = $("details");
@@ -457,10 +492,11 @@ async function showMission(id) {
 
     // Outputs and audit are secondary. If either is temporarily unavailable,
     // keep the mission details visible instead of replacing the whole panel.
-    const [outputsResult, auditResult, productsResult] = await Promise.allSettled([
+    const [outputsResult, auditResult, productsResult, diagnosticsResult] = await Promise.allSettled([
       api("/api/missions/" + encodeURIComponent(id) + "/outputs"),
       api("/api/missions/" + encodeURIComponent(id) + "/audit"),
-      api("/api/products")
+      api("/api/products"),
+      api("/api/missions/" + encodeURIComponent(id) + "/diagnostics")
     ]);
 
     if (selectedMissionId !== id) return;
@@ -474,6 +510,9 @@ async function showMission(id) {
 
     renderPipeline(audit, job.status);
     root.removeChild(loading);
+    if (diagnosticsResult.status === "fulfilled") {
+      renderStallDiagnostics(root, diagnosticsResult.value);
+    }
 
     const oh = document.createElement("h3");
     oh.textContent = "Outputs";
