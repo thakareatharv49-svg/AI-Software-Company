@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_cookie_security(self) -> "Settings":
         if self.environment.strip().lower() in {"production", "prod", "staging"}:
+            if self.debug:
+                raise ValueError("DEBUG must be false outside development")
+            if self.local_access_enabled:
+                raise ValueError(
+                    "LOCAL_ACCESS_ENABLED must be false outside development"
+                )
             if not self.session_cookie_secure:
                 raise ValueError(
                     "SESSION_COOKIE_SECURE must be true outside development"
