@@ -752,3 +752,30 @@ def test_full_stack_mission_accepts_common_routes_module_layout() -> None:
             test_command=["python", "-m", "pytest", "-q"],
         ),
     )
+
+
+def test_backend_validation_accepts_express_server_in_generic_entrypoint() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    OllamaProjectGenerator._validate_mission_output(
+        "Appointment Service API",
+        "Build a REST API for managing appointments.",
+        GeneratedProject(
+            files={
+                "index.js": (
+                    "const express = require('express');\n"
+                    "const app = express();\n"
+                    "app.get('/appointments', (_req, res) => res.json([]));\n"
+                    "app.listen(3000);\n"
+                ),
+                "tests/test_api.py": (
+                    "from pathlib import Path\n\n"
+                    "def test_appointment_api_has_route():\n"
+                    "    source = (Path(__file__).resolve().parents[1] / 'index.js').read_text()\n"
+                    "    assert 'express()' in source\n"
+                    "    assert \"app.get('/appointments'\" in source\n"
+                ),
+            },
+            test_command=["python", "-m", "pytest", "-q"],
+        ),
+    )

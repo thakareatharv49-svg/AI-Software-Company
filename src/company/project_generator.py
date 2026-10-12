@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -251,7 +252,7 @@ Rules:
             # Many natural-language missions say "Notes App" or "Finance App"
             # without the words "web" or "browser". Unless an explicit non-browser
             # deliverable above overrides it, treat an app request as browser-first.
-            " app", " apps", "notes app", "note taking app", "note-taking app",
+            "notes app", "note taking app", "note-taking app",
             "expense tracking app",
             "dashboard", "tracker", "planner", "storefront", "e-commerce",
             " ecommerce", "portfolio", "landing page", "management system",
@@ -263,7 +264,9 @@ Rules:
             "responsive app", "responsive application", "software product",
             "build a platform", "create a platform", "platform",
         )
-        return any(term in text for term in browser_terms)
+        return re.search(r"\bapps?\b", text) is not None or any(
+            term in text for term in browser_terms
+        )
 
     @staticmethod
     def _is_large_mission(name: str, objective: str) -> bool:
@@ -957,17 +960,40 @@ Requirements:
                 "auth.py", "auth.js", "auth.ts",
                 "wsgi.py", "asgi.py", "main.py", "app.py",
             }
+            # Some legitimate servers use a generic entry point such as
+            # index.js or index.ts. Recognize concrete framework/server calls in
+            # source content as well as conventional filenames and directories.
+            backend_source_markers = (
+                "from fastapi import",
+                "fastapi(",
+                "from flask import",
+                "flask(",
+                "from django",
+                "express(",
+                "http.createserver(",
+                "createserver(",
+                "app.listen(",
+                "uvicorn.run(",
+                "from aiohttp import",
+                "from sanic import",
+                "from starlette.applications import",
+                "from tornado.web import",
+                "new koa(",
+                "koa(",
+            )
             backend_files = []
-            for path in project.files:
+            for path, content in project.files.items():
                 normalized = path.replace("\\\\", "/").casefold()
                 pure_path = PurePosixPath(normalized)
                 if normalized.startswith(("tests/", "docs/")) or pure_path.name.startswith("test_"):
                     continue
+                source_content = content.casefold()
                 if (
                     bool(backend_directory_markers.intersection(
                         part.casefold() for part in pure_path.parts[:-1]
                     ))
                     or pure_path.name in backend_filenames
+                    or any(marker in source_content for marker in backend_source_markers)
                 ):
                     backend_files.append(path)
             if not backend_files:
