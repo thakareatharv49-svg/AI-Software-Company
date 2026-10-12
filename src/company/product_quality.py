@@ -245,6 +245,8 @@ _MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
     ("export", {"export", "download"}, {"export", "download"}),
     ("import", {"import", "upload"}, {"import", "upload"}),
     ("budget", {"budget"}, {"budget"}),
+    ("persistence", {"persistent", "persistence", "persist", "storage", "localstorage"}, {"persistent", "persistence", "persist", "storage", "localstorage"}),
+    ("validation", {"validation", "validate", "validated"}, {"validation", "validate", "validated"}),
     ("sorting", {"sort", "sorting", "order"}, {"sort", "sorting", "order"}),
     ("undo/redo", {"undo", "redo"}, {"undo", "redo"}),
 )
