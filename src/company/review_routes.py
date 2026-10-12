@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+import posixpath
 import re
 import tempfile
 from functools import lru_cache
@@ -202,6 +203,21 @@ _PREVIEW_CSP = (
 )
 
 
+def _preview_entrypoint(files: dict[str, str]) -> tuple[str, str] | None:
+    """Find a supported browser entry point and its asset root."""
+    for path in (
+        'index.html',
+        'frontend/index.html',
+        'public/index.html',
+        'dist/index.html',
+        'build/index.html',
+    ):
+        if path in files:
+            prefix = posixpath.dirname(path)
+            return path, '' if prefix == '.' else prefix
+    return None
+
+
 def _preview_headers(request: Request) -> dict[str, str]:
     """Headers for an untrusted generated page served in a browser sandbox."""
     origin = str(request.base_url).rstrip('/')
@@ -227,13 +243,14 @@ def live_product_preview(
     if job.status != MissionJobStatus.COMPLETED:
         raise HTTPException(status_code=409, detail='Only completed products can be previewed')
     _, files = _workspace_files(mission_id)
-    html = files.get('index.html')
-    if html is None:
+    entrypoint = _preview_entrypoint(files)
+    if entrypoint is None:
         raise HTTPException(
             status_code=422,
-            detail='Live preview requires a root index.html entry point',
+            detail='Live preview requires index.html in the product root or a supported frontend output folder',
         )
-    return HTMLResponse(content=html, headers=_preview_headers(request))
+    entrypoint_path, _ = entrypoint
+    return HTMLResponse(content=files[entrypoint_path], headers=_preview_headers(request))
 
 
 @router.get('/{mission_id}/review/live-preview/{asset_path:path}')
@@ -251,13 +268,22 @@ def live_product_preview_asset(
     if (
         not normalized
         or normalized.startswith('/')
-        or any(part in {'', '.', '..'} for part in normalized.split('/'))
         or (len(normalized) >= 2 and normalized[1] == ':')
         or chr(0) in normalized
     ):
         raise HTTPException(status_code=404, detail='Preview asset not found')
     _, files = _workspace_files(mission_id)
-    content = files.get(normalized)
+    entrypoint = _preview_entrypoint(files)
+    if entrypoint is None:
+        raise HTTPException(status_code=422, detail='Product has no supported browser entry point')
+    _, prefix = entrypoint
+    resolved = posixpath.normpath(posixpath.join(prefix, normalized))
+    if resolved in {'', '.', '..'} or resolved.startswith('../') or resolved.startswith('/'):
+        raise HTTPException(status_code=404, detail='Preview asset not found')
+    content = files.get(resolved)
+    if content is None and '..' not in normalized.split('/'):
+        # Some nested apps intentionally share assets from the product root.
+        content = files.get(posixpath.normpath(normalized))
     if content is None:
         raise HTTPException(status_code=404, detail='Preview asset not found')
     media_type = mimetypes.guess_type(normalized)[0] or 'text/plain'
