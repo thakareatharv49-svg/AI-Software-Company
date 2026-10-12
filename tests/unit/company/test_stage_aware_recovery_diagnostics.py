@@ -115,3 +115,13 @@ def test_generated_javascript_test_discovery_includes_source_tests() -> None:
     assert detect({"src/app.test.js": "test('works', () => {})"})
     assert detect({"specs/app.spec.js": "test('works', () => {})"})
     assert not detect({"src/app.js": "export const value = 1"})
+
+
+def test_generated_javascript_test_discovery_supports_common_node_module_formats() -> None:
+    detect = CompanyExecutionPipeline._has_generated_javascript_tests
+
+    assert detect({"tests/api.test.cjs": "test('works', () => {})"})
+    assert detect({"src/api.spec.mjs": "test('works', () => {})"})
+    assert detect({"tests/ui.test.js": "test('works', () => {})"})
+    assert not detect({"src/app.cjs": "module.exports = {}"})
+    assert not detect({"src/app.mjs": "export const value = 1"})
