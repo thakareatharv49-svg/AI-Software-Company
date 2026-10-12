@@ -1285,15 +1285,26 @@ Requirements:
         files: dict[str, str],
         failure: str,
     ) -> GeneratedProject:
+        targeted_paths = self._targeted_repair_paths(files, failure)
+        context_paths = targeted_paths or list(files)
         project = "\n\n".join(
-            f"FILE: {path}\n{content}" for path, content in files.items()
+            f"FILE: {path}\n{files[path]}" for path in context_paths
+        )
+        repair_scope = (
+            "TARGETED REPAIR: return only the complete replacement contents for these existing files: "
+            + ", ".join(targeted_paths)
+            + ". All other project files must remain unchanged."
+            if targeted_paths
+            else "FULL REPAIR: return complete contents for every project file that needs to exist after repair."
         )
         prompt = f"""Repair this generated software product so its tests pass.
 
 QA FAILURE:
 {failure}
 
-CURRENT PROJECT:
+{repair_scope}
+
+RELEVANT PROJECT FILES:
 {project}
 
 Return ONLY valid JSON with this shape:
@@ -1306,7 +1317,8 @@ Rules:
 - Keep the original mission objective and product category; never replace it with a generic demo.
 - If the failure mentions preview validation, add the missing root index.html or referenced local assets and preserve all existing working features.
 - Do not weaken, remove, or skip tests just to make them pass.
-- Return the COMPLETE contents of every file that should exist after repair.
+- In targeted mode, return only the requested target files; never invent or rewrite unrelated files.
+- In full-repair mode, return the COMPLETE contents of every file that should exist after repair.
 - If this is a browser/web app, preserve and improve the visual polish and responsive behavior; do not reduce it to a bare functional demo.
 - Keep tests under tests/.
 - Use only safe relative file paths.
@@ -1334,9 +1346,46 @@ Rules:
             "options": {"temperature": 0.0, "num_predict": 8192},
         }
         try:
-            return self._parse(await self._call(payload))
+            repaired = self._parse(await self._call(payload))
+            if targeted_paths:
+                merged_files = dict(files)
+                changed = False
+                for path in targeted_paths:
+                    replacement = repaired.files.get(path)
+                    if replacement is not None:
+                        merged_files[path] = replacement
+                        changed = True
+                if not changed:
+                    raise RuntimeError(
+                        "Targeted repair response did not include any requested files"
+                    )
+                return GeneratedProject(
+                    files=merged_files,
+                    test_command=repaired.test_command,
+                )
+            return repaired
         except RuntimeError:
             return self._fallback_repair(files, failure)
+
+    @staticmethod
+    def _targeted_repair_paths(files: dict[str, str], failure: str) -> list[str]:
+        """Find existing files named by QA diagnostics to avoid rewriting healthy modules."""
+        candidates = re.findall(
+            r"""['"`]([^'"`\n]+\.(?:py|js|mjs|cjs|ts|tsx|jsx|html|css|json|toml|ya?ml))['"`]""",
+            failure,
+            flags=re.IGNORECASE,
+        )
+        normalized = {
+            str(PurePosixPath(path.replace("\\", "/"))): path
+            for path in files
+        }
+        targets: list[str] = []
+        for candidate in candidates:
+            normalized_candidate = str(PurePosixPath(candidate.replace("\\", "/")))
+            original = normalized.get(normalized_candidate)
+            if original is not None and original not in targets:
+                targets.append(original)
+        return targets
 
     def _fallback_tic_tac_toe(self) -> GeneratedProject:
         """Return a deterministic playable browser Tic-Tac-Toe project."""
