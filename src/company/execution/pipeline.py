@@ -328,15 +328,23 @@ class CompanyExecutionPipeline:
         # Browser products can ship executable Node test suites as well as
         # Python tests. Run conventional Node test files independently unless the
         # configured QA command already invokes Node's built-in test runner.
-        has_javascript_tests = self._has_generated_javascript_tests(files)
+        javascript_test_paths = self._generated_javascript_test_paths(files)
+        has_javascript_tests = bool(javascript_test_paths)
         runs_node_tests = any(
             part == "--test" and index > 0
             and configured_command[index - 1] in {"node", "node.exe"}
             for index, part in enumerate(configured_command)
         )
-        if has_javascript_tests and not runs_node_tests:
+        has_non_default_node_test_names = any(
+            ".spec." in path.casefold() for path in javascript_test_paths
+        )
+        if has_javascript_tests and (
+            not runs_node_tests or has_non_default_node_test_names
+        ):
+            # Explicit paths ensure .spec.* suites run too; Node's default
+            # discovery patterns do not include every naming convention.
             javascript_test_request = qa_request.model_copy(
-                update={"command": ["node", "--test"]}
+                update={"command": ["node", "--test", *javascript_test_paths]}
             )
             javascript_test_debug = await self.debugger.run(
                 javascript_test_request,
@@ -808,27 +816,31 @@ class CompanyExecutionPipeline:
             filename = normalized.rsplit("/", 1)[-1]
             if not normalized.endswith(".py"):
                 continue
-            if normalized.startswith("tests/") or filename.startswith("test_") or filename.endswith("_test.py"):
+            if filename.startswith("test_") or filename.endswith("_test.py"):
                 return True
         return False
 
     @staticmethod
+    def _generated_javascript_test_paths(files: dict[str, str]) -> list[str]:
+        """Return generated Node test files that should be executed explicitly."""
+        suffixes = (
+            ".test.js",
+            ".spec.js",
+            ".test.cjs",
+            ".spec.cjs",
+            ".test.mjs",
+            ".spec.mjs",
+        )
+        return sorted(
+            path.replace("\\", "/")
+            for path in files
+            if path.replace("\\", "/").casefold().endswith(suffixes)
+        )
+
     @staticmethod
     def _has_generated_javascript_tests(files: dict[str, str]) -> bool:
         """Detect Node test suites regardless of directory or module format."""
-        return any(
-            path.replace("\\", "/").casefold().endswith(
-                (
-                    ".test.js",
-                    ".spec.js",
-                    ".test.cjs",
-                    ".spec.cjs",
-                    ".test.mjs",
-                    ".spec.mjs",
-                )
-            )
-            for path in files
-        )
+        return bool(CompanyExecutionPipeline._generated_javascript_test_paths(files))
 
     @staticmethod
     def _classify_recovery_stage(error: Exception) -> str:
