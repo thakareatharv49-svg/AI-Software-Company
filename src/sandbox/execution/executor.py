@@ -168,7 +168,7 @@ class SandboxExecutor:
             "--memory=512m", "--cpus=1", "--ulimit", "nofile=128:128",
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
             "--tmpfs", "/workspace:rw,exec,nosuid,nodev,size=512m,mode=1777",
-            "--workdir", "/workspace", "--user", uid_gid,
+            # Start from an existing writable tmpfs path: Docker creates the workdir\n            # before mounting tmpfs, which fails when the image rootfs is read-only.\n            "--workdir", "/tmp", "--user", uid_gid,
             "--env", "PYTHONDONTWRITEBYTECODE=1",
             "--env", "PYTHONNOUSERSITE=1", "--env", "HOME=/tmp",
             "--env", "TMPDIR=/tmp", self.container_image, "sleep", "infinity",
