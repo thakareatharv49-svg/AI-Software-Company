@@ -81,8 +81,8 @@ _STAGE_DEPENDENCIES: dict[MissionStage, list[str]] = {
 def _acceptance_criteria(mission: CompanyMission) -> list[str]:
     """Extract stable, human-reviewable requirements from the mission request."""
     criteria: list[str] = []
-    for chunk in re.split(r"(?<=[.!?])\\s+|\\n+|;\\s*", mission.objective.strip()):
-        normalized = chunk.strip(" \\t\\r\\n-*•")
+    for chunk in re.split(r"(?<=[.!?])\s+|\n+|;\s*", mission.objective.strip()):
+        normalized = chunk.strip(" \t\r\n-*•")
         if normalized and normalized not in criteria:
             criteria.append(normalized)
     for constraint in mission.constraints:
