@@ -535,6 +535,10 @@ class CompanyControlCenter:
                 working_directory=".",
             ),
             files=generated.files,
+            generation_model_calls=generated.model_calls,
+            generation_duration_ms=generated.duration_ms,
+            generation_prompt_tokens=generated.prompt_tokens,
+            generation_output_tokens=generated.generated_tokens,
             github_repository=github_repository,
             pull_request_head=pull_request_head,
         )
