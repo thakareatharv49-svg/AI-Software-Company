@@ -285,10 +285,19 @@ Rules:
         # tend to omit whole subsystems when asked to build these products at once.
         modular_product_markers = (
             "platform", "management system", "dashboard", "marketplace",
-            "booking system", "inventory system", "project management",
-            "learning management", "social network", "multi-user", "multi user",
+            "booking system", "reservation system", "inventory system",
+            "project management", "learning management", "social network",
+            "multi-user", "multi user", "multi-tenant", "multi tenant",
             "role-based access", "role based access", "e-commerce", "ecommerce",
-            "crm", "erp", "admin panel", "analytics",
+            "crm", "erp", "admin panel", "analytics", "event management",
+            "hospital management", "school management", "restaurant management",
+            "employee management", "property management", "fleet management",
+            "warehouse management", "document management", "content management",
+            "content management system", "customer relationship management",
+            "financial management", "point of sale", "pos system", "ticketing system",
+            "help desk", "support portal", "subscription billing", "workflow automation",
+            "human resources", "hr management", "supply chain", "knowledge base",
+            "community platform",
         )
         requires_modular_plan = any(marker in text for marker in modular_product_markers)
         # Three explicit capabilities are already enough to make a mission

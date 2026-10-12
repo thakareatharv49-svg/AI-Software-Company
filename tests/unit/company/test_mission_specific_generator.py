@@ -826,3 +826,28 @@ def test_normalize_test_command_rejects_arbitrary_node_commands() -> None:
     assert OllamaProjectGenerator._normalize_test_command(
         ["npm", "test"]
     ) == ["python", "-m", "pytest", "-q"]
+
+
+def test_short_enterprise_missions_use_modular_generation() -> None:
+    cases = (
+        ("Hospital Management", "Build a hospital management system."),
+        ("School Portal", "Build a school management system."),
+        ("Retail POS", "Build a point of sale system."),
+        ("Support Desk", "Build a help desk for customer support."),
+        ("Property Manager", "Build a property management platform."),
+        ("Subscription Billing", "Build a subscription billing service."),
+        ("HR Portal", "Build a human resources management app."),
+        ("Knowledge Base", "Build a knowledge base platform."),
+    )
+
+    for name, objective in cases:
+        assert OllamaProjectGenerator._is_large_mission(name, objective), (
+            f"{name!r} should use modular generation for a short but multi-subsystem brief"
+        )
+
+
+def test_simple_single_workflow_stays_on_small_mission_path() -> None:
+    assert not OllamaProjectGenerator._is_large_mission(
+        "Unit Converter",
+        "Build a simple unit converter.",
+    )
