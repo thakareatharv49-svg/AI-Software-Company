@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # Bound parallel agent work to avoid overwhelming local models and services.
     factory_max_parallel_tasks: int = Field(default=2, ge=1, le=8)
     # Prevent unattended continuous mode from accumulating an unbounded durable queue.
-    factory_max_queued_missions: int = Field(default=50, ge=1, le=500)
+    factory_max_queued_missions: int = Field(default=500, ge=1, le=500)
     # Retry transient agent failures, but always cap the number of attempts.
     factory_task_max_attempts: int = Field(default=2, ge=1, le=5)
 
