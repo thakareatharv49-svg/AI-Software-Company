@@ -84,7 +84,7 @@ def test_live_preview_asset_serves_only_workspace_text_and_rejects_traversal(mon
     monkeypatch.setattr(
         review_routes,
         "_workspace_files",
-        lambda mission_id: (None, {"assets/app.js": "console.log('safe')"}),
+        lambda mission_id: (None, {"index.html": "<h1>Demo</h1>", "assets/app.js": "console.log('safe')"}),
     )
 
     response = review_routes.live_product_preview_asset(
