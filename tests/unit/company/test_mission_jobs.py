@@ -121,3 +121,28 @@ def test_recover_running_plan_only_resets_in_flight_steps() -> None:
     assert recovered.steps[1].detail == "prior failure"
     assert recovered.steps[2].status == "planned"
     assert recovered.steps[2].detail is None
+
+
+
+def test_mission_plan_captures_acceptance_criteria_and_specialist_dependencies() -> None:
+    mission = CompanyMission(
+        name="Notes",
+        objective="Build a notes app. Support search; export notes.",
+        constraints=["Work offline"],
+    )
+    plan = build_mission_plan(mission)
+    steps = {step.stage.value: step for step in plan.steps}
+
+    assert plan.acceptance_criteria == [
+        "Build a notes app.",
+        "Support search",
+        "export notes.",
+        "Constraint: Work offline",
+    ]
+    assert steps["research"].depends_on == []
+    assert steps["architecture"].depends_on == ["product"]
+    assert steps["qa"].depends_on == ["execution"]
+    assert steps["security"].depends_on == ["execution"]
+    assert steps["github"].depends_on == ["qa", "security"]
+    assert steps["execution"].agent_role == "software_engineer"
+    assert steps["qa"].agent_role == "test_engineer"
