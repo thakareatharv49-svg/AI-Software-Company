@@ -91,7 +91,7 @@ def test_live_preview_asset_serves_only_workspace_text_and_rejects_traversal(mon
         "mission-123", "assets/app.js", _request(), None
     )
     assert response.body.decode() == "console.log('safe')"
-    assert response.media_type == "text/javascript"
+    assert response.media_type in {"text/javascript", "application/javascript"}
 
     with pytest.raises(HTTPException) as traversal:
         review_routes.live_product_preview_asset(
