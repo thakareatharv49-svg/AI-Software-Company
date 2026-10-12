@@ -3,6 +3,7 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -14,10 +15,11 @@ from src.sandbox.models.contracts import (
     SandboxResult,
 )
 from src.sandbox.models.enums import SandboxStatus
+from src.config.settings import settings
 
 
 class SandboxExecutor:
-    """Bounded subprocess runner; not an OS-level isolation boundary."""
+    """Bounded subprocess runner with an optional OS-isolated Docker backend."""
 
     ALLOWED_COMMANDS = {
         "python",
@@ -38,12 +40,18 @@ class SandboxExecutor:
         allowed_commands: set[str] | None = None,
         workspace: str | Path | None = None,
         default_limits: SandboxLimits | None = None,
+        mode: str | None = None,
+        container_image: str | None = None,
     ) -> None:
         self.allowed_commands = (
             allowed_commands if allowed_commands is not None else self.ALLOWED_COMMANDS
         )
         self.workspace = Path(workspace).resolve() if workspace is not None else None
         self.default_limits = default_limits or SandboxLimits()
+        self.mode = (mode or settings.sandbox_mode).strip().lower()
+        self.container_image = container_image or settings.sandbox_container_image
+        if self.mode not in {"host", "container"}:
+            raise ValueError("Sandbox mode must be 'host' or 'container'")
 
     def _validate(self, request: SandboxRequest) -> Path:
         if not request.command:
@@ -120,6 +128,8 @@ class SandboxExecutor:
         return await asyncio.to_thread(self.execute_sync, request)
 
     def execute_sync(self, request: SandboxRequest) -> SandboxResult:
+        if self.mode == "container":
+            return self._execute_container(request)
         command = self._normalize_python_command(request.command)
         request = request.model_copy(update={"command": command})
         working_directory = self._validate(request)
