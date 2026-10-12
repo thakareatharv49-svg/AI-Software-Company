@@ -616,7 +616,10 @@ class CompanyExecutionPipeline:
                 return result
 
             except Exception as exc:
-                recovery = self.recovery.record_failure(error=exc)
+                recovery = self.recovery.record_failure(
+                    error=exc,
+                    stage=self._classify_recovery_stage(exc),
+                )
 
                 self._publish_event(
                     "autonomous.run.failed",
@@ -628,6 +631,10 @@ class CompanyExecutionPipeline:
                         "recovery_action": recovery.action,
                         "retryable": recovery.retryable,
                         "attempt": recovery.attempt,
+                        "stage": recovery.stage,
+                        "error_type": recovery.error_type,
+                        "error_message": recovery.error_message,
+                        "repeated_failure": recovery.repeated_failure,
                     },
                 )
 
@@ -641,8 +648,25 @@ class CompanyExecutionPipeline:
                     payload={
                         "action": recovery.action,
                         "attempt": recovery.attempt,
+                        "error_type": recovery.error_type,
+                        "error_message": recovery.error_message,
+                        "repeated_failure": recovery.repeated_failure
                     },
                 )
+
+    @staticmethod
+    def _classify_recovery_stage(error: Exception) -> str:
+        """Map common pipeline errors to a stable recovery stage."""
+        message = str(error).casefold()
+        if "qa failed" in message or "product tests failed" in message:
+            return "qa"
+        if "code review failed" in message or "security" in message:
+            return "security"
+        if "artifact" in message or "browser preview" in message:
+            return "artifacts"
+        if "github" in message or "pull request" in message or "rate limit" in message:
+            return "github"
+        return "execution"
 
     def _select_repair_agent(self) -> str:
         agents = self.manager.agent_registry.list_agents()
