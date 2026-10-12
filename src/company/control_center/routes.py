@@ -9,6 +9,7 @@ from src.company.control_center.service import (
     control_center,
 )
 from src.company.mission_controller.models import MissionPlan
+from src.company.mission_controller.planner import validate_mission_plan
 from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.project_outputs import ProjectOutputManifest
 from src.company.readiness import ProductionReadinessReport, build_readiness_report
@@ -240,6 +241,25 @@ def mission_plan(
     if plan is None:
         raise HTTPException(status_code=404, detail="Mission plan not found")
     return plan
+
+
+@router.get("/missions/{mission_id}/plan/validation")
+def mission_plan_validation(
+    mission_id: str,
+    center: CompanyControlCenter = ControlCenter,
+) -> dict[str, object]:
+    plan = center.mission_plan(mission_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Mission plan not found")
+    issues = validate_mission_plan(plan)
+    return {
+        "mission_id": mission_id,
+        "valid": not issues,
+        "issues": issues,
+        "stage_count": len(plan.steps),
+        "engineering_task_count": len(plan.engineering_tasks),
+        "acceptance_criterion_count": len(plan.acceptance_criteria),
+    }
 
 
 @router.post("/missions/{mission_id}/execute", response_model=AgentResult)
