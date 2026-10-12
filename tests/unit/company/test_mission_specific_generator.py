@@ -779,3 +779,31 @@ def test_backend_validation_accepts_express_server_in_generic_entrypoint() -> No
             test_command=["python", "-m", "pytest", "-q"],
         ),
     )
+
+
+
+def test_backend_validation_accepts_modern_server_framework_signatures() -> None:
+    from src.company.project_generator import GeneratedProject
+
+    server_sources = (
+        ("hono.js", "const app = new Hono();\napp.get('/health', (c) => c.text('ok'));", "Hono"),
+        ("main.ts", "const app = await NestFactory.create(AppModule);", "NestFactory.create"),
+        ("server.js", "Bun.serve({ port: 3000, fetch: () => new Response('ok') });", "Bun.serve"),
+        ("main.ts", "Deno.serve(() => new Response('ok'));", "Deno.serve"),
+    )
+    for path, source, signature in server_sources:
+        OllamaProjectGenerator._validate_mission_output(
+            "Service API",
+            "Build a REST API service.",
+            GeneratedProject(
+                files={
+                    path: source,
+                    "tests/test_api.py": (
+                        "def test_api_uses_server_signature():\n"
+                        f"    source = {source!r}\n"
+                        f"    assert {signature!r} in source\n"
+                    ),
+                },
+                test_command=["python", "-m", "pytest", "-q"],
+            ),
+        )
