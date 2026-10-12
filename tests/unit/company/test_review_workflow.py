@@ -44,6 +44,10 @@ def test_feedback_requests_revision_and_resubmission_preserves_history():
     assert revised.status == ReviewStatus.CHANGES_REQUESTED
     assert revised.revision == 1
     assert revised.feedback[0].message == 'Add a calendar view'
+    assert revised.qa_passed is False
+    assert revised.security_passed is False
+    assert revised.qa_evidence == ''
+    assert revised.security_evidence == ''
     original_requirement_id = review.requirements[0].id
     resubmitted = prepare_review(
         revised,
