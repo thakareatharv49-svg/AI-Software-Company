@@ -3,7 +3,9 @@ from src.company.artifact_validation import validate_generated_artifacts
 
 def test_accepts_nonempty_safe_relative_artifacts() -> None:
     assert validate_generated_artifacts({
-        "index.html": "<main>Inventory</main>",
+        "index.html": '<link rel="stylesheet" href="style.css"><script src="app.js"></script>',
+        "style.css": "body { color: black; }",
+        "app.js": "console.log('ready');",
         "src/routes.py": "def health():\n    return {'status': 'ok'}\n",
     }) == []
 
@@ -42,3 +44,25 @@ def test_rejects_non_text_artifact_content() -> None:
 
     assert len(issues) == 1
     assert "non-text content" in issues[0]
+
+
+def test_rejects_missing_local_browser_assets() -> None:
+    issues = validate_generated_artifacts({
+        "index.html": (
+            '<link rel="stylesheet" href="styles/app.css">'
+            '<script src="app.js"></script>'
+        ),
+        "styles/app.css": "body { background: url('../images/grid.svg'); }",
+    })
+
+    assert any("missing local asset 'app.js'" in issue for issue in issues)
+    assert any("missing local asset '../images/grid.svg'" in issue for issue in issues)
+
+
+def test_ignores_external_urls_and_client_side_routes() -> None:
+    assert validate_generated_artifacts({
+        "index.html": (
+            '<a href="/settings">Settings</a>'
+            '<script src="https://cdn.example.com/library.js"></script>'
+        ),
+    }) == []
