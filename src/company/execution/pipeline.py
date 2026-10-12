@@ -628,6 +628,10 @@ class CompanyExecutionPipeline:
                         "recovery_action": recovery.action,
                         "retryable": recovery.retryable,
                         "attempt": recovery.attempt,
+                        "stage": recovery.stage,
+                        "error_type": recovery.error_type,
+                        "error_message": recovery.error_message,
+                        "repeated_failure": recovery.repeated_failure
                     },
                 )
 
@@ -641,6 +645,9 @@ class CompanyExecutionPipeline:
                     payload={
                         "action": recovery.action,
                         "attempt": recovery.attempt,
+                        "error_type": recovery.error_type,
+                        "error_message": recovery.error_message,
+                        "repeated_failure": recovery.repeated_failure
                     },
                 )
 
