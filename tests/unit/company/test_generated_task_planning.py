@@ -19,7 +19,7 @@ def test_generated_files_become_parallel_ready_subsystem_work_packages() -> None
 
     assert len(tasks) == 4
     assert [task.title for task in tasks] == [
-        "Integrate Inventory: application shell",
+        "Integrate Inventory: frontend",
         "Integrate Inventory: src/services",
         "Integrate Inventory: src/models",
         "Validate Inventory quality and tests",
