@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import mimetypes
 import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
 
 from src.company.control_center.routes import get_control_center
@@ -188,6 +190,77 @@ def preview_generated_product(
         total_bytes=sum(item.size_bytes for item in preview_files),
         files=preview_files,
     )
+
+
+
+_PREVIEW_CSP = (
+    "sandbox allow-scripts; default-src 'none'; "
+    "script-src {origin} 'unsafe-inline'; style-src {origin} 'unsafe-inline'; "
+    "img-src {origin} data: blob:; font-src {origin} data:; connect-src 'none'; "
+    "frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+)
+
+
+def _preview_headers(request: Request) -> dict[str, str]:
+    """Headers for an untrusted generated page served in a browser sandbox."""
+    origin = str(request.base_url).rstrip('/')
+    if not re.fullmatch(r'https?://[A-Za-z0-9.:-]+', origin):
+        raise HTTPException(status_code=400, detail='Invalid preview host')
+    return {
+        "Content-Security-Policy": _PREVIEW_CSP.format(origin=origin),
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Cache-Control": "no-store",
+        "Content-Disposition": "inline",
+    }
+
+
+@router.get('/{mission_id}/review/live-preview/', response_class=HTMLResponse)
+def live_product_preview(
+    mission_id: str,
+    request: Request,
+    center: Annotated[CompanyControlCenter, Depends(get_control_center)],
+) -> HTMLResponse:
+    """Render a generated static web app under a restrictive browser CSP sandbox."""
+    job = _get_job(mission_id, center)
+    if job.status != MissionJobStatus.COMPLETED:
+        raise HTTPException(status_code=409, detail='Only completed products can be previewed')
+    _, files = _workspace_files(mission_id)
+    html = files.get('index.html')
+    if html is None:
+        raise HTTPException(
+            status_code=422,
+            detail='Live preview requires a root index.html entry point',
+        )
+    return HTMLResponse(content=html, headers=_preview_headers(request))
+
+
+@router.get('/{mission_id}/review/live-preview/{asset_path:path}')
+def live_product_preview_asset(
+    mission_id: str,
+    asset_path: str,
+    request: Request,
+    center: Annotated[CompanyControlCenter, Depends(get_control_center)],
+) -> Response:
+    """Serve a safe text asset to the isolated preview without exposing host files."""
+    job = _get_job(mission_id, center)
+    if job.status != MissionJobStatus.COMPLETED:
+        raise HTTPException(status_code=409, detail='Only completed products can be previewed')
+    normalized = asset_path.replace(chr(92), '/')
+    if (
+        not normalized
+        or normalized.startswith('/')
+        or any(part in {'', '.', '..'} for part in normalized.split('/'))
+        or (len(normalized) >= 2 and normalized[1] == ':')
+        or '\\x00' in normalized
+    ):
+        raise HTTPException(status_code=404, detail='Preview asset not found')
+    _, files = _workspace_files(mission_id)
+    content = files.get(normalized)
+    if content is None:
+        raise HTTPException(status_code=404, detail='Preview asset not found')
+    media_type = mimetypes.guess_type(normalized)[0] or 'text/plain'
+    return Response(content=content, media_type=media_type, headers=_preview_headers(request))
 
 
 @router.post('/{mission_id}/review/submit', response_model=ProductReview)
