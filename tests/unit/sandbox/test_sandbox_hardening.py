@@ -145,3 +145,44 @@ def test_command_tools_uses_sandbox_environment(tmp_path: Path) -> None:
             os.environ.pop("SANDBOX_COMMAND_SECRET", None)
         else:
             os.environ["SANDBOX_COMMAND_SECRET"] = original
+
+
+def test_sandbox_caps_output_while_child_is_running(tmp_path: Path) -> None:
+    executor = SandboxExecutor()
+    request = SandboxRequest(
+        command=["python", "-c", "import sys; sys.stdout.write('x' * 5000000)"],
+        working_directory=str(tmp_path),
+        limits=SandboxLimits(max_output_bytes=128),
+    )
+
+    result = executor.execute_sync(request)
+
+    assert result.status == SandboxStatus.SUCCESS
+    assert len(result.stdout.encode("utf-8")) <= 128
+
+
+@pytest.mark.skipif(__import__("os").name != "posix", reason="POSIX process groups")
+def test_sandbox_timeout_terminates_child_process_group(tmp_path: Path) -> None:
+    import os
+    import signal
+    import time
+
+    marker = tmp_path / "child-survived"
+    child_code = (
+        "import time; "
+        f"time.sleep(1.5); open({str(marker)!r}, 'w').write('alive')"
+    )
+    parent_code = (
+        "import subprocess, sys, time; "
+        f"subprocess.Popen([sys.executable, '-c', {child_code!r}]); "
+        "time.sleep(10)"
+    )
+    result = SandboxExecutor().execute_sync(SandboxRequest(
+        command=["python", "-c", parent_code],
+        working_directory=str(tmp_path),
+        limits=SandboxLimits(timeout_seconds=0.2),
+    ))
+
+    assert result.status == SandboxStatus.TIMEOUT
+    time.sleep(1.7)
+    assert not marker.exists()
