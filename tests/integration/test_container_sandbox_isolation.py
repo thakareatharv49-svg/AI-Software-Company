@@ -50,3 +50,32 @@ def test_container_hides_host_secrets_and_has_no_network(tmp_path: Path, monkeyp
     assert "NETWORK_BLOCKED" in result.stdout
     assert "host-only-file-content" not in result.stdout
     assert "host-only-environment-value" not in result.stdout
+
+
+@pytest.mark.skipif(
+    not os.getenv("ASC_SANDBOX_TEST_IMAGE"),
+    reason="Docker isolation test image is not configured",
+)
+def test_container_writes_stay_in_ephemeral_workspace(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    source = workspace / "product-data.txt"
+    source.write_text("approved-source", encoding="utf-8")
+
+    result = SandboxExecutor(
+        workspace=workspace,
+        mode="container",
+        container_image=os.environ["ASC_SANDBOX_TEST_IMAGE"],
+    ).execute_sync(
+        SandboxRequest(
+            command=[
+                "python", "-c",
+                "from pathlib import Path; Path('product-data.txt').write_text('modified')",
+            ],
+            working_directory=str(workspace),
+            limits=SandboxLimits(timeout_seconds=20, max_output_bytes=2000),
+        )
+    )
+
+    assert result.status == SandboxStatus.SUCCESS, result.stderr
+    assert source.read_text(encoding="utf-8") == "approved-source"
