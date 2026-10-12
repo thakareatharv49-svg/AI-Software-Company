@@ -43,7 +43,7 @@ def test_production_accepts_https_and_secure_cookie() -> None:
     settings = Settings(
         _env_file=None,
         environment="production",
-            debug=False,
+        debug=False,
         public_base_url="https://example.com",
         session_cookie_secure=True,
         sandbox_mode="container",
