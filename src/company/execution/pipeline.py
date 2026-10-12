@@ -265,11 +265,7 @@ class CompanyExecutionPipeline:
         # product's own test suite. If tests are present and the configured QA
         # command did not already invoke pytest, run the suite separately in the
         # isolated project workspace before security review or delivery.
-        has_product_tests = any(
-            path.replace("\\\\", "/").startswith("tests/")
-            and path.endswith(".py")
-            for path in files
-        )
+        has_product_tests = self._has_generated_python_tests(files)
         configured_command = [part.casefold() for part in qa_request.command]
         runs_pytest = any(
             part == "pytest" or part.endswith("/pytest") or part.endswith("\\\\pytest.exe")
@@ -332,11 +328,7 @@ class CompanyExecutionPipeline:
         # Browser products can ship executable Node test suites as well as
         # Python tests. Run conventional Node test files independently unless the
         # configured QA command already invokes Node's built-in test runner.
-        has_javascript_tests = any(
-            path.replace("\\", "/").casefold().startswith("tests/")
-            and path.casefold().endswith((".test.js", ".spec.js"))
-            for path in files
-        )
+        has_javascript_tests = self._has_generated_javascript_tests(files)
         runs_node_tests = any(
             part == "--test" and index > 0
             and configured_command[index - 1] in {"node", "node.exe"}
@@ -806,6 +798,26 @@ class CompanyExecutionPipeline:
                 "changed_file_count": len(changed_paths),
                 "changed_paths": sorted(changed_paths)[:100],
             },
+        )
+
+    @staticmethod
+    def _has_generated_python_tests(files: dict[str, str]) -> bool:
+        """Detect pytest-discoverable suites outside the conventional tests/ folder too."""
+        for path in files:
+            normalized = path.replace("\\", "/").lstrip("./").casefold()
+            filename = normalized.rsplit("/", 1)[-1]
+            if not normalized.endswith(".py"):
+                continue
+            if normalized.startswith("tests/") or filename.startswith("test_") or filename.endswith("_test.py"):
+                return True
+        return False
+
+    @staticmethod
+    def _has_generated_javascript_tests(files: dict[str, str]) -> bool:
+        """Detect Node test suites regardless of whether they live in tests/ or src/."""
+        return any(
+            path.replace("\\", "/").casefold().endswith((".test.js", ".spec.js"))
+            for path in files
         )
 
     @staticmethod
