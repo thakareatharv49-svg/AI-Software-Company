@@ -183,6 +183,7 @@ async def test_failed_stage_gets_bounded_repair_retry_before_blocking() -> None:
 async def test_qa_stage_receives_explicit_evidence_expectations() -> None:
     class CapturingRuntime(FakeRuntime):
         def __init__(self):
+            super().__init__()
             self.last_prompt = ""
 
         async def generate(self, request):
