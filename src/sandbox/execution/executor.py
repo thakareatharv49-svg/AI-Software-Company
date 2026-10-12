@@ -200,8 +200,7 @@ class SandboxExecutor:
             copied = subprocess.run(
                 ["docker", "cp", "--archive", source_path, f"{container_id}:/workspace/"],
                 stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 timeout=30,
                 check=False,
