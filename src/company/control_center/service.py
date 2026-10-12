@@ -437,6 +437,25 @@ class CompanyControlCenter:
             self._sync_mission_from_job(job)
         return jobs
 
+    def delete_mission(self, mission_id: str) -> dict[str, object]:
+        """Delete one queued/blocked mission without touching generated products."""
+        job = self.mission_job(mission_id)
+        if job is None:
+            raise KeyError(mission_id)
+        if job.status not in {MissionJobStatus.QUEUED, MissionJobStatus.BLOCKED}:
+            raise ValueError(
+                f"Only queued or blocked missions can be deleted (current: {job.status.value})"
+            )
+        if self.factory_running():
+            raise RuntimeError("Stop the factory before deleting a mission")
+
+        self._factory.remove_missions({mission_id})
+        self._job_store.delete_many({mission_id})
+        with self._lock:
+            self._jobs.pop(mission_id, None)
+            self._missions.pop(mission_id, None)
+        return {"deleted": True, "mission_id": mission_id}
+
     def delete_queued_and_blocked_missions(self) -> dict[str, object]:
         """Delete queued/blocked mission records without touching products or output files."""
         if self.factory_running():
