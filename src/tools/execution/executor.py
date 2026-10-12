@@ -1,4 +1,5 @@
 from src.agents.execution.context import AgentExecutionContext
+from src.security.redaction import redact_sensitive_text, redact_sensitive_value
 from src.tools.models.contracts import ToolRequest, ToolResult
 from src.tools.registry.registry import ToolRegistry
 
@@ -34,10 +35,10 @@ class ToolExecutor:
         except Exception as exc:
             return ToolResult(
                 success=False,
-                error=str(exc),
+                error=redact_sensitive_text(str(exc)),
             )
 
         return ToolResult(
             success=True,
-            output=output,
+            output=redact_sensitive_value(output),
         )
