@@ -208,6 +208,21 @@ def mission_jobs(center: CompanyControlCenter = ControlCenter) -> list[MissionJo
     return center.mission_jobs()
 
 
+@router.delete("/missions/{mission_id}")
+def delete_mission(
+    mission_id: str,
+    center: CompanyControlCenter = ControlCenter,
+) -> dict[str, object]:
+    try:
+        return center.delete_mission(mission_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Mission job not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.post("/missions/cleanup")
 def cleanup_missions(center: CompanyControlCenter = ControlCenter) -> dict[str, object]:
     try:
