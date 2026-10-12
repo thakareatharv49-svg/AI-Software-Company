@@ -43,6 +43,18 @@ def test_production_accepts_https_and_secure_cookie() -> None:
         environment="production",
         public_base_url="https://example.com",
         session_cookie_secure=True,
+        sandbox_mode="container",
     )
 
     assert settings.session_cookie_secure is True
+
+
+def test_production_rejects_host_execution_mode() -> None:
+    with pytest.raises(ValidationError, match="SANDBOX_MODE"):
+        Settings(
+            _env_file=None,
+            environment="production",
+            public_base_url="https://example.com",
+            session_cookie_secure=True,
+            sandbox_mode="host",
+        )
