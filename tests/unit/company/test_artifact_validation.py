@@ -66,3 +66,11 @@ def test_ignores_external_urls_and_client_side_routes() -> None:
             '<script src="https://cdn.example.com/library.js"></script>'
         ),
     }) == []
+
+
+def test_resolves_assets_relative_to_nested_stylesheets() -> None:
+    assert validate_generated_artifacts({
+        "index.html": '<link rel="stylesheet" href="styles/app.css">',
+        "styles/app.css": "body { background: url('../images/grid.svg'); }",
+        "images/grid.svg": '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+    }) == []
