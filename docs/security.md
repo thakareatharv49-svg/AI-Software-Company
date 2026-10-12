@@ -8,35 +8,44 @@ and the operating environment, not by model instructions alone.
 
 1. Run automated tests and static checks on the exact artifact to be published.
 2. Scan generated files and diffs for credentials and dangerous execution patterns.
-3. Block publication when a critical security finding is unresolved.
+3. Block publication when a critical/high security finding is unresolved.
 4. Bind approval to an immutable artifact fingerprint; any changed artifact requires
    a fresh review and new approval.
 5. Keep customer workspace authorization server-side and verify ownership for every
    read and write. Never trust a workspace ID supplied by the client on its own.
-6. Keep write access to GitHub, shell execution, network access, and destructive
-   operations disabled unless the relevant policy explicitly grants them.
+6. Keep GitHub writes and destructive operations disabled unless policy explicitly
+   grants them. Untrusted code must not receive host credentials.
 7. Redact credentials from logs, user-visible errors, and audit metadata.
 
-## Execution isolation boundary
+## Generated-code execution
 
-The Python `SandboxExecutor` limits executable names, working-directory selection,
-environment inheritance, execution time, and captured output. These are useful
-application-level restrictions, **not an operating-system security sandbox**.
-A child process can still potentially read host files or use the network when the
-OS account permits it. Do not execute untrusted generated code on a production
-host with sensitive credentials. Production isolation requires a separate low-
-privilege OS account or container/VM, filesystem and network restrictions, resource
-quotas, and no mounted host secrets or control sockets.
+Development defaults to `SANDBOX_MODE=host` for compatibility, but host execution is
+not a security boundary. For production or staging, configuration validation requires
+`SANDBOX_MODE=container`; startup refuses unsafe host mode. Build the reviewed runtime
+image with `docker build -t ai-software-company-sandbox:latest docker/sandbox`.
+
+The container backend runs with no network, a read-only root filesystem, dropped Linux
+capabilities, no-new-privileges, process/memory/CPU/file-descriptor limits, a temporary
+filesystem, bounded output, and a single workspace bind mount. It does not mount host
+secrets or the Docker socket. Docker must be available and the image must already exist;
+the runner does not pull arbitrary images. If Docker is unavailable, isolated execution
+fails closed. The writable workspace is intentionally shared with the factory, so only
+the project workspace—not a home directory or repository containing credentials—should
+be passed as the sandbox root.
+
+The sandbox image provides Python, pytest, and Node for basic generated-app checks. Projects
+that need extra dependencies require a separate controlled dependency/build stage; do not
+solve that by mounting host virtual environments or enabling unrestricted network access.
 
 ## Secret scanning limitations
 
-The built-in scanner is heuristic and may miss encoded, split, encrypted, or
-unrecognized credentials. It can also report false positives. Use it as one
-release gate alongside repository-level secret scanning and credential rotation.
-Never print the matched source line or credential value in findings.
+The built-in scanner is heuristic and may miss encoded, split, encrypted, or unrecognized
+credentials. It can also report false positives. Use it as one release gate alongside
+repository-level scanning and credential rotation. Never print the matched source line or
+credential value in findings.
 
 ## Incident response
 
-If a credential is exposed: revoke/rotate it first, disable affected automation,
-identify affected commits and logs, inspect audit events, and only then remove the
-secret from source history. Removing a value from the latest file does not revoke it.
+If a credential is exposed: revoke/rotate it first, disable affected automation, identify
+affected commits and logs, inspect audit events, and only then remove the secret from
+source history. Removing a value from the latest file does not revoke it.
