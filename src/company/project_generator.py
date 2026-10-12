@@ -770,7 +770,13 @@ Rules:
             }
             browser_assets = {"index.html", "style.css", "app.js"}
 
-            def context_priority(item: tuple[str, str]) -> tuple[int, int, str]:
+            def context_priority(
+                item: tuple[str, str],
+                _direct_dependencies: set[str] = direct_dependencies,
+                _generating_tests: bool = generating_tests,
+                _browser_mission: bool = browser_mission,
+                _browser_assets: set[str] = browser_assets,
+            ) -> tuple[int, int, str]:
                 existing_path = item[0].casefold()
                 basename = existing_path.rsplit("/", 1)[-1]
                 is_test = (
@@ -781,9 +787,9 @@ Rules:
                 is_source = existing_path.endswith((".py", ".js", ".mjs", ".cjs"))
                 is_markup = existing_path.endswith((".html", ".htm"))
                 is_style = existing_path.endswith(".css")
-                if existing_path in direct_dependencies:
+                if existing_path in _direct_dependencies:
                     return (0, 0, existing_path)
-                if generating_tests:
+                if _generating_tests:
                     # Tests need implementation contracts first, not other tests.
                     if is_source:
                         return (1, 0, existing_path)
@@ -792,7 +798,7 @@ Rules:
                     if is_style:
                         return (3, 0, existing_path)
                     return (4 if is_test else 3, 0, existing_path)
-                if browser_mission and basename in browser_assets:
+                if _browser_mission and basename in _browser_assets:
                     return (1, 0, existing_path)
                 if is_source:
                     return (2, 0, existing_path)
