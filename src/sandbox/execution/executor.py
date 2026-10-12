@@ -155,6 +155,12 @@ class SandboxExecutor:
         os.close(cid_fd)
         os.unlink(cid_path)
         cli_env = {"PATH": os.environ.get("PATH", "")}
+        for key in (
+            "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CERT_PATH",
+            "DOCKER_TLS_VERIFY", "DOCKER_CONFIG", "HOME", "USERPROFILE",
+        ):
+            if key in os.environ:
+                cli_env[key] = os.environ[key]
         create_command = [
             "docker", "run", "--rm", "--detach", "--pull=never", "--cidfile", cid_path,
             "--network=none", "--read-only", "--cap-drop=ALL",
