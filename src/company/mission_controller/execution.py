@@ -81,23 +81,46 @@ class MissionExecutionPipeline:
             )
         )
 
-        result = await self.executor.execute(
-            AgentExecutionContext(
-                agent=agent,
-                allowed_permissions=frozenset(agent.permissions),
-            ),
-            AgentRequest(
+        step.attempts += 1
+        try:
+            result = await self.executor.execute(
+                AgentExecutionContext(
+                    agent=agent,
+                    allowed_permissions=frozenset(agent.permissions),
+                ),
+                AgentRequest(
+                    task_id=task_id,
+                    instruction=step.objective,
+                    context={
+                        "mission_id": mission.id,
+                        "mission_name": mission.name,
+                        "mission_objective": mission.objective,
+                        "constraints": mission.constraints,
+                        "stage": step.stage.value,
+                    },
+                ),
+            )
+        except Exception as exc:
+            # Runtime/provider errors must become an explicit failed stage rather
+            # than leaving the plan permanently marked as "running".
+            error = f"{type(exc).__name__}: {exc}"
+            step.status = "failed"
+            step.detail = error
+            self.orchestrator.block(error)
+            self.orchestrator.events.publish(
+                CompanyEvent(
+                    event_type="STAGE_FAILED",
+                    message=f"Stage failed: {step.stage.value}: {error}",
+                    project_id=self.orchestrator.state.current_project_id,
+                    task_id=task_id,
+                )
+            )
+            return AgentResult(
                 task_id=task_id,
-                instruction=step.objective,
-                context={
-                    "mission_id": mission.id,
-                    "mission_name": mission.name,
-                    "mission_objective": mission.objective,
-                    "constraints": mission.constraints,
-                    "stage": step.stage.value,
-                },
-            ),
-        )
+                agent_name=agent_name,
+                success=False,
+                error=error,
+            )
 
         if not result.success:
             step.status = "failed"

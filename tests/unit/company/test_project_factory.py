@@ -998,3 +998,35 @@ async def test_factory_contains_unexpected_worker_error_and_continues_queue() ->
         later.mission.id,
     ]
     assert factory._active_project is None
+
+
+
+@pytest.mark.asyncio
+async def test_executor_exception_marks_stage_failed_and_records_attempt() -> None:
+    class ExplodingExecutor:
+        async def execute(self, _context, _request):
+            raise RuntimeError("model provider unavailable")
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        ExplodingExecutor(),
+        AgentRegistry(),
+    )
+    mission = CompanyMission(
+        name="Provider outage",
+        objective="Build a multi-feature application",
+    )
+    plan = build_mission_plan(mission)
+    controller.start(mission)
+
+    result = await pipeline.execute_next(mission, plan)
+
+    first_step = plan.steps[0]
+    assert result.success is False
+    assert result.error == "RuntimeError: model provider unavailable"
+    assert first_step.status == "failed"
+    assert first_step.detail == result.error
+    assert first_step.attempts == 1
+    assert orchestrator.state.status.value != "running"
