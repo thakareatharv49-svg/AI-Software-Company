@@ -1362,9 +1362,17 @@ Rules:
 - Re-check the complete mission workflow, responsive layout, form validation, state persistence, and empty/error/success feedback before returning.
 """
         if "calculator" in f"{failure} {project}".lower():
-            return self._fallback_calculator()
+            fallback = self._fallback_calculator()
+            return GeneratedProject(
+                files=self._preserve_regression_tests(files, fallback.files),
+                test_command=fallback.test_command,
+            )
         if "tic tac toe" in f"{failure} {project}".lower() or "tictactoe" in f"{failure} {project}".lower() or "tic-tac-toe" in f"{failure} {project}".lower():
-            return self._fallback_tic_tac_toe()
+            fallback = self._fallback_tic_tac_toe()
+            return GeneratedProject(
+                files=self._preserve_regression_tests(files, fallback.files),
+                test_command=fallback.test_command,
+            )
 
         payload = {
             "model": settings.ollama_model,
@@ -1396,12 +1404,47 @@ Rules:
                         "Targeted repair response did not include any requested files"
                     )
                 return GeneratedProject(
-                    files=merged_files,
+                    files=self._preserve_regression_tests(
+                        files,
+                        merged_files,
+                        allow_test_changes=any(
+                            path.replace("\\", "/").casefold().startswith("tests/")
+                            for path in targeted_paths
+                        ),
+                    ),
                     test_command=repaired.test_command,
                 )
-            return repaired
+            return GeneratedProject(
+                files=self._preserve_regression_tests(files, repaired.files),
+                test_command=repaired.test_command,
+            )
         except RuntimeError:
-            return self._fallback_repair(files, failure)
+            fallback = self._fallback_repair(files, failure)
+            return GeneratedProject(
+                files=self._preserve_regression_tests(files, fallback.files),
+                test_command=fallback.test_command,
+            )
+
+    @staticmethod
+    def _preserve_regression_tests(
+        original_files: dict[str, str],
+        repaired_files: dict[str, str],
+        *,
+        allow_test_changes: bool = False,
+    ) -> dict[str, str]:
+        """Keep the existing regression suite unless a test file was explicitly targeted."""
+        merged = dict(repaired_files)
+        for path, source in original_files.items():
+            normalized = path.replace("\\", "/").casefold()
+            is_test = normalized.startswith("tests/") or (
+                PurePosixPath(normalized).name.startswith("test_")
+                and normalized.endswith(".py")
+            )
+            if not is_test:
+                continue
+            if not allow_test_changes or path not in merged:
+                merged[path] = source
+        return merged
 
     @staticmethod
     def _targeted_repair_paths(files: dict[str, str], failure: str) -> list[str]:
