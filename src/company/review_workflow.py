@@ -140,7 +140,19 @@ def request_changes(review: ProductReview, message: str) -> ProductReview:
     if review.status not in {ReviewStatus.IN_REVIEW, ReviewStatus.CHANGES_REQUESTED}:
         raise InvalidReviewTransition(f'Cannot request changes from {review.status.value}')
     feedback = Feedback(message=message)
-    return _updated(review, status=ReviewStatus.CHANGES_REQUESTED, feedback=[*review.feedback, feedback], revision=review.revision + 1, approved_at=None, published_at=None, repository_url=None)
+    return _updated(
+        review,
+        status=ReviewStatus.CHANGES_REQUESTED,
+        feedback=[*review.feedback, feedback],
+        revision=review.revision + 1,
+        qa_passed=False,
+        security_passed=False,
+        qa_evidence='',
+        security_evidence='',
+        approved_at=None,
+        published_at=None,
+        repository_url=None,
+    )
 
 def approve_review(review: ProductReview) -> ProductReview:
     if review.status != ReviewStatus.IN_REVIEW:
