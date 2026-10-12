@@ -374,9 +374,9 @@ def find_uncovered_mission_features(
         )
         test_cases.extend(match.group(2) for match in javascript_test_title.finditer(content))
 
-    if not test_cases:
-        return []  # Missing/empty-test policies report these separately.
-
+    # Keep checking requested features even when no test cases were found. The
+    # missing-test gate reports the absent suite, while this gate explains which
+    # mission workflows lack named behavioral coverage.
     issues: list[str] = []
     for feature, objective_aliases, test_aliases in _MISSION_FEATURES:
         if not objective_words.intersection(objective_aliases):
