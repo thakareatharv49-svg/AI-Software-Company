@@ -659,7 +659,14 @@ async def test_ollama_request_logs_timing_without_prompt_contents(monkeypatch, c
             return None
 
         def json(self):
-            return {"response": "generated result"}
+            return {
+                "response": "generated result",
+                "load_duration": 12_000_000,
+                "prompt_eval_duration": 34_000_000,
+                "eval_duration": 56_000_000,
+                "prompt_eval_count": 123,
+                "eval_count": 45,
+            }
 
     class FakeClient:
         def __init__(self, *, timeout):
@@ -687,4 +694,9 @@ async def test_ollama_request_logs_timing_without_prompt_contents(monkeypatch, c
     assert "prompt_chars=20" in caplog.text
     assert "response_chars=16" in caplog.text
     assert "outcome=success" in caplog.text
+    assert "ollama_load_ms=12" in caplog.text
+    assert "prompt_eval_ms=34" in caplog.text
+    assert "generation_ms=56" in caplog.text
+    assert "prompt_tokens=123" in caplog.text
+    assert "generated_tokens=45" in caplog.text
     assert "PRIVATE_MISSION_TEXT" not in caplog.text
