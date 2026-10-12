@@ -795,6 +795,7 @@ def test_manual_retry_resets_failed_plan_stages_and_persists_reset() -> None:
 
     queued_project = factory.queue[0]
     persisted_job = store.jobs[mission.id]
+    assert queued_project.retry_feedback == "Previous attempt failed"
     assert queued_project.plan.steps[0].status == "planned"
     assert queued_project.plan.steps[0].detail is None
     assert persisted_job.plan.steps[0].status == "planned"
