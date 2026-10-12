@@ -645,3 +645,46 @@ async def test_large_generation_keeps_file_context_bounded_and_dependency_first(
     assert "- index.html" in app_prompt
     assert "- index.html: App entry point" not in app_prompt
     assert "- style.css: Visual styling" not in app_prompt
+
+
+
+@pytest.mark.asyncio
+async def test_ollama_request_logs_timing_without_prompt_contents(monkeypatch, caplog):
+    import logging
+
+    from src.company import project_generator as generator_module
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"response": "generated result"}
+
+    class FakeClient:
+        def __init__(self, *, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback):
+            return False
+
+        async def post(self, url, *, json):
+            assert url.endswith("/api/generate")
+            return FakeResponse()
+
+    monkeypatch.setattr(generator_module.httpx, "AsyncClient", FakeClient)
+    caplog.set_level(logging.INFO, logger=generator_module.__name__)
+    result = await OllamaProjectGenerator()._call(
+        {"model": "test-model", "prompt": "PRIVATE_MISSION_TEXT", "stream": False}
+    )
+
+    assert result == "generated result"
+    assert "ollama_generation_request" in caplog.text
+    assert "model=test-model" in caplog.text
+    assert "prompt_chars=20" in caplog.text
+    assert "response_chars=16" in caplog.text
+    assert "outcome=success" in caplog.text
+    assert "PRIVATE_MISSION_TEXT" not in caplog.text

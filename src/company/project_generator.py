@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import ast
 import json
+import logging
 import re
 import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -15,6 +17,9 @@ from src.company.project_planning import order_manifest_paths
 import httpx
 
 from src.config.settings import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1841,42 +1846,63 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
 
     async def _call(self, payload: dict) -> str:
         model = str(payload.get("model", settings.ollama_model))
+        prompt = payload.get("prompt", "")
+        prompt_chars = len(prompt) if isinstance(prompt, str) else 0
+        started_at = time.perf_counter()
+        outcome = "error"
+        response_chars = 0
         try:
-            async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
-                response = await client.post(
-                    f"{settings.ollama_base_url.rstrip('/')}/api/generate",
-                    json=payload,
-                )
-                response.raise_for_status()
-                data = response.json()
-        except httpx.TimeoutException as exc:
-            raise RuntimeError(
-                "Ollama project generation timed out after "
-                f"{settings.ollama_timeout:g}s for model '{model}'. "
-                "Increase OLLAMA_TIMEOUT or use a faster/smaller mission."
-            ) from exc
-        except httpx.HTTPStatusError as exc:
-            body = exc.response.text[:500].replace("\\n", " ")
-            raise RuntimeError(
-                f"Ollama returned HTTP {exc.response.status_code} for model "
-                f"'{model}': {body}"
-            ) from exc
-        except httpx.HTTPError as exc:
-            raise RuntimeError(
-                f"Could not reach Ollama at {settings.ollama_base_url}: {exc}"
-            ) from exc
-        except ValueError as exc:
-            raise RuntimeError(
-                f"Ollama returned a non-JSON API response for model '{model}'"
-            ) from exc
+            try:
+                async with httpx.AsyncClient(timeout=settings.ollama_timeout) as client:
+                    response = await client.post(
+                        f"{settings.ollama_base_url.rstrip('/')}/api/generate",
+                        json=payload,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+            except httpx.TimeoutException as exc:
+                raise RuntimeError(
+                    "Ollama project generation timed out after "
+                    f"{settings.ollama_timeout:g}s for model '{model}'. "
+                    "Increase OLLAMA_TIMEOUT or use a faster/smaller mission."
+                ) from exc
+            except httpx.HTTPStatusError as exc:
+                body = exc.response.text[:500].replace("\\n", " ")
+                raise RuntimeError(
+                    f"Ollama returned HTTP {exc.response.status_code} for model "
+                    f"'{model}': {body}"
+                ) from exc
+            except httpx.HTTPError as exc:
+                raise RuntimeError(
+                    f"Could not reach Ollama at {settings.ollama_base_url}: {exc}"
+                ) from exc
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"Ollama returned a non-JSON API response for model '{model}'"
+                ) from exc
 
-        result = data.get("response")
-        if not isinstance(result, str) or not result.strip():
-            raise RuntimeError(
-                f"Ollama returned an empty generation for model '{model}'. "
-                "Try a smaller mission or a model with a larger context window."
+            result = data.get("response")
+            if not isinstance(result, str) or not result.strip():
+                raise RuntimeError(
+                    f"Ollama returned an empty generation for model '{model}'. "
+                    "Try a smaller mission or a model with a larger context window."
+                )
+            response_chars = len(result)
+            outcome = "success"
+            return result
+        finally:
+            # Log performance metadata only, never prompts or generated source.
+            # This lets operators distinguish model latency from oversized context
+            # without leaking mission content into application logs.
+            logger.info(
+                "ollama_generation_request model=%s duration_seconds=%.3f "
+                "prompt_chars=%d response_chars=%d outcome=%s",
+                model,
+                time.perf_counter() - started_at,
+                prompt_chars,
+                response_chars,
+                outcome,
             )
-        return result
 
     def _parse(self, response: str) -> GeneratedProject:
         try:
