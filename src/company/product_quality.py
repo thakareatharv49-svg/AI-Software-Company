@@ -330,21 +330,41 @@ def find_uncovered_mission_features(
 
 
 def find_missing_product_tests(files: Mapping[str, str]) -> list[str]:
-    """Require at least one conventional automated test module for broad projects."""
-    test_modules = [
-        path for path in files
-        if (
-            path.replace("\\", "/").casefold().rsplit("/", 1)[-1].startswith("test_")
-            or path.replace("\\", "/").casefold().rsplit("/", 1)[-1].endswith("_test.py")
-        ) and path.casefold().endswith(".py")
-    ]
+    """Require at least one conventional automated test module for broad projects.
+
+    Recognize common Python and JavaScript/TypeScript test naming conventions so
+    frontend-first projects are not rejected merely because they use Vitest,
+    Jest, or another JS test runner instead of pytest.
+    """
+    python_suffixes = (".py",)
+    javascript_suffixes = (".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts")
+    test_modules = []
+    for path in files:
+        normalized = path.replace("\\", "/").casefold()
+        filename = normalized.rsplit("/", 1)[-1]
+        if filename.endswith(python_suffixes) and (
+            filename.startswith("test_") or filename.endswith("_test.py")
+        ):
+            test_modules.append(path)
+            continue
+        if filename.endswith(javascript_suffixes) and (
+            filename.startswith("test_")
+            or filename.endswith((
+                "_test.js", "_test.jsx", "_test.mjs", "_test.cjs",
+                "_test.ts", "_test.tsx", "_test.mts", "_test.cts",
+                ".test.js", ".test.jsx", ".test.mjs", ".test.cjs",
+                ".test.ts", ".test.tsx", ".test.mts", ".test.cts",
+                ".spec.js", ".spec.jsx", ".spec.mjs", ".spec.cjs",
+                ".spec.ts", ".spec.tsx", ".spec.mts", ".spec.cts",
+            ))
+        ):
+            test_modules.append(path)
     if test_modules:
         return []
     return [
         "Generated project contains no automated test files. Add mission-specific "
         "behavioral tests and at least one edge case before delivery."
     ]
-
 
 
 _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
