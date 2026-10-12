@@ -22,12 +22,29 @@ from src.db.models.workspace import WorkspaceMembershipModel, WorkspaceModel
 from src.db.session import get_db
 from src.security.oauth_flow import issue_oauth_state, issue_pkce_verifier, pkce_s256_challenge
 from src.security.session_tokens import issue_session_token, session_expiry
+from src.security.rate_limit import InMemoryRateLimiter
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 _STATE_COOKIE = "asc_oauth_state"
 _VERIFIER_COOKIE = "asc_oauth_verifier"
 _SESSION_COOKIE = "asc_session"
 _COMPANY_WORKSPACE_ID = "00000000-0000-4000-8000-000000000001"
+_OAUTH_RATE_LIMITER = InMemoryRateLimiter()
+
+
+def _enforce_oauth_rate_limit(request: Request, action: str) -> None:
+    # Use the direct peer address; do not trust arbitrary X-Forwarded-For headers.
+    client_ip = request.client.host if request.client else "unknown"
+    limit = 12 if action == "start" else 20
+    decision = _OAUTH_RATE_LIMITER.check(
+        f"{action}:{client_ip}", limit=limit, window_seconds=60
+    )
+    if not decision.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many authentication requests. Try again shortly.",
+            headers={"Retry-After": str(decision.retry_after_seconds)},
+        )
 
 
 def _provider_config(provider: str) -> tuple[str, str, str, str]:
@@ -90,7 +107,8 @@ def _set_short_cookie(response: Response, name: str, value: str) -> None:
 
 
 @router.get("/{provider}/start")
-async def oauth_start(provider: str) -> RedirectResponse:
+async def oauth_start(provider: str, request: Request) -> RedirectResponse:
+    _enforce_oauth_rate_limit(request, "start")
     client_id, _, authorize_url, _ = _provider_config(provider)
     if not client_id:
         raise HTTPException(status_code=503, detail=f"{provider.title()} OAuth is not configured")
@@ -182,6 +200,7 @@ async def oauth_callback(
     state: str,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RedirectResponse:
+    _enforce_oauth_rate_limit(request, "callback")
     client_id, client_secret, _, _ = _provider_config(provider)
     expected_state = request.cookies.get(_STATE_COOKIE)
     verifier = request.cookies.get(_VERIFIER_COOKIE)
