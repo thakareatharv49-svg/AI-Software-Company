@@ -199,7 +199,7 @@ class SandboxExecutor:
             container_id = Path(cid_path).read_text(encoding="utf-8").strip()
             source_path = str(mount_root) + os.sep + "."
             copied = subprocess.run(
-                ["docker", "cp", "--archive", source_path, f"{container_id}:/workspace/"],
+                ["docker", "cp", "--archive", source_path, f"{container_id}:/tmp/"],
                 stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
@@ -212,6 +212,22 @@ class SandboxExecutor:
                     status=SandboxStatus.FAILED,
                     stderr=(copied.stderr or copied.stdout or "")[:2000],
                     error="Could not stage the project into the bounded sandbox workspace",
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                )
+            staged = subprocess.run(
+                ["docker", "exec", container_id, "cp", "-a", "/tmp/.", "/workspace/"],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+                env=cli_env,
+            )
+            if staged.returncode != 0:
+                return SandboxResult(
+                    status=SandboxStatus.FAILED,
+                    stderr=(staged.stderr or staged.stdout or "")[:2000],
+                    error="Could not copy staged project into the bounded sandbox workspace",
                     duration_ms=int((time.perf_counter() - started) * 1000),
                 )
 
