@@ -303,15 +303,32 @@ def find_uncovered_mission_features(
         return set(re.findall(r"[a-z]+", text.casefold()))
 
     objective_words = words(objective)
-    test_content = " ".join(
-        content
-        for path, content in files.items()
-        if (
-            path.replace("\\\\", "/").casefold().startswith("tests/")
-            or path.casefold().rsplit("/", 1)[-1].startswith("test_")
-            or path.casefold().endswith("_test.py")
-            or path.casefold().endswith((".test.js", ".spec.js", ".test.ts", ".spec.ts"))
+    javascript_test_suffixes = (
+        "_test.js", "_test.jsx", "_test.mjs", "_test.cjs",
+        "_test.ts", "_test.tsx", "_test.mts", "_test.cts",
+        ".test.js", ".test.jsx", ".test.mjs", ".test.cjs",
+        ".test.ts", ".test.tsx", ".test.mts", ".test.cts",
+        ".spec.js", ".spec.jsx", ".spec.mjs", ".spec.cjs",
+        ".spec.ts", ".spec.tsx", ".spec.mts", ".spec.cts",
+    )
+
+    def is_test_path(path: str) -> bool:
+        normalized = path.replace("\\", "/").casefold()
+        filename = normalized.rsplit("/", 1)[-1]
+        in_test_directory = (
+            normalized.startswith(("tests/", "__tests__/"))
+            or "/tests/" in normalized
+            or "/__tests__/" in normalized
         )
+        return (
+            in_test_directory
+            or filename.startswith("test_")
+            or filename.endswith("_test.py")
+            or filename.endswith(javascript_test_suffixes)
+        )
+
+    test_content = " ".join(
+        content for path, content in files.items() if is_test_path(path)
     )
     if not test_content:
         return []  # Missing-test policy reports this separately.
