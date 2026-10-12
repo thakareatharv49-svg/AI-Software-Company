@@ -862,6 +862,10 @@ Requirements:
 - Do not return markdown fences, explanations, or another file.
 - No placeholders for required behavior, remote dependencies, CDNs, secrets, or network calls.
 - For tests, verify meaningful mission-specific behavior and edge cases; do not test only file existence or copied strings.
+- Tests must call the actual implementation or exercise a real user workflow; do not copy the implementation logic into the test itself.
+- Browser acceptance tests should cover a complete mission-specific interaction and at least one validation/error edge case, asserting the resulting state or output.
+- Acceptance tests must exercise the actual generated implementation: import and call its public functions, execute its documented CLI/API, or drive real browser controls and assert observable state changes. Never reproduce the feature algorithm inside the test and assert only against that duplicate.
+- For browser apps, cover at least one complete mission-specific user workflow from input through the resulting visible/state change, plus a failure or validation edge case. When a browser automation dependency is not part of the project, expose the core behavior through testable functions and test those functions directly.
 - Keep this file complete and runnable with the other planned files.
 - Never return "coming soon", "lorem ipsum", "TODO: implement", or stub behavior for required functionality.
 - Keep the visual design and interactions consistent across all files; use real accessible controls and useful empty states.
