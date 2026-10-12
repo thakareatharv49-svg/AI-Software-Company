@@ -311,6 +311,21 @@ class CompanyExecutionPipeline:
             files,
         )
 
+        # Reject structurally broken deliverables before spending time on
+        # security review. The workspace has already been reconciled after QA,
+        # so this validates the exact files that would be reviewed and shipped.
+        artifact_issues = validate_generated_artifacts(files)
+        if artifact_issues:
+            self.project_engine.transition(project.id, ProjectStatus.BLOCKED)
+            self._publish_event(
+                "production.artifacts.rejected",
+                project_id=project.id,
+                payload={"artifact_issues": artifact_issues},
+            )
+            raise RuntimeError(
+                "Generated artifacts failed validation: " + " ".join(artifact_issues)
+            )
+
         self.project_engine.transition(
             project.id,
             ProjectStatus.SECURITY,
@@ -341,7 +356,6 @@ class CompanyExecutionPipeline:
 
         self.project_engine.transition(project.id, ProjectStatus.REVIEW)
 
-        artifact_issues = validate_generated_artifacts(files)
         gate = self.quality_gate.evaluate(
             qa_passed=qa_result.status == QATestStatus.PASSED,
             security_approved=review_result.status.value == "approved",
