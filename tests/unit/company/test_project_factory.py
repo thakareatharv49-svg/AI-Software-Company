@@ -1030,3 +1030,41 @@ async def test_executor_exception_marks_stage_failed_and_records_attempt() -> No
     assert first_step.detail == result.error
     assert first_step.attempts == 1
     assert orchestrator.state.status.value != "running"
+
+
+@pytest.mark.asyncio
+async def test_unsuccessful_executor_result_persists_stage_error_detail() -> None:
+    class UnsuccessfulExecutor:
+        async def execute(self, _context, _request):
+            from src.agents.models.contracts import AgentResult
+
+            return AgentResult(
+                task_id="task",
+                agent_name="research-agent",
+                success=False,
+                error="model request timed out",
+            )
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        UnsuccessfulExecutor(),
+        AgentRegistry(),
+    )
+    mission = CompanyMission(
+        name="Provider timeout",
+        objective="Build a multi-feature application",
+    )
+    plan = build_mission_plan(mission)
+    controller.start(mission)
+
+    result = await pipeline.execute_next(mission, plan)
+
+    first_step = plan.steps[0]
+    assert result.success is False
+    assert result.error == "model request timed out"
+    assert first_step.status == "failed"
+    assert first_step.detail == "model request timed out"
+    assert first_step.attempts == 1
+    assert orchestrator.state.status.value != "running"
