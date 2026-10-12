@@ -235,9 +235,9 @@ def find_weak_product_tests(files: Mapping[str, str]) -> list[str]:
 # Objective keywords are mapped to common implementation/test vocabulary. This is a
 # traceability guard, not a substitute for executing tests or reviewing behavior.
 _MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
-    ("create", {"create", "add", "insert", "crud"}, {"create", "add", "insert", "crud"}),
+    ("create", {"create", "creates", "add", "insert", "crud"}, {"create", "creates", "add", "insert", "crud"}),
     ("edit/update", {"edit", "update", "modify", "crud"}, {"edit", "update", "modify", "crud"}),
-    ("delete/remove", {"delete", "remove", "destroy", "crud"}, {"delete", "remove", "destroy", "crud"}),
+    ("delete/remove", {"delete", "deletes", "remove", "destroy", "crud"}, {"delete", "deletes", "remove", "destroy", "crud"}),
     ("search", {"search", "find", "query"}, {"search", "find", "query"}),
     ("filter", {"filter"}, {"filter"}),
     ("pin/favorite", {"pin", "favorite", "favourite", "star"}, {"pin", "favorite", "favourite", "star"}),
@@ -359,8 +359,7 @@ def find_uncovered_mission_features(
 
     test_cases: list[str] = []
     python_test_name = re.compile(
-        r"^\s*(?:async\s+)?def\s+(test_[A-Za-z0-9_]+)\s*\(",
-        re.MULTILINE,
+        r"\b(?:async\s+)?def\s+(test_[A-Za-z0-9_]+)\s*\(",
     )
     javascript_test_title = re.compile(
         r"""\b(?:test|it)\s*\(\s*(['\"`])([^'\"`]+)\1""",
@@ -369,7 +368,10 @@ def find_uncovered_mission_features(
     for path, content in files.items():
         if not is_test_path(path):
             continue
-        test_cases.extend(match.group(1) for match in python_test_name.finditer(content))
+        python_content = re.sub(r"(?m)#.*$", "", content)
+        test_cases.extend(
+            match.group(1) for match in python_test_name.finditer(python_content)
+        )
         test_cases.extend(match.group(2) for match in javascript_test_title.finditer(content))
 
     if not test_cases:
