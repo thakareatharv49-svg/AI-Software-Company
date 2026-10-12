@@ -26,3 +26,26 @@ def test_blocked_security_scan_emits_metadata_only_audit_event() -> None:
     assert kwargs["status"] == "blocked"
     assert kwargs["metadata"]["finding_count"] >= 1
     assert private_value not in repr(events)
+
+
+def test_mission_audit_entry_redacts_sensitive_message_and_metadata() -> None:
+    from src.company.audit import MissionAuditEntry
+
+    token = "ghp_" + "Z" * 32
+    entry = MissionAuditEntry(
+        id="audit-redaction",
+        mission_id="mission-a",
+        event_type="tool_failure",
+        message="Provider error with token " + token,
+        metadata={
+            "api_key": token,
+            "details": {"password": "plain-text-password", "status": "failed"},
+        },
+    )
+
+    serialized = entry.model_dump_json()
+    assert token not in serialized
+    assert "plain-text-password" not in serialized
+    assert entry.metadata["api_key"] == "[REDACTED]"
+    assert entry.metadata["details"]["password"] == "[REDACTED]"
+    assert entry.metadata["details"]["status"] == "failed"
