@@ -49,3 +49,13 @@ credential value in findings.
 If a credential is exposed: revoke/rotate it first, disable affected automation, identify
 affected commits and logs, inspect audit events, and only then remove the secret from
 source history. Removing a value from the latest file does not revoke it.
+
+## Emergency factory pause
+
+The owner-only `POST /api/factory/pause` endpoint blocks new submissions, retries,
+queue launches, and continuous-mode restarts. It deliberately lets a currently running
+project finish rather than cancelling an async worker unsafely. Use
+`POST /api/factory/resume` to release the pause. The current pause flag is process-local;
+set `FACTORY_START_PAUSED=true` to require an explicit resume after startup. Multi-worker
+deployments should use a shared durable control-state store and enforce the pause at every
+worker before enabling customer traffic.
