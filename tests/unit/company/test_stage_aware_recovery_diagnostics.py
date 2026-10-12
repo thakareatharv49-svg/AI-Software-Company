@@ -98,3 +98,20 @@ def test_pipeline_classifies_failures_into_recovery_stages() -> None:
     assert classify(RuntimeError("Generated artifacts failed validation")) == "artifacts"
     assert classify(RuntimeError("GitHub rate limit exceeded")) == "github"
     assert classify(RuntimeError("agent execution crashed")) == "execution"
+
+def test_generated_python_test_discovery_includes_root_and_source_tests() -> None:
+    detect = CompanyExecutionPipeline._has_generated_python_tests
+
+    assert detect({"test_app.py": "def test_app(): pass"})
+    assert detect({"src/test_service.py": "def test_service(): pass"})
+    assert detect({"src/service_test.py": "def test_service(): pass"})
+    assert detect({"tests/custom_suite.py": "def suite(): pass"})
+    assert not detect({"src/service.py": "def service(): pass"})
+
+
+def test_generated_javascript_test_discovery_includes_source_tests() -> None:
+    detect = CompanyExecutionPipeline._has_generated_javascript_tests
+
+    assert detect({"src/app.test.js": "test('works', () => {})"})
+    assert detect({"specs/app.spec.js": "test('works', () => {})"})
+    assert not detect({"src/app.js": "export const value = 1"})
