@@ -52,16 +52,10 @@ class ProductPreview(BaseModel):
 
 class SubmitReviewRequest(BaseModel):
     requirements: list[Requirement] = Field(min_length=1, max_length=200)
-    qa_evidence: str = Field(min_length=1, max_length=4000)
-    security_evidence: str = Field(min_length=1, max_length=4000)
-
-    @field_validator('qa_evidence', 'security_evidence')
-    @classmethod
-    def nonblank_gate_evidence(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError('QA and security evidence cannot be blank')
-        return value
+    # Legacy client fields remain accepted, but server-generated mission evidence
+    # is authoritative and caller-supplied text is never treated as proof.
+    qa_evidence: str | None = Field(default=None, max_length=4000)
+    security_evidence: str | None = Field(default=None, max_length=4000)
 
 
 class RequirementUpdateRequest(BaseModel):
@@ -274,6 +268,13 @@ def submit_product_for_review(
         raise HTTPException(status_code=409, detail='Only a completed, QA-checked product can enter human review')
     if not (PRODUCTS_ROOT / mission_id).is_dir():
         raise HTTPException(status_code=409, detail='Generated product workspace is unavailable for review')
+    plan = job.plan
+    qa_evidence = plan.qa_evidence
+    security_evidence = plan.security_evidence
+    if plan.qa_status != 'passed' or not qa_evidence:
+        raise HTTPException(status_code=409, detail='A successful factory QA run is required before review')
+    if plan.security_status != 'approved' or not security_evidence:
+        raise HTTPException(status_code=409, detail='A successful factory security review is required before human review')
     review = _get_review(mission_id, center)
     try:
         updated = prepare_review(
@@ -281,8 +282,8 @@ def submit_product_for_review(
             payload.requirements,
             qa_passed=True,
             security_passed=True,
-            qa_evidence=payload.qa_evidence,
-            security_evidence=payload.security_evidence,
+            qa_evidence=qa_evidence,
+            security_evidence=security_evidence,
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
