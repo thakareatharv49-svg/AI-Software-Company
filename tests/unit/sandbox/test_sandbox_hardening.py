@@ -163,8 +163,6 @@ def test_sandbox_caps_output_while_child_is_running(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(__import__("os").name != "posix", reason="POSIX process groups")
 def test_sandbox_timeout_terminates_child_process_group(tmp_path: Path) -> None:
-    import os
-    import signal
     import time
 
     marker = tmp_path / "child-survived"
