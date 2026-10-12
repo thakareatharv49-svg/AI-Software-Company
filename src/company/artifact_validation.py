@@ -105,7 +105,8 @@ def validate_generated_artifacts(files: Mapping[str, str]) -> list[str]:
                 # A srcset is a comma-separated list of URL + optional descriptor.
                 # Data URLs contain commas, so ignore them instead of splitting
                 # their payload into false file references.
-                for candidate in match.group(2).split(","):
+                srcset_value = re.sub(r"data:[^\\s]+", "", match.group(2), flags=re.IGNORECASE)
+                for candidate in srcset_value.split(","):
                     candidate = candidate.strip()
                     if candidate and not candidate.casefold().startswith("data:"):
                         references.append(candidate.split()[0])
