@@ -50,9 +50,12 @@ class RecoveryService:
             flags=re.IGNORECASE,
         )
         signature = (error_type, " ".join(normalized_message.casefold().split()))
-        # Only suppress identical retries when the caller identified the failing stage.
-        # Unclassified failures may be transient and should retain the bounded retry budget.
-        repeated_failure = stage is not None and self._last_error_signature.get(key) == signature
+        # Only suppress deterministic validation failures. Infrastructure, execution,
+        # and reviewer errors can be transient even when their messages are identical.
+        repeated_failure = (
+            stage in {"qa", "artifacts"}
+            and self._last_error_signature.get(key) == signature
+        )
         self._last_error_signature[key] = signature
         retryable = attempt < self.max_attempts and not repeated_failure
         if repeated_failure:
