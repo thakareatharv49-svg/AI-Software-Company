@@ -642,3 +642,6 @@ async def test_large_generation_keeps_file_context_bounded_and_dependency_first(
         if "File to generate: app.js" in prompt
     )
     assert "FILE: index.html" in app_prompt
+    assert "- index.html" in app_prompt
+    assert "- index.html: App entry point" not in app_prompt
+    assert "- style.css: Visual styling" not in app_prompt
