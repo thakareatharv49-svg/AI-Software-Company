@@ -137,3 +137,76 @@ async def test_execution_selects_only_dependency_ready_stages_and_uses_specialis
     assert result.task_id == f"task:{mission.id}:research"
     assert next(step for step in plan.steps if step.stage.value == "research").status == "completed"
     assert registry.get("research-agent").role == "research_analyst"
+
+
+@pytest.mark.asyncio
+async def test_failed_stage_gets_bounded_repair_retry_before_blocking() -> None:
+    class FlakyRuntime:
+        def __init__(self):
+            self.calls = 0
+
+        async def generate(self, request):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("temporary provider failure")
+            return ModelResponse(
+                content="recovered after retry",
+                model="fake",
+                provider="fake",
+            )
+
+    runtime = FlakyRuntime()
+    orchestrator = CompanyOrchestrator()
+    mission = CompanyMission(name="Retry X", objective="Create X")
+    controller = MissionController(orchestrator)
+    plan, _ = controller.start(mission)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(runtime),
+        AgentRegistry(),
+    )
+
+    result = await pipeline.execute_next(mission, plan)
+
+    assert result.success is True
+    assert runtime.calls == 2
+    assert plan.steps[0].status == "completed"
+    assert plan.steps[0].attempts == 2
+    assert orchestrator.state.status.value == "running"
+    assert any(
+        event.event_type == "STAGE_REPAIR_STARTED"
+        for event in orchestrator.events.list_events()
+    )
+
+
+@pytest.mark.asyncio
+async def test_qa_stage_receives_explicit_evidence_expectations() -> None:
+    class CapturingRuntime(FakeRuntime):
+        def __init__(self):
+            self.last_prompt = ""
+
+        async def generate(self, request):
+            self.last_prompt = request.prompt
+            return await super().generate(request)
+
+    runtime = CapturingRuntime()
+    orchestrator = CompanyOrchestrator()
+    mission = CompanyMission(name="QA evidence", objective="Create X")
+    controller = MissionController(orchestrator)
+    plan, _ = controller.start(mission)
+    for step in plan.steps:
+        if step.stage.value in {
+            "research", "product", "architecture", "tasks", "agents", "execution"
+        }:
+            step.status = "completed"
+
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(runtime),
+        AgentRegistry(),
+    )
+    result = await pipeline.execute_next(mission, plan)
+
+    assert result.success is True
+    assert "Report the exact checks performed." in runtime.last_prompt
+    assert "Do not report success when required checks were not run." in runtime.last_prompt
