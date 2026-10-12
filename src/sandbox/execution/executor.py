@@ -128,7 +128,7 @@ class SandboxExecutor:
         return await asyncio.to_thread(self.execute_sync, request)
 
     def _execute_container(self, request: SandboxRequest) -> SandboxResult:
-        """Run generated code with network, capability, filesystem, and resource limits."""
+        """Run code in a networkless container with a size-limited ephemeral workspace."""
         command = list(request.command)
         executable = Path(command[0]).name.lower() if command else ""
         aliases = {
@@ -144,7 +144,7 @@ class SandboxExecutor:
         try:
             relative_workdir = working_directory.relative_to(mount_root).as_posix()
         except ValueError as exc:
-            raise PermissionError("Working directory is outside the container mount") from exc
+            raise PermissionError("Working directory is outside the container workspace") from exc
         container_workdir = (
             "/workspace" if relative_workdir == "." else "/workspace/" + relative_workdir
         )
@@ -154,34 +154,77 @@ class SandboxExecutor:
         cid_fd, cid_path = tempfile.mkstemp(prefix="asc-sandbox-", suffix=".cid")
         os.close(cid_fd)
         os.unlink(cid_path)
-        docker_command = [
-            "docker", "run", "--rm", "--pull=never", "--cidfile", cid_path,
+        cli_env = {"PATH": os.environ.get("PATH", "")}
+        create_command = [
+            "docker", "run", "--rm", "--detach", "--pull=never", "--cidfile", cid_path,
             "--network=none", "--read-only", "--cap-drop=ALL",
             "--security-opt=no-new-privileges", "--pids-limit=64",
             "--memory=512m", "--cpus=1", "--ulimit", "nofile=128:128",
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
             "--tmpfs", "/workspace:rw,exec,nosuid,nodev,size=512m,mode=1777",
-            "--mount", f"type=bind,source={mount_root},target=/input,readonly",
             "--workdir", "/workspace", "--user", uid_gid,
             "--env", "PYTHONDONTWRITEBYTECODE=1",
             "--env", "PYTHONNOUSERSITE=1", "--env", "HOME=/tmp",
-            "--env", "TMPDIR=/tmp", self.container_image, *request.command,
+            "--env", "TMPDIR=/tmp", self.container_image, "sleep", "infinity",
         ]
         started = time.perf_counter()
         process: subprocess.Popen[bytes] | None = None
         stdout_bytes = bytearray()
         stderr_bytes = bytearray()
         timed_out = False
-        popen_kwargs: dict[str, object] = {}
-        if os.name == "posix":
-            popen_kwargs["start_new_session"] = True
         try:
-            process = subprocess.Popen(
-                docker_command,
+            created = subprocess.run(
+                create_command,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env={"PATH": os.environ.get("PATH", "")},
+                text=True,
+                timeout=30,
+                check=False,
+                env=cli_env,
+            )
+            if created.returncode != 0:
+                return SandboxResult(
+                    status=SandboxStatus.FAILED,
+                    stderr=(created.stderr or created.stdout or "")[:2000],
+                    error="Could not start the isolated container",
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                )
+            container_id = Path(cid_path).read_text(encoding="utf-8").strip()
+            source_path = str(mount_root / ".")
+            copied = subprocess.run(
+                ["docker", "cp", "--archive", source_path, f"{container_id}:/workspace/"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=30,
+                check=False,
+                env=cli_env,
+            )
+            if copied.returncode != 0:
+                return SandboxResult(
+                    status=SandboxStatus.FAILED,
+                    stderr=(copied.stderr or copied.stdout or "")[:2000],
+                    error="Could not stage the project into the bounded sandbox workspace",
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                )
+
+            docker_exec = [
+                "docker", "exec", "--workdir", container_workdir, "--user", uid_gid,
+                "--env", "PYTHONDONTWRITEBYTECODE=1", "--env", "PYTHONNOUSERSITE=1",
+                "--env", "HOME=/tmp", "--env", "TMPDIR=/tmp",
+                container_id, *request.command,
+            ]
+            popen_kwargs: dict[str, object] = {}
+            if os.name == "posix":
+                popen_kwargs["start_new_session"] = True
+            process = subprocess.Popen(
+                docker_exec,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=cli_env,
                 **popen_kwargs,
             )
             assert process.stdout is not None
@@ -204,7 +247,6 @@ class SandboxExecutor:
                 timed_out = True
                 self._terminate_process_tree(process)
                 process.wait()
-                self._stop_container(cid_path)
             stdout_thread.join()
             stderr_thread.join()
         except FileNotFoundError:
@@ -213,7 +255,14 @@ class SandboxExecutor:
                 error="Docker is unavailable; isolated execution was refused",
                 duration_ms=int((time.perf_counter() - started) * 1000),
             )
+        except subprocess.TimeoutExpired:
+            return SandboxResult(
+                status=SandboxStatus.TIMEOUT,
+                error="Timed out while preparing the isolated workspace",
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
         finally:
+            self._stop_container(cid_path)
             try:
                 Path(cid_path).unlink(missing_ok=True)
             except OSError:
@@ -243,7 +292,7 @@ class SandboxExecutor:
 
     @staticmethod
     def _stop_container(cid_path: str) -> None:
-        """Stop a daemon-side container if its Docker client times out."""
+        """Stop/remove the isolated container if it still exists."""
         try:
             container_id = Path(cid_path).read_text(encoding="utf-8").strip()
         except OSError:
