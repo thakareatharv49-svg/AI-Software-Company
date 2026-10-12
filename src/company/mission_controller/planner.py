@@ -1,6 +1,11 @@
 import re
 
-from src.company.mission_controller.models import MissionPlan, MissionStage, PlannedStep
+from src.company.mission_controller.models import (
+    EngineeringTask,
+    MissionPlan,
+    MissionStage,
+    PlannedStep,
+)
 from src.company.models.contracts import CompanyMission
 
 
@@ -94,14 +99,57 @@ def _acceptance_criteria(mission: CompanyMission) -> list[str]:
     return criteria or [mission.objective.strip()]
 
 
+def _build_engineering_tasks(criteria: list[str]) -> list[EngineeringTask]:
+    """Turn each user requirement into design, implementation, and verification work."""
+    tasks: list[EngineeringTask] = []
+    for index, requirement in enumerate(criteria, start=1):
+        prefix = f"req-{index:03d}"
+        design_id = f"{prefix}-design"
+        implementation_id = f"{prefix}-implementation"
+        verification_id = f"{prefix}-verification"
+        tasks.extend(
+            [
+                EngineeringTask(
+                    id=design_id,
+                    title=f"Design: {requirement}",
+                    requirement=requirement,
+                    workstream="design",
+                    agent_role="software_architect",
+                    acceptance_check="Interfaces, data needs, and edge cases are documented.",
+                ),
+                EngineeringTask(
+                    id=implementation_id,
+                    title=f"Implement: {requirement}",
+                    requirement=requirement,
+                    workstream="implementation",
+                    depends_on=[design_id],
+                    agent_role="software_engineer",
+                    acceptance_check=f"Product behavior implements this requirement: {requirement}",
+                ),
+                EngineeringTask(
+                    id=verification_id,
+                    title=f"Verify: {requirement}",
+                    requirement=requirement,
+                    workstream="verification",
+                    depends_on=[implementation_id],
+                    agent_role="test_engineer",
+                    acceptance_check=f"An automated test proves the requirement: {requirement}",
+                ),
+            ]
+        )
+    return tasks
+
+
 def build_mission_plan(mission: CompanyMission) -> MissionPlan:
     """Build a durable engineering plan with requirements, roles, and dependencies."""
+    criteria = _acceptance_criteria(mission)
     return MissionPlan(
         mission_id=mission.id,
         name=mission.name,
         objective=mission.objective,
         constraints=list(mission.constraints),
-        acceptance_criteria=_acceptance_criteria(mission),
+        acceptance_criteria=criteria,
+        engineering_tasks=_build_engineering_tasks(criteria),
         steps=[
             PlannedStep(
                 stage=stage,
