@@ -195,6 +195,7 @@ async def test_run_end_to_end_recovers_from_transient_failure(tmp_path: Path):
     assert len(pipeline.manager.task_engine.list(project_id=result.project.id)) == 1
 
     assert len(failed_events) == 2
+    assert all(event.project_id == result.project.id for event in failed_events)
     assert [event.payload["attempt"] for event in failed_events] == [1, 2]
     assert [
         event.payload["recovery_action"] for event in failed_events
