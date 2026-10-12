@@ -355,6 +355,17 @@ def stop_continuous_factory(
         ),
     }
 
+@router.post("/factory/pause")
+def pause_factory(center: CompanyControlCenter = ControlCenter) -> dict[str, object]:
+    """Emergency pause: block new work while the active project exits safely."""
+    return center.pause_factory()
+
+
+@router.post("/factory/resume")
+def resume_factory(center: CompanyControlCenter = ControlCenter) -> dict[str, object]:
+    return center.resume_factory()
+
+
 @router.get("/factory/status")
 def factory_status(center: CompanyControlCenter = ControlCenter) -> dict[str, object]:
     """Expose durable queue state, not only the current process's in-memory queue."""
@@ -418,6 +429,7 @@ def factory_status(center: CompanyControlCenter = ControlCenter) -> dict[str, ob
     return {
         "running": center.factory_running(),
         "continuous": center.continuous_factory_enabled(),
+        "paused": center.factory_paused(),
         "queued_projects": len(queued_jobs),
         "queue_counts": counts,
         "queue_preview": queue_preview,

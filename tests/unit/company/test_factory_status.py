@@ -41,6 +41,9 @@ def test_factory_status_reports_durable_queue_and_live_order():
         def continuous_factory_enabled(self):
             return True
 
+        def factory_paused(self):
+            return False
+
     payload = factory_status(Center())
 
     assert payload["running"] is True
@@ -67,6 +70,9 @@ def test_factory_status_handles_empty_queue():
             return False
 
         def continuous_factory_enabled(self):
+            return False
+
+        def factory_paused(self):
             return False
 
     payload = factory_status(Center())

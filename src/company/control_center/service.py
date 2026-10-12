@@ -114,6 +114,7 @@ class CompanyControlCenter:
             pass
         self._factory_task: asyncio.Task[None] | None = None
         self._continuous_mode = False
+        self._factory_paused = settings.factory_start_paused
         self._lock = Lock()
 
     @property
@@ -149,6 +150,8 @@ class CompanyControlCenter:
         self, submission: MissionSubmission, *, workspace_id: str | None = "00000000-0000-4000-8000-000000000001"
     ) -> MissionRecord:
         with self._lock:
+            if self._factory_paused:
+                raise RuntimeError("Factory is emergency-paused; resume it before submitting missions")
             try:
                 existing_jobs = self._job_store.list_all()
             except SQLAlchemyError:
@@ -215,6 +218,8 @@ class CompanyControlCenter:
         max_retries: int = 2,
         mission_id: str | None = None,
     ) -> None:
+        if self._factory_paused:
+            raise RuntimeError("Factory is emergency-paused; resume it before running missions")
         if self._factory_task is not None and not self._factory_task.done():
             if self._continuous_mode:
                 if mission_id is not None:
@@ -244,6 +249,8 @@ class CompanyControlCenter:
             self._factory.prioritize_mission(mission_id)
 
         async def runner() -> None:
+            if self._factory_paused:
+                return
             try:
                 # Keep the factory on the application's event loop. The control
                 # center, factory, orchestrator, event bus, and autonomous runner
@@ -294,12 +301,14 @@ class CompanyControlCenter:
         """Process one queued project at a time until continuous mode is stopped."""
         if max_retries < 0:
             raise ValueError("max_retries must be non-negative")
-        if self._continuous_mode and self._factory_task is not None and not self._factory_task.done():
-            return
-        if self._factory_task is not None and not self._factory_task.done():
-            raise RuntimeError("Factory is already running in one-shot mode")
-
-        self._continuous_mode = True
+        with self._lock:
+            if self._factory_paused:
+                raise RuntimeError("Factory is emergency-paused; resume it before starting continuous mode")
+            if self._continuous_mode and self._factory_task is not None and not self._factory_task.done():
+                return
+            if self._factory_task is not None and not self._factory_task.done():
+                raise RuntimeError("Factory is already running in one-shot mode")
+            self._continuous_mode = True
 
         async def continuous_runner() -> None:
             try:
@@ -344,6 +353,57 @@ class CompanyControlCenter:
         self._continuous_mode = False
         return was_enabled
 
+    def pause_factory(self) -> dict[str, object]:
+        """Block new submissions and runs; let an already-running project finish."""
+        with self._lock:
+            self._factory_paused = True
+            was_continuous = self._continuous_mode
+            self._continuous_mode = False
+        jobs = self.mission_jobs()
+        active = next(
+            (job for job in jobs if job.status == MissionJobStatus.RUNNING), None
+        )
+        for job in jobs:
+            if job.status in {MissionJobStatus.QUEUED, MissionJobStatus.RUNNING}:
+                try:
+                    self._audit(
+                        job.id,
+                        "FACTORY_PAUSED",
+                        "Factory emergency pause engaged",
+                        status=job.status.value,
+                        metadata={"active_at_pause": job.status == MissionJobStatus.RUNNING},
+                    )
+                except SQLAlchemyError:
+                    pass
+        return {
+            "paused": True,
+            "continuous_stopped": was_continuous,
+            "active_mission_id": active.id if active else None,
+            "message": (
+                "New work is blocked. The active project will finish safely."
+                if active else "New work is blocked; no project is currently running."
+            ),
+        }
+
+    def resume_factory(self) -> dict[str, object]:
+        with self._lock:
+            self._factory_paused = False
+        for job in self.mission_jobs():
+            if job.status == MissionJobStatus.QUEUED:
+                try:
+                    self._audit(
+                        job.id,
+                        "FACTORY_RESUMED",
+                        "Factory emergency pause released",
+                        status=job.status.value,
+                    )
+                except SQLAlchemyError:
+                    pass
+        return {"paused": False, "message": "Factory resumed; queued work can run again."}
+
+    def factory_paused(self) -> bool:
+        return self._factory_paused
+
     def factory_running(self) -> bool:
         # Enabled continuous mode may be idle while waiting for the next mission.
         if self._factory._running:
@@ -355,6 +415,8 @@ class CompanyControlCenter:
         return self._continuous_mode
 
     def enqueue_factory_mission(self, mission_id: str) -> None:
+        if self._factory_paused:
+            raise RuntimeError("Factory is emergency-paused; resume it before queuing execution")
         record = self._get_mission(mission_id)
         if not self._factory.has_queued_mission(mission_id):
             self._factory.enqueue(record.mission)
@@ -377,6 +439,8 @@ class CompanyControlCenter:
         return job
 
     def retry_mission(self, mission_id: str) -> MissionJob:
+        if self._factory_paused:
+            raise RuntimeError("Factory is emergency-paused; resume it before retrying missions")
         job = self._factory.retry(mission_id)
         self._jobs[mission_id] = job
         self._sync_mission_from_job(job)
