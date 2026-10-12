@@ -252,7 +252,7 @@ def live_product_preview_asset(
         or normalized.startswith('/')
         or any(part in {'', '.', '..'} for part in normalized.split('/'))
         or (len(normalized) >= 2 and normalized[1] == ':')
-        or '\\x00' in normalized
+        or chr(0) in normalized
     ):
         raise HTTPException(status_code=404, detail='Preview asset not found')
     _, files = _workspace_files(mission_id)
