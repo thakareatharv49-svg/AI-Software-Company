@@ -511,3 +511,48 @@ def test_accepts_javascript_test_with_nested_behavior_assertion() -> None:
     })
 
     assert issues == []
+
+
+
+def test_feature_traceability_covers_common_multi_feature_workflows() -> None:
+    objective = (
+        "Sort records, confirm deletion, show an empty state, support responsive "
+        "mobile layout, display notifications, and allow undo."
+    )
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "tests/test_records.py": (
+                "def test_sort_records(): pass\n"
+                "def test_delete_confirmation(): pass\n"
+                "def test_empty_state(): pass\n"
+                "def test_responsive_mobile_layout(): pass\n"
+                "def test_notifications(): pass\n"
+            ),
+        },
+    )
+
+    assert len(issues) == 1
+    assert "undo/redo" in issues[0]
+
+
+def test_feature_traceability_accepts_covered_extended_workflows() -> None:
+    objective = (
+        "Sort records, confirm deletion, show an empty state, support responsive "
+        "mobile layout, display notifications, and allow undo."
+    )
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "tests/test_records.py": (
+                "def test_sort_records(): pass\n"
+                "def test_delete_confirmation(): pass\n"
+                "def test_empty_state(): pass\n"
+                "def test_responsive_mobile_layout(): pass\n"
+                "def test_notifications(): pass\n"
+                "def test_undo_last_change(): pass\n"
+            ),
+        },
+    )
+
+    assert issues == []
