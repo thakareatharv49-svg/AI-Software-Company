@@ -149,7 +149,7 @@ class SandboxExecutor:
             "/workspace" if relative_workdir == "." else "/workspace/" + relative_workdir
         )
         uid_gid = (
-            f"{os.getuid()}:{os.getgid()}" if os.name == "posix" else "0:0"
+            f"{os.getuid()}:{os.getgid()}" if os.name == "posix" else "10001:10001"
         )
         cid_fd, cid_path = tempfile.mkstemp(prefix="asc-sandbox-", suffix=".cid")
         os.close(cid_fd)
