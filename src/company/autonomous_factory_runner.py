@@ -127,7 +127,10 @@ class FactoryAutonomousRunner:
             raise
 
         plan = plan.model_copy(
-            update=self._quality_evidence_updates(result, request.qa_request.command)
+            update=self._quality_evidence_updates(
+                result,
+                getattr(request.qa_request, 'command', []) if request.qa_request is not None else [],
+            )
         )
         if on_progress is not None:
             # Persist evidence from the exact successful pipeline run before the
@@ -171,21 +174,24 @@ class FactoryAutonomousRunner:
         qa_status = str(getattr(qa.status, "value", qa.status))
         security_status = str(getattr(security.status, "value", security.status))
         command = [str(part) for part in qa_command]
+        qa_exit_code = getattr(qa, 'exit_code', None)
+        qa_duration_ms = getattr(qa, 'duration_ms', None)
+        security_approved = bool(getattr(security, 'approved', security_status == 'approved'))
         qa_evidence = (
             "Factory QA runner result: "
-            f"status={qa_status}; exit_code={qa.exit_code}; "
-            f"duration_ms={qa.duration_ms}; command={' '.join(command)[:500]}"
+            f"status={qa_status}; exit_code={qa_exit_code}; "
+            f"duration_ms={qa_duration_ms}; command={' '.join(command)[:500]}"
         )
-        security_summary = str(security.summary or "")[:1000]
+        security_summary = str(getattr(security, 'summary', '') or '')[:1000]
         security_evidence = (
             "Factory security reviewer result: "
-            f"status={security_status}; approved={bool(security.approved)}; "
+            f"status={security_status}; approved={security_approved}; "
             f"summary={security_summary or 'No summary supplied.'}"
         )
         return {
             "qa_status": qa_status,
-            "qa_exit_code": qa.exit_code,
-            "qa_duration_ms": qa.duration_ms,
+            "qa_exit_code": qa_exit_code,
+            "qa_duration_ms": qa_duration_ms,
             "qa_command": command,
             "qa_evidence": qa_evidence,
             "security_status": security_status,
