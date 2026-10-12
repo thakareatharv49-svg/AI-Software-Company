@@ -11,14 +11,23 @@ def ready_review():
         ProductReview(mission_id='mission-1'),
         [Requirement(description='Create a task', verification='Create and reload a task')],
         qa_passed=True, security_passed=True,
+        qa_evidence='CI run #123 passed',
+        security_evidence='Security checklist reviewed',
     )
     return review, review.requirements[0]
 
 def test_cannot_submit_without_requirements_or_quality_gates():
     with pytest.raises(InvalidReviewTransition, match='requirement'):
-        prepare_review(ProductReview(mission_id='m1'), [], qa_passed=True, security_passed=True)
+        prepare_review(
+            ProductReview(mission_id='m1'), [], qa_passed=True, security_passed=True,
+            qa_evidence='CI passed', security_evidence='Security review passed',
+        )
     with pytest.raises(InvalidReviewTransition, match='must pass'):
-        prepare_review(ProductReview(mission_id='m1'), [Requirement(description='Works')], qa_passed=False, security_passed=True)
+        prepare_review(
+            ProductReview(mission_id='m1'), [Requirement(description='Works')],
+            qa_passed=False, security_passed=True,
+            qa_evidence='CI failed', security_evidence='Security review passed',
+        )
 
 def test_approval_requires_every_acceptance_requirement_to_pass():
     review, requirement = ready_review()
@@ -35,8 +44,18 @@ def test_feedback_requests_revision_and_resubmission_preserves_history():
     assert revised.status == ReviewStatus.CHANGES_REQUESTED
     assert revised.revision == 1
     assert revised.feedback[0].message == 'Add a calendar view'
+    assert revised.qa_passed is False
+    assert revised.security_passed is False
+    assert revised.qa_evidence == ''
+    assert revised.security_evidence == ''
     original_requirement_id = review.requirements[0].id
-    resubmitted = prepare_review(revised, [Requirement(description='Create a task'), Requirement(description='Calendar view works')], qa_passed=True, security_passed=True)
+    resubmitted = prepare_review(
+        revised,
+        [Requirement(description='Create a task'), Requirement(description='Calendar view works')],
+        qa_passed=True, security_passed=True,
+        qa_evidence='CI run #124 passed',
+        security_evidence='Security checklist rerun and passed',
+    )
     assert resubmitted.status == ReviewStatus.IN_REVIEW
     assert resubmitted.revision == 1
     assert len(resubmitted.feedback) == 1
@@ -68,3 +87,15 @@ def test_blank_feedback_and_requirements_are_rejected():
     review, _ = ready_review()
     with pytest.raises(ValueError):
         request_changes(review, '   ')
+
+
+def test_review_submission_requires_nonblank_qa_and_security_evidence():
+    with pytest.raises(InvalidReviewTransition, match='evidence must be supplied'):
+        prepare_review(
+            ProductReview(mission_id='m1'),
+            [Requirement(description='Works')],
+            qa_passed=True,
+            security_passed=True,
+            qa_evidence='  ',
+            security_evidence='Security review passed',
+        )

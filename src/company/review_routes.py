@@ -50,6 +50,16 @@ class ProductPreview(BaseModel):
 
 class SubmitReviewRequest(BaseModel):
     requirements: list[Requirement] = Field(min_length=1, max_length=200)
+    qa_evidence: str = Field(min_length=1, max_length=4000)
+    security_evidence: str = Field(min_length=1, max_length=4000)
+
+    @field_validator('qa_evidence', 'security_evidence')
+    @classmethod
+    def nonblank_gate_evidence(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError('QA and security evidence cannot be blank')
+        return value
 
 
 class RequirementUpdateRequest(BaseModel):
@@ -198,6 +208,8 @@ def submit_product_for_review(
             payload.requirements,
             qa_passed=True,
             security_passed=True,
+            qa_evidence=payload.qa_evidence,
+            security_evidence=payload.security_evidence,
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
