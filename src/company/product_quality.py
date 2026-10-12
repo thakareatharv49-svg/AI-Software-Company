@@ -250,6 +250,46 @@ _MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
 )
 
 
+def find_weak_javascript_tests(files: Mapping[str, str]) -> list[str]:
+    """Reject obvious empty or tautological tests in generated JavaScript/TypeScript suites.
+
+    This is intentionally a narrow guard: it catches common model-generated
+    no-op patterns without attempting to parse JavaScript with regular expressions.
+    Actual test execution remains the authoritative runtime check.
+    """
+    issues: list[str] = []
+    empty_test = re.compile(
+        r"""\b(?:test|it)\s*\(\s*(['"`])[^'"\`]*\1\s*,\s*"""
+        r"""(?:async\s*)?\(\s*\)\s*=>\s*\{\s*\}\s*\)""",
+        re.IGNORECASE | re.DOTALL,
+    )
+    tautologies = (
+        re.compile(r"""\bexpect\(\s*(true|false|null|[-+]?\d+(?:\.\d+)?|(['"]).*?\2)\s*\)\s*\.\s*toBe\(\s*\1\s*\)""", re.DOTALL),
+        re.compile(r"""\bassert\.(?:equal|strictEqual|deepEqual)\(\s*(true|false|null|[-+]?\d+(?:\.\d+)?|(['"]).*?\2)\s*,\s*\1\s*\)""", re.DOTALL),
+    )
+    for path, content in files.items():
+        normalized = path.replace("\\", "/").casefold()
+        filename = normalized.rsplit("/", 1)[-1]
+        is_test = (
+            normalized.startswith("tests/")
+            or filename.endswith((".test.js", ".spec.js", ".test.ts", ".spec.ts",
+                                  ".test.jsx", ".spec.jsx", ".test.tsx", ".spec.tsx"))
+        )
+        if not is_test or not filename.endswith((".js", ".jsx", ".ts", ".tsx")):
+            continue
+        if empty_test.search(content):
+            issues.append(
+                f"Generated JavaScript test '{path}' contains an empty test body. "
+                "Exercise product behavior and assert the expected result."
+            )
+        if any(pattern.search(content) for pattern in tautologies):
+            issues.append(
+                f"Generated JavaScript test '{path}' contains a tautological assertion. "
+                "Assert a result derived from the product behavior instead."
+            )
+    return issues
+
+
 def find_uncovered_mission_features(
     objective: str,
     files: Mapping[str, str],

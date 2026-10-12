@@ -5,6 +5,7 @@ from src.company.product_quality import (
     find_missing_product_tests,
     find_uncovered_mission_features,
     find_unfinished_product_content,
+    find_weak_javascript_tests,
     find_weak_product_tests,
 )
 
@@ -378,5 +379,38 @@ def test_accepts_test_traceability_for_requested_product_workflows() -> None:
             ),
         },
     )
+
+    assert issues == []
+
+
+
+def test_rejects_empty_javascript_test_bodies() -> None:
+    issues = find_weak_javascript_tests({
+        "tests/notes.test.js": "test('creates a note', () => {});",
+    })
+
+    assert len(issues) == 1
+    assert "empty test body" in issues[0]
+
+
+def test_rejects_tautological_javascript_assertions() -> None:
+    issues = find_weak_javascript_tests({
+        "tests/app.spec.js": "it('works', () => { expect(true).toBe(true); });",
+    })
+
+    assert len(issues) == 1
+    assert "tautological assertion" in issues[0]
+
+
+def test_accepts_javascript_test_that_checks_product_behavior() -> None:
+    issues = find_weak_javascript_tests({
+        "tests/notes.test.js": (
+            "test('adds a note', () => {\\n"
+            "  const notes = addNote([], { title: 'Study' });\\n"
+            "  expect(notes).toHaveLength(1);\\n"
+            "  expect(notes[0].title).toBe('Study');\\n"
+            "});"
+        ),
+    })
 
     assert issues == []
