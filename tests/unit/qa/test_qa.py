@@ -52,6 +52,9 @@ async def test_debugger_does_not_retry_success():
 
     assert result.status == DebugStatus.NOT_NEEDED
     assert result.attempts == []
+    assert result.test_result is not None
+    assert result.test_result.status == QATestStatus.PASSED
+    assert "success" in result.test_result.stdout
 
 
 @pytest.mark.asyncio
@@ -83,6 +86,9 @@ async def test_debugger_resolves_after_repair():
     assert state["fixed"] is True
     assert result.status == DebugStatus.RESOLVED
     assert len(result.attempts) == 1
+    assert result.test_result is not None
+    assert result.test_result.status == QATestStatus.PASSED
+    assert "fixed" in result.test_result.stdout
 
 
 @pytest.mark.asyncio

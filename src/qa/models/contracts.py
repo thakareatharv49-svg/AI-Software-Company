@@ -37,3 +37,6 @@ class DebugResult(BaseModel):
     status: DebugStatus
     attempts: list[DebugAttempt] = Field(default_factory=list)
     final_error: str | None = None
+    # Keep the exact final execution result so callers do not need to rerun
+    # an already-passing suite merely to retrieve stdout/exit status/timing.
+    test_result: QATestResult | None = None

@@ -249,7 +249,9 @@ class CompanyExecutionPipeline:
                 f"{debug_result.final_error}"
             )
 
-        qa_result = await self.qa_runner.run(qa_request)
+        # The debugger already ran the successful command (including after any
+        # repair). Reuse that exact result instead of paying for a duplicate run.
+        qa_result = debug_result.test_result or await self.qa_runner.run(qa_request)
 
         if qa_result.status != QATestStatus.PASSED:
             self.project_engine.transition(
@@ -302,8 +304,9 @@ class CompanyExecutionPipeline:
                     f"Generated product tests failed for project {project.id}: "
                     f"{product_test_debug.final_error}"
                 )
-            # Re-run after repair to verify the exact final workspace state.
-            product_test_result = await self.qa_runner.run(product_test_request)
+            # The debugger's successful final attempt is already the verification
+            # of the post-repair workspace; do not execute the suite a second time.
+            product_test_result = product_test_debug.test_result or await self.qa_runner.run(product_test_request)
             self._publish_event(
                 "qa.generated_product_tests.completed",
                 project_id=project.id,
@@ -368,8 +371,9 @@ class CompanyExecutionPipeline:
                     f"Generated JavaScript product tests failed for project {project.id}: "
                     f"{javascript_test_debug.final_error}"
                 )
-            # Re-run after repair to verify the exact final workspace state.
-            javascript_test_result = await self.qa_runner.run(javascript_test_request)
+            # Reuse the debugger's successful final attempt to avoid a duplicate
+            # Node process after the suite has already passed.
+            javascript_test_result = javascript_test_debug.test_result or await self.qa_runner.run(javascript_test_request)
             self._publish_event(
                 "qa.generated_product_tests.completed",
                 project_id=project.id,
