@@ -48,6 +48,10 @@ class AutonomousProjectRequest:
     tasks: tuple[TaskPlanItem, ...]
     qa_request: QATestRequest
     files: dict[str, str]
+    generation_model_calls: int = 0
+    generation_duration_ms: int = 0
+    generation_prompt_tokens: int = 0
+    generation_output_tokens: int = 0
     agent_executor: Callable[..., Any] | None = None
     repair_agent_executor: Callable[..., Any] | None = None
     github_repository: GitHubRepository | None = None
