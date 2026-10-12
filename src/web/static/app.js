@@ -477,8 +477,13 @@ async function showMission(id) {
       actions.append(product);
     }
     if (job.status === "failed" || job.status === "blocked") actions.append(action("Retry", "retry", id, "secondary"));
-    if (job.status !== "completed" && job.status !== "cancelled") {
-      actions.append(action("Cancel", "cancel", id, "danger"));
+    // Cancellation is supported only while work is still queued. Running work
+    // must be stopped through the factory controls, not a misleading per-job action.
+    if (job.status === "queued") {
+      actions.append(action("Cancel queued mission", "cancel", id, "danger"));
+      actions.append(action("Delete mission", "delete", id, "secondary"));
+    } else if (job.status === "blocked") {
+      actions.append(action("Delete mission", "delete", id, "danger"));
     }
 
     head.append(info, actions);
@@ -637,7 +642,24 @@ $("details").addEventListener("click",e => {
   const id=b.dataset.id;
   if(b.dataset.action==="run") runFactory(id);
   if(b.dataset.action==="retry") (async()=>{try{await api("/api/missions/"+encodeURIComponent(id)+"/retry",{method:"POST"}); await runFactory(id);}catch(x){message("Retry failed: "+x.message,true);}})();
-  if(b.dataset.action==="cancel") (async()=>{try{await api("/api/missions/"+encodeURIComponent(id)+"/cancel",{method:"POST"}); await showMission(id); await refresh();}catch(x){message("Cancel failed: "+x.message,true);}})();
+  if(b.dataset.action==="cancel") (async()=>{
+    if (!confirm("Cancel this queued mission? Its generated files will be kept.")) return;
+    try { await api("/api/missions/"+encodeURIComponent(id)+"/cancel",{method:"POST"}); await showMission(id); await refresh(); }
+    catch(x) { message("Cancel failed: "+x.message,true); }
+  })();
+  if(b.dataset.action==="delete") (async()=>{
+    if (!confirm("Permanently delete this queued/blocked mission record? Generated products and files are not deleted.")) return;
+    try {
+      await api("/api/missions/"+encodeURIComponent(id),{method:"DELETE"});
+      if (selectedMissionId === id) {
+        selectedMissionId = null;
+        $("detail-title").textContent = "Mission details";
+        $("details").textContent = "Select a mission to inspect outputs and audit trail.";
+      }
+      message("Mission record deleted. Generated products and files were kept.");
+      await refresh();
+    } catch(x) { message("Delete failed: "+x.message,true); }
+  })();
 });
 $("cleanup-missions")?.addEventListener("click", async () => {
   const button = $("cleanup-missions");
