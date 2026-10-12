@@ -13,7 +13,12 @@ from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
 from src.company.mission_controller.planner import build_mission_plan
-from src.company.mission_jobs import MissionJob, MissionJobStatus, transition_job
+from src.company.mission_jobs import (
+    MissionJob,
+    MissionJobStatus,
+    recover_running_plan,
+    transition_job,
+)
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.project_outputs import ProjectOutputManifest
@@ -77,8 +82,28 @@ class ProjectFactory:
         for item in self.store.load_pending():
             if item["mission"].id in known_ids:
                 continue
-            self.queue.append(FactoryProject(**item))
-            known_ids.add(item["mission"].id)
+            project = FactoryProject(**item)
+            # The durable project queue can outlive the process that owned a
+            # running item. Never restore it as actively running: the new worker
+            # must reclaim it as queued and reset only interrupted stages.
+            if project.status == "running":
+                project.plan = recover_running_plan(project.plan)
+                project.status = "queued"
+                interrupted_detail = next(
+                    (
+                        step.detail.strip()
+                        for step in project.plan.steps
+                        if step.detail and step.detail.strip()
+                        and step.status == "failed"
+                    ),
+                    None,
+                )
+                project.retry_feedback = (
+                    interrupted_detail[:2000] if interrupted_detail else None
+                )
+                self._save(project)
+            self.queue.append(project)
+            known_ids.add(project.mission.id)
             restored += 1
         return restored
 
