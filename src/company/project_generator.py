@@ -744,9 +744,12 @@ Rules:
         for path, purpose in manifest_items:
             if path in files:
                 continue
+            # Repeat only planned paths, not every descriptive purpose. The
+            # current file's purpose and the bounded source excerpts below provide
+            # actionable context; repeating all descriptions for every file wastes
+            # prompt tokens on large manifests.
             previous_files = "\\n".join(
-                f"- {existing_path}: {manifest_purpose}"
-                for existing_path, manifest_purpose in manifest_items
+                f"- {existing_path}" for existing_path, _ in manifest_items
             )
             # Give the model the actual interfaces and markup already generated,
             # not just filenames and character counts. A bounded excerpt helps keep
