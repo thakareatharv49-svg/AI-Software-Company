@@ -54,3 +54,35 @@ def test_recovery_bounds_persisted_error_message_length() -> None:
     result = recovery.record_failure(RuntimeError("x" * 5000), "project-1", "qa")
 
     assert len(result.error_message) == 2000
+
+
+def test_recovery_stops_repeating_the_same_failure_before_budget_exhaustion() -> None:
+    recovery = RecoveryService(max_attempts=4)
+
+    first = recovery.record_failure(
+        RuntimeError("QA failed for project project-a: missing app.js"),
+    )
+    repeated = recovery.record_failure(
+        RuntimeError("QA failed for project project-b: missing app.js"),
+    )
+
+    assert first.retryable
+    assert not first.repeated_failure
+    assert not repeated.retryable
+    assert repeated.repeated_failure
+    assert repeated.action == "block_repeated_failure"
+    assert repeated.attempt == 2
+
+
+def test_recovery_reset_allows_retrying_a_failure_after_inputs_change() -> None:
+    recovery = RecoveryService(max_attempts=3)
+    recovery.record_failure(RuntimeError("artifact missing"))
+    repeated = recovery.record_failure(RuntimeError("artifact missing"))
+    assert repeated.repeated_failure
+
+    recovery.reset()
+    fresh = recovery.record_failure(RuntimeError("artifact missing"))
+
+    assert fresh.attempt == 1
+    assert fresh.retryable
+    assert not fresh.repeated_failure
