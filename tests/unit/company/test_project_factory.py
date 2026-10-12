@@ -143,6 +143,8 @@ async def test_factory_retries_a_failed_project() -> None:
     orchestrator = CompanyOrchestrator()
     controller = MissionController(orchestrator)
     pipeline = MissionExecutionPipeline(orchestrator, AgentExecutor(runtime), AgentRegistry())
+    # Keep this test focused on the factory-level retry policy.
+    pipeline.max_repair_attempts = 0
     factory = ProjectFactory(orchestrator, controller, pipeline)
     project = factory.enqueue(CompanyMission(name="Retry", objective="Recover"))
 
@@ -1014,6 +1016,7 @@ async def test_executor_exception_marks_stage_failed_and_records_attempt() -> No
         ExplodingExecutor(),
         AgentRegistry(),
     )
+    pipeline.max_repair_attempts = 0
     mission = CompanyMission(
         name="Provider outage",
         objective="Build a multi-feature application",
@@ -1052,6 +1055,7 @@ async def test_unsuccessful_executor_result_persists_stage_error_detail() -> Non
         UnsuccessfulExecutor(),
         AgentRegistry(),
     )
+    pipeline.max_repair_attempts = 0
     mission = CompanyMission(
         name="Provider timeout",
         objective="Build a multi-feature application",
