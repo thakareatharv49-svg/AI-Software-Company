@@ -232,7 +232,7 @@ class SandboxExecutor:
                     duration_ms=int((time.perf_counter() - started) * 1000),
                 )
             staged = subprocess.run(
-                ["docker", "exec", "-i", container_id, "tar", "-x", "--no-same-owner", "-C", "/workspace"],
+                ["docker", "exec", "--user", uid_gid, "-i", container_id, "tar", "-x", "--no-same-owner", "-C", "/workspace"],
                 input=workspace_archive,
                 capture_output=True,
                 timeout=120,
