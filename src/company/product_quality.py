@@ -352,12 +352,13 @@ def find_uncovered_mission_features(
         )
         return (
             in_test_directory
-            or filename.startswith("test_")
+            or (filename.startswith("test_") and filename.endswith(".py"))
             or filename.endswith("_test.py")
             or filename.endswith(javascript_test_suffixes)
         )
 
     test_cases: list[str] = []
+    saw_test_path = False
     python_test_name = re.compile(
         r"\b(?:async\s+)?def\s+(test_[A-Za-z0-9_]+)\s*\(",
     )
@@ -368,15 +369,19 @@ def find_uncovered_mission_features(
     for path, content in files.items():
         if not is_test_path(path):
             continue
+        saw_test_path = True
         python_content = re.sub(r"(?m)#.*$", "", content)
         test_cases.extend(
             match.group(1) for match in python_test_name.finditer(python_content)
         )
         test_cases.extend(match.group(2) for match in javascript_test_title.finditer(content))
 
-    # Keep checking requested features even when no test cases were found. The
-    # missing-test gate reports the absent suite, while this gate explains which
-    # mission workflows lack named behavioral coverage.
+    # If no test module exists at all, let the dedicated missing-test gate
+    # report that primary problem. If a test module exists but names no cases,
+    # continue so requested features are reported as uncovered.
+    if not test_cases and not saw_test_path:
+        return []
+
     issues: list[str] = []
     for feature, objective_aliases, test_aliases in _MISSION_FEATURES:
         if not objective_words.intersection(objective_aliases):
