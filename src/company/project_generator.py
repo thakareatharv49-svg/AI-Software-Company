@@ -1969,9 +1969,13 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
             ("py", "-m", "pytest"), ("py", "-m", "pytest", "-q"),
             ("python", "-m", "unittest"), ("python3", "-m", "unittest"),
             ("py", "-m", "unittest"),
+            # Node's built-in test runner executes local tests without package
+            # scripts, package installation, or arbitrary user-supplied flags.
+            ("node", "--test"), ("node.exe", "--test"),
         }
         if normalized in allowed_commands and executable in {
-            "pytest", "pytest.exe", "python", "python3", "python.exe", "py", "py.exe"
+            "pytest", "pytest.exe", "python", "python3", "python.exe", "py", "py.exe",
+            "node", "node.exe",
         }:
             return command
 
