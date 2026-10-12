@@ -1,4 +1,5 @@
 import asyncio
+import time
 from types import SimpleNamespace
 
 from src.company.autonomous_factory_runner import FactoryAutonomousRunner
@@ -67,3 +68,42 @@ def test_factory_runner_clamps_invalid_negative_usage_metrics():
     )
 
     assert all(value == 0 for value in updates.values())
+
+
+
+def test_ollama_response_token_counts_are_aggregated(tmp_path, monkeypatch):
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    generator._generation_deadline = time.monotonic() + 60
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "response": '{"files": {}, "test_command": []}',
+                "prompt_eval_count": 123,
+                "eval_count": 45,
+            }
+
+    class FakeClient:
+        def __init__(self, timeout):
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json):
+            return FakeResponse()
+
+    monkeypatch.setattr("src.company.project_generator.httpx.AsyncClient", FakeClient)
+
+    result = asyncio.run(generator._call({"model": "test-model", "prompt": "test"}))
+
+    assert result == '{"files": {}, "test_command": []}'
+    assert generator._generation_model_calls == 1
+    assert generator._generation_prompt_tokens == 123
+    assert generator._generation_output_tokens == 45
