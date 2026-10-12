@@ -643,7 +643,6 @@ async def test_large_generation_keeps_file_context_bounded_and_dependency_first(
     )
     assert "FILE: index.html" in app_prompt
     assert "- index.html" in app_prompt
-    assert "- index.html: App entry point" not in app_prompt
     assert "- style.css: Visual styling" not in app_prompt
     assert "Declared dependencies and their contracts:" in app_prompt
     assert "- index.html: App entry point" in app_prompt
