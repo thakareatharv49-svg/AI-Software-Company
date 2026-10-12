@@ -169,3 +169,23 @@ def test_artifact_size_limit(tmp_path: Path) -> None:
         workspace.collect_artifacts(("artifact.bin",))
 
 
+
+
+def test_workspace_ids_with_same_slug_do_not_collide(tmp_path: Path) -> None:
+    slash_id = ProjectWorkspace.create(tmp_path, "a/b")
+    slash_id.write_file("important.txt", "must survive")
+
+    dash_id = ProjectWorkspace.create(tmp_path, "a-b")
+
+    assert slash_id.root != dash_id.root
+    assert slash_id.read_file("important.txt") == "must survive"
+
+
+def test_recreating_exact_workspace_id_starts_a_clean_retry(tmp_path: Path) -> None:
+    first = ProjectWorkspace.create(tmp_path, "same-mission")
+    first.write_file("stale.txt", "old output")
+
+    second = ProjectWorkspace.create(tmp_path, "same-mission")
+
+    assert first.root == second.root
+    assert second.list_files() == ()
