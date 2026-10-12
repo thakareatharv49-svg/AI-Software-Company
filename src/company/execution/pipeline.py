@@ -181,15 +181,24 @@ class CompanyExecutionPipeline:
 
         self.manager.start_mission(mission)
         existing_tasks = self.manager.task_engine.list(project_id=project.id)
-        if existing_tasks and [task.title for task in existing_tasks] == [
-            item.title.strip() for item in tasks
-        ]:
+        plan_matches_existing = (
+            len(existing_tasks) == len(tasks)
+            and all(
+                existing.title == planned.title.strip()
+                and existing.description == planned.description
+                for existing, planned in zip(existing_tasks, tasks, strict=True)
+            )
+        )
+        if existing_tasks and plan_matches_existing:
             task_ids = [task.id for task in existing_tasks]
-            # A failed or interrupted task can be retried in place. This keeps
-            # completed dependencies and task history instead of duplicating the plan.
+            # Retry failed or interrupted tasks in place, retaining completed
+            # dependencies and task history instead of duplicating the plan.
             for task in existing_tasks:
                 if task.status.value == "in_progress":
-                    self.manager.task_engine.fail(task.id, "Interrupted by a prior pipeline attempt")
+                    self.manager.task_engine.fail(
+                        task.id,
+                        "Interrupted by a prior pipeline attempt",
+                    )
                 current = self.manager.task_engine.get(task.id)
                 if current.status.value == "failed":
                     self.manager.task_engine.retry(task.id)
