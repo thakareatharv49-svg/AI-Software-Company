@@ -19,7 +19,7 @@ def test_generated_files_become_parallel_ready_subsystem_work_packages() -> None
 
     assert len(tasks) == 4
     assert [task.title for task in tasks] == [
-        "Integrate Inventory: application shell",
+        "Integrate Inventory: frontend",
         "Integrate Inventory: src/services",
         "Integrate Inventory: src/models",
         "Validate Inventory quality and tests",
@@ -34,7 +34,7 @@ def test_generated_files_become_parallel_ready_subsystem_work_packages() -> None
     assert "tests/test_inventory.py" in tasks[3].description
 
 
-def test_task_planning_groups_root_browser_assets_as_one_shell() -> None:
+def test_task_planning_groups_root_browser_assets_as_frontend_work() -> None:
     tasks = build_generated_task_plan(
         "Notes",
         "Build a notes app.",
@@ -46,7 +46,7 @@ def test_task_planning_groups_root_browser_assets_as_one_shell() -> None:
     )
 
     assert len(tasks) == 1
-    assert "application shell" in tasks[0].title
+    assert tasks[0].title == "Integrate Notes: frontend"
     assert tasks[0].dependencies == ()
 
 
@@ -115,7 +115,7 @@ def test_root_level_backend_modules_get_a_separate_integration_package() -> None
     )
 
     titles = [task.title for task in tasks]
-    assert "Integrate Inventory: application shell" in titles
+    assert "Integrate Inventory: frontend" in titles
     assert "Integrate Inventory: backend" in titles
     qa_task = tasks[-1]
     assert qa_task.title == "Validate Inventory quality and tests"

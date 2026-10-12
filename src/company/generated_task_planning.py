@@ -23,6 +23,9 @@ def _subsystem_for_path(path: str) -> str:
         "routes.py", "schemas.py", "services.py",
     }:
         return "backend"
+    # Flat browser assets need their own work package, separate from root-level Python services.
+    if len(parts) == 1 and PurePosixPath(filename).suffix in {".html", ".css", ".js"}:
+        return "frontend"
     if first == "src" and len(parts) > 2:
         return f"src/{parts[1]}"
     if first in {"frontend", "backend", "api", "database", "public", "assets", "docs", "scripts"}:
