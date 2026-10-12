@@ -84,7 +84,7 @@ def test_live_preview_asset_serves_only_workspace_text_and_rejects_traversal(mon
     monkeypatch.setattr(
         review_routes,
         "_workspace_files",
-        lambda mission_id: (None, {"assets/app.js": "console.log('safe')"}),
+        lambda mission_id: (None, {"index.html": "<h1>Demo</h1>", "assets/app.js": "console.log('safe')"}),
     )
 
     response = review_routes.live_product_preview_asset(
@@ -134,3 +134,38 @@ def test_workspace_preview_supports_legacy_product_root(tmp_path, monkeypatch):
 
     assert root == workspace
     assert files == {"index.html": "<h1>Legacy</h1>"}
+
+
+def test_live_preview_supports_nested_frontend_and_shared_assets(monkeypatch):
+    monkeypatch.setattr(review_routes, "_get_job", lambda mission_id, center: _completed_job())
+    files = {
+        "frontend/index.html": '<!doctype html><link rel="stylesheet" href="style.css"><script src="../shared.js"></script>',
+        "frontend/style.css": "body { color: navy; }",
+        "shared.js": "console.log('shared');",
+    }
+    monkeypatch.setattr(review_routes, "_workspace_files", lambda mission_id: (None, files))
+
+    response = review_routes.live_product_preview("mission-123", _request(), None)
+    assert response.status_code == 307
+    assert response.headers["location"].endswith("/live-preview/frontend/")
+
+    nested_page = review_routes.live_product_preview_asset(
+        "mission-123", "frontend/", _request(), None
+    )
+    assert nested_page.status_code == 200
+    assert "style.css" in nested_page.body.decode()
+
+    nested_asset = review_routes.live_product_preview_asset(
+        "mission-123", "frontend/style.css", _request(), None
+    )
+    shared_asset = review_routes.live_product_preview_asset(
+        "mission-123", "shared.js", _request(), None
+    )
+    assert nested_asset.body.decode() == "body { color: navy; }"
+    assert shared_asset.body.decode() == "console.log('shared');"
+
+    with pytest.raises(HTTPException) as traversal:
+        review_routes.live_product_preview_asset(
+            "mission-123", "../../outside.js", _request(), None
+        )
+    assert traversal.value.status_code == 404
