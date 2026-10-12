@@ -233,4 +233,78 @@ def stop_continuous_factory(
 
 @router.get("/factory/status")
 def factory_status(center: CompanyControlCenter = ControlCenter) -> dict[str, object]:
-    return {"running": center.factory_running(), "continuous": center.continuous_factory_enabled(), "queued_projects": len(center._factory.queue)}
+    """Expose durable queue state, not only the current process's in-memory queue."""
+    jobs = center.mission_jobs()
+    counts = {item.value: 0 for item in MissionJobStatus}
+    for job in jobs:
+        counts[job.status.value] += 1
+
+    queued_jobs = sorted(
+        (job for job in jobs if job.status == MissionJobStatus.QUEUED),
+        key=lambda item: item.created_at,
+    )
+    running_jobs = sorted(
+        (job for job in jobs if job.status == MissionJobStatus.RUNNING),
+        key=lambda item: item.updated_at,
+        reverse=True,
+    )
+
+    # Prefer the factory's actual order (which may include an explicit priority
+    # action), then append durable queued jobs not yet loaded into this process.
+    queue_order: list[str] = []
+    seen: set[str] = set()
+    for project in center._factory.queue:
+        mission_id = project.mission.id
+        if mission_id not in seen:
+            queue_order.append(mission_id)
+            seen.add(mission_id)
+    for job in queued_jobs:
+        if job.id not in seen:
+            queue_order.append(job.id)
+            seen.add(job.id)
+
+    jobs_by_id = {job.id: job for job in queued_jobs}
+    queue_preview = []
+    for position, mission_id in enumerate(queue_order[:10], start=1):
+        job = jobs_by_id.get(mission_id)
+        if job is None:
+            project = next(
+                (item for item in center._factory.queue if item.mission.id == mission_id),
+                None,
+            )
+            if project is None:
+                continue
+            queue_preview.append({
+                "position": position,
+                "mission_id": mission_id,
+                "name": project.mission.name,
+                "status": project.status,
+            })
+        else:
+            queue_preview.append({
+                "position": position,
+                "mission_id": job.id,
+                "name": job.mission.name,
+                "status": job.status.value,
+                "created_at": job.created_at.isoformat(),
+                "attempts": job.attempts,
+            })
+
+    active = running_jobs[0] if running_jobs else None
+    return {
+        "running": center.factory_running(),
+        "continuous": center.continuous_factory_enabled(),
+        "queued_projects": len(queued_jobs),
+        "queue_counts": counts,
+        "queue_preview": queue_preview,
+        "active_mission": (
+            {
+                "mission_id": active.id,
+                "name": active.mission.name,
+                "status": active.status.value,
+                "message": active.message,
+                "updated_at": active.updated_at.isoformat(),
+            }
+            if active is not None else None
+        ),
+    }
