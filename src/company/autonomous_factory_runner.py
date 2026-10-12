@@ -71,7 +71,8 @@ class FactoryAutonomousRunner:
                 f"{type(exc).__name__}: {exc}",
             )
             raise
-        plan = plan.model_copy(update=self._generation_metrics_updates(request))
+        for key, value in self._generation_metrics_updates(request).items():
+            setattr(plan, key, value)
         if on_progress is not None:
             # Preserve generation usage even if workspace validation fails later.
             try:
@@ -134,12 +135,11 @@ class FactoryAutonomousRunner:
                     pass
             raise
 
-        plan = plan.model_copy(
-            update=self._quality_evidence_updates(
-                result,
-                getattr(request.qa_request, 'command', []) if request.qa_request is not None else [],
-            )
-        )
+        for key, value in self._quality_evidence_updates(
+            result,
+            getattr(request.qa_request, 'command', []) if request.qa_request is not None else [],
+        ).items():
+            setattr(plan, key, value)
         if on_progress is not None:
             # Persist evidence from the exact successful pipeline run before the
             # mission can be marked completed or submitted for human review.
