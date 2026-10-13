@@ -113,7 +113,7 @@ def _bounded_audit_value(value: Any, *, depth: int = 0) -> Any:
     if isinstance(value, str):
         return redact_sensitive_text(value)[:2000]
     if isinstance(value, dict):
-        return {str(key)[:120]: _bounded_audit_value(item, depth=depth + 1) for key, item in list(value.items())[:100]}
+        return {redact_sensitive_text(str(key))[:120]: _bounded_audit_value(item, depth=depth + 1) for key, item in list(value.items())[:100]}
     if isinstance(value, (list, tuple)):
         return [_bounded_audit_value(item, depth=depth + 1) for item in value[:100]]
     if isinstance(value, float) and not math.isfinite(value):
