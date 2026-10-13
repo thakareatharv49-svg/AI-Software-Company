@@ -23,7 +23,7 @@ from src.company.mission_jobs import (
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.project_outputs import ProjectOutputManifest
-from src.security.redaction import redact_sensitive_text
+from src.security.redaction import redact_sensitive_text, redact_sensitive_value
 
 if TYPE_CHECKING:
     from src.company.autonomous_factory_runner import FactoryAutonomousRunner
@@ -1121,14 +1121,17 @@ class ProjectFactory:
         metadata: dict[str, Any] | None = None,
     ) -> None:
         if self.audit_store is not None:
+            # Audit entries can outlive the mission snapshot and are often
+            # surfaced in dashboards or incident reports. Treat messages and
+            # nested metadata as untrusted text at this final persistence boundary.
             self.audit_store.append(
                 MissionAuditEntry(
                     id=str(uuid4()),
                     mission_id=mission_id,
                     event_type=event_type,
-                    message=message,
+                    message=redact_sensitive_text(str(message)),
                     status=status,
-                    metadata=metadata or {},
+                    metadata=redact_sensitive_value(metadata or {}),
                 )
             )
 
