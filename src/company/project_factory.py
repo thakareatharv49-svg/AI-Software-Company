@@ -145,8 +145,13 @@ class ProjectFactory:
                     ),
                     None,
                 )
+                # Retry feedback is fed back into the model on the next
+                # attempt. Older persisted snapshots may predate write-time
+                # redaction, so sanitize recovered diagnostics before reuse.
                 project.retry_feedback = (
-                    interrupted_detail[:2000] if interrupted_detail else None
+                    self._safe_error_detail(interrupted_detail)[:2000]
+                    if interrupted_detail
+                    else None
                 )
                 self._save(project)
             self.queue.append(project)
