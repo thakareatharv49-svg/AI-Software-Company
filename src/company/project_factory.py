@@ -187,13 +187,16 @@ class ProjectFactory:
 
     @staticmethod
     def _safe_mission(mission: CompanyMission) -> CompanyMission:
-        """Redact credential-like text from mission fields before persistence or planning."""
+        """Redact and bound mission text before persistence or planning."""
+        def safe_text(value: str, limit: int) -> str:
+            return redact_sensitive_text(str(value))[:limit]
+
         return mission.model_copy(
             update={
-                "name": redact_sensitive_text(mission.name),
-                "objective": redact_sensitive_text(mission.objective),
+                "name": safe_text(mission.name, 500),
+                "objective": safe_text(mission.objective, 8000),
                 "constraints": [
-                    redact_sensitive_text(constraint)
+                    safe_text(constraint, 2000)
                     for constraint in mission.constraints
                 ],
             }
