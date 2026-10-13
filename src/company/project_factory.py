@@ -441,7 +441,7 @@ class ProjectFactory:
         if project.last_error:
             # Give the next generation attempt the concrete reason the previous
             # attempt failed, instead of repeating the same prompt unchanged.
-            project.retry_feedback = project.last_error[:2000]
+            project.retry_feedback = self._safe_error_detail(project.last_error)[:2000]
         project.last_error = None
         self._last_autonomous_result = None
         self.orchestrator.stop()
