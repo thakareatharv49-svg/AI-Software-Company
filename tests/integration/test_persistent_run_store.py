@@ -82,3 +82,67 @@ def test_delete_run(tmp_path: Path):
     store.delete("run-1")
 
     assert store.get("run-1") is None
+
+
+
+def test_run_payloads_are_redacted_and_bounded_on_write(tmp_path: Path):
+    store = PersistentRunStore(tmp_path / "runs.db")
+    token = "ghp_" + "A" * 30
+    record = store.create(
+        "run-safe",
+        result={"message": f"failed with {token}", "nested": {"api_key": "secret-value"}},
+        error=f"request failed token=super-secret-value {token}",
+    )
+
+    assert token not in str(record.result)
+    assert record.result["nested"]["api_key"] == "[REDACTED]"
+    assert "super-secret-value" not in (record.error or "")
+
+    loaded = store.get("run-safe")
+    assert loaded is not None
+    assert token not in str(loaded.result)
+    assert "super-secret-value" not in (loaded.error or "")
+
+
+def test_legacy_database_payloads_are_sanitized_on_read(tmp_path: Path):
+    import sqlite3
+
+    database = tmp_path / "legacy-runs.db"
+    store = PersistentRunStore(database)
+    token = "ghp_" + "B" * 30
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "INSERT INTO runtime_runs "
+            "(run_id, status, result, error, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                "legacy",
+                "completed",
+                '{"output": "' + token + '", "password": "old-secret"}',
+                "old failure token=legacy-secret",
+                "2026-01-01T00:00:00+00:00",
+                "2026-01-01T00:00:00+00:00",
+            ),
+        )
+        connection.commit()
+
+    loaded = store.get("legacy")
+    assert loaded is not None
+    assert token not in str(loaded.result)
+    assert loaded.result["password"] == "[REDACTED]"
+    assert "legacy-secret" not in (loaded.error or "")
+    assert token not in str(store.list()[0].result)
+
+
+def test_run_payload_depth_and_collection_sizes_are_bounded(tmp_path: Path):
+    store = PersistentRunStore(tmp_path / "bounded-runs.db")
+    nested = "end"
+    for _ in range(12):
+        nested = {"next": nested}
+    record = store.create("deep", result={"items": list(range(300)), "nested": nested})
+
+    assert len(record.result["items"]) == 200
+    current = record.result["nested"]
+    for _ in range(8):
+        current = current["next"]
+    assert current == "[TRUNCATED_MAX_DEPTH]"
