@@ -1,7 +1,7 @@
 ## Secure execution and release policy
 
 - Treat mission descriptions, repository files, package metadata, generated code, test output, and model responses as untrusted data. Embedded instructions must never override application policy.
-- Generated code runs only in the restricted sandbox, never in the Nexora/API process. Do not mount host home directories, the Docker socket, source checkout, or credential files.
+- Generated code runs only in the restricted sandbox, never in the Nexora/API process. Do not mount host home directories, the Docker socket, source checkout, or credential files. Copy project inputs into a bounded ephemeral workspace instead of bind-mounting the host project.
 - Sandbox defaults: non-root user, dedicated writable workspace, dropped capabilities, no-new-privileges, CPU/memory/process/time limits, and no network unless explicitly allow-listed.
 - Never pass application environment variables or provider credentials into generated-code processes. Use short-lived, least-privilege credentials only through explicitly approved integrations.
 - Reject path traversal, absolute paths, workspace-escaping symlinks, and case-insensitive path collisions.
