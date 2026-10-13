@@ -19,9 +19,9 @@ and the operating environment, not by model instructions alone.
 
 ## Generated-code execution
 
-Development defaults to `SANDBOX_MODE=host` for compatibility, but host execution is
-not a security boundary. For production or staging, configuration validation requires
-`SANDBOX_MODE=container`; startup refuses unsafe host mode. Build the reviewed runtime
+Development and production default to `SANDBOX_MODE=container`. Host execution is not a
+security boundary and is only an explicit local-development exception. Production/staging
+configuration validation requires `SANDBOX_MODE=container`; startup refuses unsafe host mode. Build the reviewed runtime
 image with `docker build -t ai-software-company-sandbox:latest docker/sandbox`.
 
 The container backend runs with no network, a read-only root filesystem, dropped Linux
@@ -46,7 +46,8 @@ credential value in findings.
 
 ## Incident response
 
-If a credential is exposed: revoke/rotate it first, disable affected automation, identify
+Follow the detailed [Security Operations and Incident Response Runbook](security/SECURITY_OPERATIONS_RUNBOOK.md).
+If a credential is exposed, revoke/rotate it first, disable affected automation, identify
 affected commits and logs, inspect audit events, and only then remove the secret from
 source history. Removing a value from the latest file does not revoke it.
 
