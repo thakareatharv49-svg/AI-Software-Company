@@ -22,6 +22,7 @@ Product/branding decisions:
 - The GitHub repository name stays `AI-Software-Company` to preserve links.
 - The user explicitly moved away from the old “owner app” concept as the primary company tracker; Nexora is the HQ concept. Legacy owner/auth routes still exist in code and must not be mistaken for the desired product identity.
 - The AI Software Company should let the user review generated product quality, ask for missing details/fixes, and approve before final GitHub publication.
+- **Branding correction reported by the user on 2026-10-13:** “AI Software Developer” branding has now been fixed everywhere. Treat this as resolved unless a fresh repository-wide search or UI check finds a remaining occurrence; do not reopen it based on stale prior findings.
 - Generated products should become substantial, useful applications—not only calculator, Tic-Tac-Toe, or notes demos—and the factory should eventually progress through projects continuously under configured policy.
 
 ## 3. High-level architecture/capabilities represented in the repository
@@ -123,7 +124,7 @@ These are user-reported symptoms and open investigation items, not claims that t
 2. The factory queue appeared to sit for hours / queued projects did not start.
 3. The user wanted a way to delete queued or blocked missions, plus less scrolling and a larger/new-mission submission area.
 4. The user wants a meaningful review loop: inspect generated product, request missing features/fixes, then approve final publication.
-5. Brand labels were previously changed accidentally to “AI Software Developer”; user wanted **AI Software Company** branding and Nexora as the company HQ identity. Current `README.md` and `src/main.py` still contain “AI Software Developer” strings at this review, so branding is inconsistent and needs a deliberate follow-up rather than being treated as resolved.
+5. **Branding:** user reports that “AI Software Developer” branding has now been fixed everywhere. The previous inconsistent-branding finding is resolved; only reopen if a fresh repository-wide search or UI check finds a regression.
 6. Customer Google/GitHub sign-in and workspace creation previously encountered database/schema and missing-workspace/foreign-key errors. Re-test current migrations and full auth-to-workspace flow before claiming production-ready customer onboarding.
 7. The permanent roadmap's M47–M49 one-mission autonomy and launch acceptance remain open in `docs/MILESTONES.md`.
 
@@ -142,8 +143,7 @@ These are user-reported symptoms and open investigation items, not claims that t
 2. Reproduce the user's blocked/queued mission problem through the actual factory path (not just isolated unit tests); identify the earliest stage that fails to transition, and make failure/progress visible and actionable.
 3. Verify the queue starts the next healthy mission after a blocked/timed-out one and preserves FIFO/fairness.
 4. Verify delete/cancel controls for queued/blocked missions, including durable job, project snapshot, audit/event, and UI state consistency.
-5. Fix the branding mismatch consistently across backend metadata, browser UI, README and Nexora integration labels without breaking legacy URLs/config keys.
-6. Continue M47 one-mission autonomy only after reliability and review gates are demonstrated; then M48, and finally M49 acceptance.
+5. Continue M47 one-mission autonomy only after reliability and review gates are demonstrated; then M48, and finally M49 acceptance. Branding is no longer an active task unless regression evidence appears.
 
 ## 10. Required handoff checklist for every new session
 
