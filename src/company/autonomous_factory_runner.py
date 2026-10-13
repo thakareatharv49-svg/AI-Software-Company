@@ -291,7 +291,9 @@ class FactoryAutonomousRunner:
         if any(step.status == "failed" for step in plan.steps):
             return
 
-        message = f"{type(error).__name__}: {error}"
+        message = redact_sensitive_text(
+            f"{type(error).__name__}: {error}"
+        )[:4000]
         stage_name = None
         prefix = "Autonomous stage '"
         if prefix in str(error):
@@ -351,6 +353,10 @@ class FactoryAutonomousRunner:
     ) -> None:
         """Project autonomous lifecycle progress onto the visible factory plan."""
         normalized_status = str(status).strip().lower()
+        # Stage details are persisted in mission history and can surface in the
+        # HQ UI. Sanitize and bound them even when an upstream stage fails before
+        # the normal QA evidence path runs.
+        detail = redact_sensitive_text(str(detail))[:4000]
         mappings: dict[str, tuple[str, ...]] = {
             "product_generation": ("execution",),
             "ai_ceo": ("product",),
