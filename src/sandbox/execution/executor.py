@@ -54,6 +54,14 @@ class SandboxExecutor:
         self.container_image = container_image or settings.sandbox_container_image
         if self.mode not in {"host", "container"}:
             raise ValueError("Sandbox mode must be 'host' or 'container'")
+        if (
+            self.mode == "host"
+            and settings.environment.strip().lower() not in {"development", "dev", "test"}
+        ):
+            raise ValueError(
+                "Host sandbox execution is only allowed in development/test; "
+                "use the isolated container backend"
+            )
 
     def _validate(self, request: SandboxRequest) -> Path:
         if not request.command:
@@ -153,6 +161,11 @@ class SandboxExecutor:
         """Use a worker thread for compatibility with Windows ASGI event loops."""
         return await asyncio.to_thread(self.execute_sync, request)
 
+    @staticmethod
+    def _container_uid_gid() -> str:
+        """Use the image's dedicated unprivileged account, even if the API runs as root."""
+        return "10001:10001"
+
     def _execute_container(self, request: SandboxRequest) -> SandboxResult:
         """Run code in a networkless container with a size-limited ephemeral workspace."""
         command = list(request.command)
@@ -174,9 +187,7 @@ class SandboxExecutor:
         container_workdir = (
             "/workspace" if relative_workdir == "." else "/workspace/" + relative_workdir
         )
-        uid_gid = (
-            f"{os.getuid()}:{os.getgid()}" if os.name == "posix" else "10001:10001"
-        )
+        uid_gid = self._container_uid_gid()
         cid_fd, cid_path = tempfile.mkstemp(prefix="asc-sandbox-", suffix=".cid")
         os.close(cid_fd)
         os.unlink(cid_path)
@@ -193,7 +204,7 @@ class SandboxExecutor:
             "--security-opt=no-new-privileges", "--pids-limit=64",
             "--memory=512m", "--cpus=1", "--ulimit", "nofile=128:128",
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
-            "--tmpfs", "/workspace:rw,exec,nosuid,nodev,size=512m,mode=1777",
+            "--tmpfs", "/workspace:rw,exec,nosuid,nodev,size=512m,mode=0700",
             # Start from an existing writable tmpfs path: Docker creates the workdir
             # before mounting tmpfs, which fails when the image rootfs is read-only.
             "--workdir", "/tmp", "--user", uid_gid,
