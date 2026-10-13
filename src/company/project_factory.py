@@ -382,11 +382,9 @@ class ProjectFactory:
         # Sanitize the full objective, not only new feedback, before persisting
         # it or sending it back through the planner/model pipeline.
         revised_objective = redact_sensitive_text(
-            (
-                f"{job.mission.objective.rstrip()}\n\n"
-                "OWNER-REQUESTED REVISION FEEDBACK:\n"
-                f"{feedback}"
-            )
+            f"{job.mission.objective.rstrip()}\n\n"
+            "OWNER-REQUESTED REVISION FEEDBACK:\n"
+            f"{feedback}"
         )
         revised_mission = job.mission.model_copy(
             update={"objective": revised_objective}
