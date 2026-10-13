@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 from src.company.audit import MissionAuditEntry
-from src.company.persistence import _safe_audit_entry
+from src.company.persistence import _bounded_audit_limit, _safe_audit_entry
 
 
 def test_audit_entries_redact_and_bound_message_and_metadata() -> None:
@@ -44,3 +44,10 @@ def test_audit_entry_bounds_depth_and_identifier_text() -> None:
     assert len(safe.id) == 100
     assert len(safe.event_type) == 100
     assert safe.metadata["a"]["b"]["c"]["d"]["e"]["f"] == "[TRUNCATED]"
+
+
+def test_audit_history_limit_is_clamped() -> None:
+    assert _bounded_audit_limit(10) == 10
+    assert _bounded_audit_limit(0) == 1
+    assert _bounded_audit_limit(-100) == 1
+    assert _bounded_audit_limit(10000) == 500
