@@ -1251,3 +1251,74 @@ def test_safe_plan_redacts_and_bounds_all_restored_free_text_fields() -> None:
     assert len(safe.engineering_tasks[0].workstream) == 200
     assert len(safe.engineering_tasks[0].acceptance_check) == 2000
     assert safe.steps[0].status == plan.steps[0].status
+
+
+
+def test_loaded_legacy_mission_job_is_sanitized_before_use_and_rewritten() -> None:
+    from src.company.mission_jobs import MissionJob, MissionJobStatus
+
+    mission = CompanyMission(
+        name="legacy " + "N" * 700,
+        objective="api_key=legacyMissionSecret123456 " + "O" * 9000,
+        constraints=["password=legacyConstraintSecret123456 " + "C" * 3000],
+    )
+    plan = build_mission_plan(mission)
+    plan.qa_evidence = "token=legacyPlanSecret123456 " + "Q" * 6000
+    unsafe = MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=plan,
+        status=MissionJobStatus.QUEUED,
+        message="password=legacyMessageSecret123456 " + "M" * 5000,
+    )
+    # Simulate a pre-hardening durable record or model_copy update that bypassed
+    # validation and was returned by a legacy store.
+    unsafe = unsafe.model_copy(
+        update={
+            "mission": mission,
+            "plan": plan,
+            "message": "password=legacyMessageSecret123456 " + "M" * 5000,
+        }
+    )
+
+    class JobStore:
+        def __init__(self):
+            self.saved = []
+
+        def get(self, _job_id):
+            return unsafe
+
+        def save(self, job):
+            self.saved.append(job)
+
+    store = JobStore()
+    orchestrator = CompanyOrchestrator()
+    factory = ProjectFactory(
+        orchestrator,
+        MissionController(orchestrator),
+        MissionExecutionPipeline(
+            orchestrator,
+            AgentExecutor(FakeRuntime()),
+            AgentRegistry(),
+        ),
+        job_store=store,
+    )
+
+    loaded = factory._load_job(mission.id)
+
+    assert loaded is not None
+    assert len(loaded.mission.name) == 500
+    assert len(loaded.mission.objective) == 8000
+    assert len(loaded.mission.constraints[0]) == 2000
+    assert len(loaded.plan.qa_evidence) == 5200
+    serialized = loaded.model_dump_json()
+    for secret in (
+        "legacyMissionSecret123456",
+        "legacyConstraintSecret123456",
+        "legacyPlanSecret123456",
+        "legacyMessageSecret123456",
+    ):
+        assert secret not in serialized
+    assert len(loaded.message) <= 4000
+    assert store.saved
+    assert store.saved[-1].model_dump() == loaded.model_dump()
