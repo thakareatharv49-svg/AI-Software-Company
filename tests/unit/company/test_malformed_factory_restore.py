@@ -94,3 +94,33 @@ def test_restore_skips_snapshot_with_malformed_nested_mission_and_continues():
     assert factory.restore() == 1
     assert [project.mission.id for project in factory.queue] == [valid_mission.id]
 
+def test_restore_normalizes_legacy_snapshot_counters():
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    mission = CompanyMission(name="Legacy counters", objective="Recover safely")
+    snapshot = {
+        "mission": mission,
+        "plan": build_mission_plan(mission),
+        "status": "queued",
+        "stages_executed": -5,
+        "attempts": "not-a-number",
+    }
+
+    class Store:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, project):
+            pass
+
+    factory = ProjectFactory(orchestrator, controller, pipeline, store=Store())
+
+    assert factory.restore() == 1
+    assert factory.queue[0].attempts == 0
+    assert factory.queue[0].stages_executed == 0
+
