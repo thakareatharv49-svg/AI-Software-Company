@@ -39,6 +39,8 @@ def test_retry_feedback_is_redacted_before_being_reused():
     assert "api_key=[REDACTED]" in project.retry_feedback
     assert project.last_error is None
 
+from src.company.mission_jobs import MissionJob, MissionJobStatus
+
 
 def test_manual_retry_feedback_is_redacted_before_being_reused():
     mission = CompanyMission(
@@ -49,40 +51,43 @@ def test_manual_retry_feedback_is_redacted_before_being_reused():
     failed_step = plan.steps[0]
     failed_step.status = "failed"
     failed_step.detail = "Build failed: api_key=supersecret123456"
-    job = SimpleNamespace(
-        status=__import__("src.company.mission_jobs", fromlist=["MissionJobStatus"]).MissionJobStatus.BLOCKED,
+    job = MissionJob(
+        id=mission.id,
         mission=mission,
         plan=plan,
-        attempts=1,
+        status=MissionJobStatus.BLOCKED,
         message="blocked",
-        model_copy=lambda **kwargs: SimpleNamespace(
-            status=kwargs.get("update", {}).get("status", __import__("src.company.mission_jobs", fromlist=["MissionJobStatus"]).MissionJobStatus.QUEUED),
-            mission=kwargs.get("update", {}).get("mission", mission),
-            plan=kwargs.get("update", {}).get("plan", plan),
-            attempts=kwargs.get("update", {}).get("attempts", 1),
-            message=kwargs.get("update", {}).get("message", "queued"),
-        ),
+        attempts=1,
     )
+
     class JobStore:
         def get(self, _mission_id):
             return job
+
         def save(self, _job):
             pass
+
     class Store:
         def save(self, _project):
             pass
+
     class Audit:
         def append(self, _entry):
             pass
+
     factory = object.__new__(ProjectFactory)
     factory.job_store = JobStore()
     factory.store = Store()
     factory.audit_store = Audit()
     factory.queue = []
     factory._running = False
-    factory.orchestrator = SimpleNamespace(events=SimpleNamespace(publish=lambda _event: None))
-    queued = factory.retry(mission.id)
+    factory.orchestrator = SimpleNamespace(
+        events=SimpleNamespace(publish=lambda _event: None)
+    )
+
+    factory.retry(mission.id)
     project = factory.queue[0]
+
     assert project.retry_feedback is not None
     assert "supersecret123456" not in project.retry_feedback
     assert "api_key=[REDACTED]" in project.retry_feedback
