@@ -215,14 +215,6 @@ def test_restore_redacts_legacy_mission_and_plan_without_losing_progress():
     plan.steps[0].status = "completed"
     plan.steps[0].detail = "Finished with token=legacystep123456"
     plan.engineering_tasks[0].requirement = "api_key=legacytask123456"
-    project = FactoryProject(
-        mission=mission,
-        plan=plan,
-        status="queued",
-        attempts=2,
-        last_error="password=legacyerror123456",
-        retry_feedback="token=legacyfeedback123456",
-    )
     saved = []
 
     class Store:
