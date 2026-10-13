@@ -104,16 +104,15 @@ class ProjectFactory:
             # (for example, after a bounded pause or a crash during persistence).
             # Prefer its latest plan and attempt count without resetting progress.
             if job is not None and job.status == MissionJobStatus.QUEUED:
-                if project.status != "running":
-                    durable_plan = job.plan.model_copy(deep=True)
-                    project_changed = (
-                        project.plan.model_dump() != durable_plan.model_dump()
-                        or project.attempts < job.attempts
-                    )
-                    project.plan = durable_plan
-                    project.attempts = max(project.attempts, job.attempts)
-                    if project_changed:
-                        self._save(project)
+                durable_plan = job.plan.model_copy(deep=True)
+                project_changed = (
+                    project.plan.model_dump() != durable_plan.model_dump()
+                    or project.attempts < job.attempts
+                )
+                project.plan = durable_plan
+                project.attempts = max(project.attempts, job.attempts)
+                if project_changed:
+                    self._save(project)
 
             # The project snapshot and durable job are written separately, so
             # a crash can leave either one behind. If the durable job says RUNNING,
