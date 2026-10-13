@@ -16,6 +16,7 @@ from src.company.mission_controller.planner import build_mission_plan
 from src.company.mission_jobs import (
     MissionJob,
     MissionJobStatus,
+    recover_running_job,
     recover_running_plan,
     transition_job,
 )
@@ -103,6 +104,15 @@ class ProjectFactory:
                     interrupted_detail[:2000] if interrupted_detail else None
                 )
                 self._save(project)
+                # Keep the durable job record aligned with the recovered queue.
+                # Otherwise the dashboard can remain stuck on "running" after a
+                # process restart even though the project is safely queued again.
+                job = self._load_job(project.mission.id)
+                if job is not None and job.status == MissionJobStatus.RUNNING:
+                    recovered_job = recover_running_job(
+                        job.model_copy(update={"plan": project.plan})
+                    )
+                    self._save_job(recovered_job)
             self.queue.append(project)
             known_ids.add(project.mission.id)
             restored += 1
