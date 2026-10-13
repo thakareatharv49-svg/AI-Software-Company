@@ -208,3 +208,57 @@ def test_restore_prefers_newer_queued_job_plan_and_is_idempotent():
     assert len(factory.queue) == 1
     assert factory.queue[0].plan.steps[0].status == "completed"
     assert factory.queue[0].attempts == 2
+
+
+
+def test_restore_redacts_legacy_secrets_before_reusing_retry_feedback():
+    mission = CompanyMission(
+        name="Legacy diagnostic recovery",
+        objective="Never pass persisted credentials back into the model",
+    )
+    plan = build_mission_plan(mission)
+    plan.steps[0].status = "failed"
+    plan.steps[0].detail = "Build failed: api_key=supersecret123456"
+    project_data = {
+        "mission": mission,
+        "plan": plan,
+        "status": "running",
+        "stages_executed": 0,
+        "attempts": 1,
+        "last_error": None,
+        "retry_feedback": None,
+    }
+    job = MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=plan,
+        status=MissionJobStatus.RUNNING,
+        message="Interrupted before retry",
+        attempts=1,
+    )
+
+    class ProjectStore:
+        def save(self, project):
+            pass
+
+        def load_pending(self):
+            return [project_data]
+
+    class JobStore:
+        def get(self, job_id):
+            return job if job_id == mission.id else None
+
+        def save(self, saved):
+            pass
+
+    factory = object.__new__(ProjectFactory)
+    factory.store = ProjectStore()
+    factory.job_store = JobStore()
+    factory.queue = []
+    factory._active_project = None
+
+    assert factory.restore() == 1
+    feedback = factory.queue[0].retry_feedback
+    assert feedback is not None
+    assert "supersecret123456" not in feedback
+    assert "api_key=[REDACTED]" in feedback
