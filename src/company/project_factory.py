@@ -22,6 +22,7 @@ from src.company.mission_jobs import (
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.project_outputs import ProjectOutputManifest
+from src.security.redaction import redact_sensitive_text
 
 if TYPE_CHECKING:
     from src.company.autonomous_factory_runner import FactoryAutonomousRunner
@@ -552,7 +553,7 @@ class ProjectFactory:
                     f"{self.execution_timeout_seconds:g} seconds"
                 )
             else:
-                project.last_error = f"{type(exc).__name__}: {exc}"
+                project.last_error = self._safe_error_detail(f"{type(exc).__name__}: {exc}")
             # Failures can occur before the autonomous runner emits its first
             # progress callback (for example, while preparing the request). Mark
             # a concrete stage and persist it so the customer dashboard does not
@@ -777,13 +778,18 @@ class ProjectFactory:
         self._active_project = None
         return project
 
+    @staticmethod
+    def _safe_error_detail(value: str) -> str:
+        """Redact and bound exception text before persisting it to mission state."""
+        return redact_sensitive_text(str(value))[:4000]
+
     def _contain_unexpected_worker_error(
         self, project: FactoryProject, exc: Exception
     ) -> None:
         """Best-effort terminalize a mission if an error escapes run_next cleanup."""
         if project.status not in {"completed", "blocked", "cancelled"}:
             project.status = "blocked"
-            project.last_error = (
+            project.last_error = self._safe_error_detail(
                 f"Factory worker error: {type(exc).__name__}: {exc}"
             )
             active_step = next(
