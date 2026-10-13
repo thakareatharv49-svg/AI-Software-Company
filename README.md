@@ -40,15 +40,15 @@ The legacy owner console remains at **http://127.0.0.1:8000/owner** for deployme
 
 1. You give the company a software mission from the web control center.
 2. The local Ollama model turns the mission into a small runnable project.
-3. The company materializes the project in an isolated workspace.
+3. The company materializes the project in an isolated workspace and executes generated code in a restricted Docker container by default.
 4. Automated tests run inside the workspace.
 5. QA and security gates run before completion.
-6. Generated project files are published directly to the target repository's default branch.
+6. The exact reviewed artifact is held behind approval and publication gates; publishing is blocked if its digest changes or required checks fail.
 7. The result is recorded in the company dashboard.
 
 ## Run locally
 
-Requirements: Python 3.13+, PostgreSQL 16+, and Ollama with the configured model.
+Requirements: Python 3.13+, PostgreSQL 16+, Ollama with the configured model, and Docker Desktop (or Docker Engine) for isolated generated-code execution.
 
 PowerShell:
 
@@ -56,7 +56,10 @@ PowerShell:
     .venv\Scripts\Activate.ps1
     pip install -e ".[dev]"
 
-Create `.env` from `.env.example`, start PostgreSQL, then:
+Create `.env` from `.env.example`, build the restricted execution image, start PostgreSQL, then:
+
+    docker build -t ai-software-company-sandbox:latest docker/sandbox
+
 
     alembic upgrade head
     uvicorn src.main:app --reload
