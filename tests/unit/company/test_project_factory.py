@@ -1115,6 +1115,79 @@ def test_factory_recovers_interrupted_running_projects_as_queued() -> None:
     assert saved and saved[-1][0] == "queued"
 
 
+def test_factory_write_boundaries_sanitize_project_and_durable_job() -> None:
+    from src.company.mission_jobs import MissionJob, MissionJobStatus
+
+    mission = CompanyMission(name="Write boundary", objective="Safe objective")
+    plan = build_mission_plan(mission)
+    plan.qa_evidence = "token=writeSecret123456 " + "Q" * 6000
+    plan.steps[0].detail = "password=stageSecret123456 " + "D" * 5000
+    project_saved = []
+    job_saved = []
+
+    class ProjectStore:
+        def save(self, project):
+            project_saved.append(project)
+
+        def load_pending(self):
+            return []
+
+    class JobStore:
+        def get(self, _job_id):
+            return None
+
+        def save(self, job):
+            job_saved.append(job)
+
+    orchestrator = CompanyOrchestrator()
+    factory = ProjectFactory(
+        orchestrator,
+        MissionController(orchestrator),
+        MissionExecutionPipeline(
+            orchestrator,
+            AgentExecutor(FakeRuntime()),
+            AgentRegistry(),
+        ),
+        store=ProjectStore(),
+        job_store=JobStore(),
+    )
+    project = FactoryProject(
+        mission=mission,
+        plan=plan,
+        last_error="api_key=errorSecret123456 " + "E" * 5000,
+        retry_feedback="token=retrySecret123456 " + "R" * 3000,
+    )
+
+    factory._save(project)
+    factory._save_job(
+        MissionJob(
+            id=mission.id,
+            mission=mission,
+            plan=plan,
+            status=MissionJobStatus.QUEUED,
+            message="password=jobSecret123456 " + "J" * 5000,
+        )
+    )
+
+    assert project_saved and job_saved
+    persisted_project = project_saved[0]
+    persisted_job = job_saved[0]
+    assert "writeSecret123456" not in persisted_project.plan.qa_evidence
+    assert len(persisted_project.plan.qa_evidence) == 5200
+    assert "stageSecret123456" not in persisted_project.plan.steps[0].detail
+    assert len(persisted_project.plan.steps[0].detail) == 4000
+    assert "errorSecret123456" not in (persisted_project.last_error or "")
+    assert len(persisted_project.last_error or "") <= 4000
+    assert "retrySecret123456" not in (persisted_project.retry_feedback or "")
+    assert len(persisted_project.retry_feedback or "") <= 4000
+    assert "writeSecret123456" not in persisted_job.plan.qa_evidence
+    assert len(persisted_job.plan.qa_evidence) == 5200
+    assert "stageSecret123456" not in persisted_job.plan.steps[0].detail
+    assert len(persisted_job.plan.steps[0].detail) == 4000
+    assert "jobSecret123456" not in persisted_job.message
+    assert len(persisted_job.message) <= 4000
+
+
 def test_safe_plan_redacts_and_bounds_all_restored_free_text_fields() -> None:
     mission = CompanyMission(name="Restore", objective="Restore safely")
     plan = build_mission_plan(mission)
