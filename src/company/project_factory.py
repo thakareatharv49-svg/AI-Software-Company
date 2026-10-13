@@ -211,7 +211,27 @@ class ProjectFactory:
             for item in self.queue
         ):
             raise ValueError("Cannot delete a mission that is currently running")
-        self.queue = [item for item in self.queue if item.mission.id not in mission_ids]
+        removed = [
+            item for item in self.queue if item.mission.id in mission_ids
+        ]
+        self.queue = [
+            item for item in self.queue if item.mission.id not in mission_ids
+        ]
+        for project in removed:
+            job = self._load_job(project.mission.id)
+            if job is not None and job.status == MissionJobStatus.QUEUED:
+                cancelled = transition_job(
+                    job,
+                    MissionJobStatus.CANCELLED,
+                    f"Mission removed from queue: {project.mission.name}",
+                )
+                self._save_job(cancelled)
+                self._audit(
+                    project.mission.id,
+                    "MISSION_REMOVED_FROM_QUEUE",
+                    cancelled.message,
+                    cancelled.status.value,
+                )
         delete_many = getattr(self.store, "delete_many", None)
         if callable(delete_many):
             delete_many(mission_ids)
