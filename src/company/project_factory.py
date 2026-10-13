@@ -100,10 +100,26 @@ class ProjectFactory:
                 if callable(delete_many):
                     delete_many({project.mission.id})
                 continue
-            # The durable project queue can outlive the process that owned a
-            # running item. Never restore it as actively running: the new worker
-            # must reclaim it as queued and reset only interrupted stages.
-            if project.status == "running":
+            # The project snapshot and durable job are written separately, so
+            # a crash can leave either one behind. If the durable job says RUNNING,
+            # prefer its latest plan when the project snapshot still says queued;
+            # progress updates persist to both stores, but the job can be newer.
+            if job is not None and job.status == MissionJobStatus.RUNNING:
+                if project.status != "running":
+                    project.plan = job.plan.model_copy(deep=True)
+                    project.attempts = max(project.attempts, job.attempts)
+                project.plan = recover_running_plan(project.plan)
+                recovered_job = recover_running_job(
+                    job.model_copy(update={"plan": project.plan})
+                )
+                self._save_job(recovered_job)
+
+            # Never restore an interrupted project as actively running. Reclaim
+            # it as queued and reset only in-flight stages, preserving completed
+            # work from the freshest available plan snapshot.
+            if project.status == "running" or (
+                job is not None and job.status == MissionJobStatus.RUNNING
+            ):
                 project.plan = recover_running_plan(project.plan)
                 project.status = "queued"
                 interrupted_detail = next(
@@ -119,14 +135,6 @@ class ProjectFactory:
                     interrupted_detail[:2000] if interrupted_detail else None
                 )
                 self._save(project)
-                # Keep the durable job record aligned with the recovered queue.
-                # Otherwise the dashboard can remain stuck on "running" after a
-                # process restart even though the project is safely queued again.
-                if job is not None and job.status == MissionJobStatus.RUNNING:
-                    recovered_job = recover_running_job(
-                        job.model_copy(update={"plan": project.plan})
-                    )
-                    self._save_job(recovered_job)
             self.queue.append(project)
             known_ids.add(project.mission.id)
             restored += 1
