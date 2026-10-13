@@ -42,9 +42,19 @@ class MissionJob(BaseModel):
     status: MissionJobStatus
     message: str
     workspace_id: str | None = None
-    attempts: int = 0
+    # Old persisted jobs may contain negative counters. Normalize them on load
+    # so one malformed legacy record cannot be quarantined or hide other jobs.
+    attempts: int = Field(default=0, ge=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @field_validator("attempts", mode="before")
+    @classmethod
+    def normalize_attempts(cls, value: object) -> int:
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError, OverflowError):
+            return 0
 
     @field_validator("message", mode="before")
     @classmethod
