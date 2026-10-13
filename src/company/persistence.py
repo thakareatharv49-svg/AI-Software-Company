@@ -276,18 +276,26 @@ class MissionJobStore:
                 select(MissionJobRow).where(MissionJobRow.status == MissionJobStatus.RUNNING.value)
             ).all()
             for row in rows:
-                job = _safe_job(MissionJob(
-                    id=row.id,
-                    mission=CompanyMission.model_validate(row.mission),
-                    plan=MissionPlan.model_validate(row.plan),
-                    status=MissionJobStatus(row.status),
-                    message=row.message,
-                    workspace_id=row.workspace_id,
-                    attempts=row.attempts,
-                    created_at=row.created_at,
-                    updated_at=row.updated_at,
-                ))
-                job = _safe_job(recover_running_job(job))
+                try:
+                    job = _safe_job(MissionJob(
+                        id=row.id,
+                        mission=CompanyMission.model_validate(row.mission),
+                        plan=MissionPlan.model_validate(row.plan),
+                        status=MissionJobStatus(row.status),
+                        message=row.message,
+                        workspace_id=row.workspace_id,
+                        attempts=row.attempts,
+                        created_at=row.created_at,
+                        updated_at=row.updated_at,
+                    ))
+                    job = _safe_job(recover_running_job(job))
+                except (TypeError, ValueError, OverflowError):
+                    # A corrupt legacy job must not block recovery of other
+                    # interrupted missions. Avoid logging untrusted row data.
+                    logging.getLogger(__name__).error(
+                        "Skipping malformed running mission-job snapshot"
+                    )
+                    continue
                 # Recovery is also a durable write boundary: rewrite every
                 # normalized field, not only the status and plan.
                 row.mission = job.mission.model_dump(mode="json")
