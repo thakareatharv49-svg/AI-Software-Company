@@ -1173,7 +1173,23 @@ class ProjectFactory:
     def _load_job(self, mission_id: str) -> MissionJob | None:
         if self.job_store is None:
             return None
-        return self.job_store.get(mission_id)
+        job = self.job_store.get(mission_id)
+        if job is None:
+            return None
+
+        # Legacy durable records can bypass current write-time safeguards.
+        # Normalize them immediately on read so retry, enqueue, dashboard, and
+        # audit paths never consume unsafe nested text from a job store.
+        safe_job = job.model_copy(
+            update={
+                "mission": self._safe_mission(job.mission),
+                "plan": self._safe_plan(job.plan),
+                "message": redact_sensitive_text(str(job.message))[:4000],
+            }
+        )
+        if safe_job.model_dump() != job.model_dump():
+            self._save_job(safe_job)
+        return safe_job
 
     def _persist_plan_progress(self, project: FactoryProject) -> None:
         """Persist live stage status so the dashboard never shows stale all-planned work."""
