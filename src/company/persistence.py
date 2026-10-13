@@ -66,6 +66,27 @@ def _safe_job(job: MissionJob) -> MissionJob:
     return job.model_copy(update={"mission": _safe_mission(job.mission), "plan": _safe_plan(job.plan)})
 
 
+def _safe_output_manifest(manifest: ProjectOutputManifest) -> ProjectOutputManifest:
+    """Bound and redact durable project-output metadata on write and read."""
+    def safe_text(value: str | None, limit: int) -> str | None:
+        if value is None:
+            return None
+        return redact_sensitive_text(str(value))[:limit]
+
+    return manifest.model_copy(update={
+        "id": safe_text(manifest.id, 100),
+        "mission_id": safe_text(manifest.mission_id, 100),
+        "project_id": safe_text(manifest.project_id, 200),
+        "name": safe_text(manifest.name, 500),
+        "status": safe_text(manifest.status, 80),
+        "output_type": safe_text(manifest.output_type, 100),
+        "repository": safe_text(manifest.repository, 500),
+        "product_url": safe_text(manifest.product_url, 1000),
+        "github_message": safe_text(manifest.github_message, 2000),
+        "memory_id": safe_text(manifest.memory_id, 100),
+    })
+
+
 if TYPE_CHECKING:
     from src.company.project_factory import FactoryProject
 
@@ -244,6 +265,7 @@ class ProjectOutputStore:
         self._engine = create_engine(url, pool_pre_ping=True)
 
     def save(self, manifest: ProjectOutputManifest) -> None:
+        manifest = _safe_output_manifest(manifest)
         with Session(self._engine) as session:
             row = session.get(ProjectOutputRow, manifest.id)
             values = {
@@ -275,7 +297,7 @@ class ProjectOutputStore:
             return [self._model(row) for row in rows]
 
     def _model(self, row: ProjectOutputRow) -> ProjectOutputManifest:
-        return ProjectOutputManifest(
+        return _safe_output_manifest(ProjectOutputManifest(
             id=row.id,
             mission_id=row.mission_id,
             project_id=row.project_id,
@@ -287,7 +309,7 @@ class ProjectOutputStore:
             memory_id=row.memory_id,
             created_at=row.created_at,
             updated_at=row.updated_at,
-        )
+        ))
 
     def close(self) -> None:
         self._engine.dispose()

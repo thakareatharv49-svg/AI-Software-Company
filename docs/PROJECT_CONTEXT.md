@@ -94,8 +94,10 @@ The recent “Milestone 1, 2, ...” PR series is a separate short-term hardenin
 | 26 | #297 | Sanitize mission plans at write boundaries. |
 | 27 | #298 | Bound/redact mission input text before persistence/planning. |
 | 28 | #299 | Sanitize restored mission jobs at read time; rewrite unsafe legacy records. |
+| 29 | #302 | Sanitize durable mission and project snapshot reads. |
+| 30 | #303 | Redact and bound persistent runtime-run results and errors. |
 
-Most recent confirmed merged PR at this review: [#299 — Milestone 28: sanitize restored mission jobs](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/299), merge commit `da0f4071f16db6154e4e4da6682c45e95985f046`. The four required workflows passed on the PR head before merge.
+Most recent confirmed merged PR at this review: [#303 — Milestone 30: sanitize persistent runtime run records](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/303), merge commit `a2c17d1407ac9cb6b40a3ff2881bee34b97e067c`. The four required workflows passed on the PR head before merge. Milestone 31 continues the persistence trust-boundary work by sanitizing durable project-output manifests.
 
 ## 5. Latest hardening details
 
