@@ -151,7 +151,9 @@ def test_enqueue_redacts_secrets_from_mission_fields_before_persistence_and_plan
     mission = CompanyMission(
         name="Budget app api_key=namesecret123456",
         objective="Build a budget app with password=objectivesecret123456",
-        constraints=["Use database_url=constraintsecret123456 only in local config"],
+        constraints=[
+            "Use database_url=constraintsecret123456 only in local config"
+        ],
     )
     saved_jobs = []
 
@@ -183,7 +185,12 @@ def test_enqueue_redacts_secrets_from_mission_fields_before_persistence_and_plan
     project = factory.enqueue(mission)
     persisted = saved_jobs[-1]
 
-    for secret in ("namesecret123456", "objectivesecret123456", "constraintsecret123456"):
+    secrets = (
+        "namesecret123456",
+        "objectivesecret123456",
+        "constraintsecret123456",
+    )
+    for secret in secrets:
         assert secret not in persisted.mission.name
         assert secret not in persisted.mission.objective
         assert secret not in " ".join(persisted.mission.constraints)
