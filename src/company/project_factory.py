@@ -372,7 +372,7 @@ class ProjectFactory:
             raise KeyError(mission_id)
         if job.status != MissionJobStatus.COMPLETED:
             raise ValueError(f"Mission '{mission_id}' cannot be revised from '{job.status.value}'")
-        feedback = feedback.strip()
+        feedback = redact_sensitive_text(feedback.strip())
         if not feedback:
             raise ValueError("Revision feedback cannot be blank")
         if len(feedback) > 10000:
