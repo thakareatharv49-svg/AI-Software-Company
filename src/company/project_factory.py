@@ -99,6 +99,7 @@ class ProjectFactory:
                 if project.retry_feedback
                 else None
             )
+            self._save(project)
             job = self._load_job(project.mission.id)
             if job is not None:
                 safe_job_mission = self._safe_mission(job.mission)
