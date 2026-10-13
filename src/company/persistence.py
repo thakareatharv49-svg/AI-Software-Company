@@ -290,6 +290,7 @@ class MissionJobStore:
                     plan=MissionPlan.model_validate(row.plan),
                     status=MissionJobStatus(row.status),
                     message=row.message,
+                    workspace_id=row.workspace_id,
                     attempts=row.attempts,
                     created_at=row.created_at,
                     updated_at=row.updated_at,

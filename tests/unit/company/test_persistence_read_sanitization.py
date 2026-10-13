@@ -54,3 +54,52 @@ def test_recovered_job_is_normalized_before_being_returned_or_rewritten() -> Non
     assert "recoveryMessageSecret123456" not in safe.message
     assert len(safe.message) <= 4000
     assert safe.attempts == 0
+
+
+def test_mission_job_list_preserves_workspace_ownership(monkeypatch) -> None:
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    import src.company.persistence as persistence
+    from src.company.mission_jobs import MissionJobStatus
+
+    mission = CompanyMission(name="Workspace mission", objective="Keep workspace scope")
+    plan = build_mission_plan(mission)
+    now = datetime.now(UTC)
+    row = SimpleNamespace(
+        id=mission.id,
+        mission=mission.model_dump(mode="json"),
+        plan=plan.model_dump(mode="json"),
+        status=MissionJobStatus.QUEUED.value,
+        message="queued",
+        workspace_id="workspace-owned-123",
+        attempts=0,
+        created_at=now,
+        updated_at=now,
+    )
+
+    class FakeScalars:
+        def all(self):
+            return [row]
+
+    class FakeSession:
+        def __init__(self, _engine):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def scalars(self, _statement):
+            return FakeScalars()
+
+    monkeypatch.setattr(persistence, "Session", FakeSession)
+    store = persistence.MissionJobStore.__new__(persistence.MissionJobStore)
+    store._engine = object()
+
+    jobs = store.list_all()
+
+    assert len(jobs) == 1
+    assert jobs[0].workspace_id == "workspace-owned-123"
