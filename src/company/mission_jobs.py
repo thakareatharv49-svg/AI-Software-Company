@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from src.security.redaction import redact_sensitive_text
 
 from src.company.mission_controller.models import MissionPlan
 from src.company.models.contracts import CompanyMission
@@ -45,6 +47,12 @@ class MissionJob(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
+    @field_validator("message", mode="before")
+    @classmethod
+    def sanitize_message(cls, value: object) -> str:
+        """Redact and bound job diagnostics before they are persisted or exposed."""
+        return redact_sensitive_text(str(value))[:4000]
+
 
 def recover_running_plan(plan: MissionPlan) -> MissionPlan:
     """Make interrupted in-flight stages safe to retry after a process restart."""
@@ -73,10 +81,11 @@ def transition_job(job: MissionJob, target: MissionJobStatus, message: str) -> M
         return job.model_copy(update={"message": message, "updated_at": datetime.now(UTC)})
     if target not in _ALLOWED_TRANSITIONS[job.status]:
         raise ValueError(f"Invalid mission transition: {job.status.value} -> {target.value}")
+    safe_message = redact_sensitive_text(str(message))[:4000]
     return job.model_copy(
         update={
             "status": target,
-            "message": message,
+            "message": safe_message,
             "updated_at": datetime.now(UTC),
         }
     )
