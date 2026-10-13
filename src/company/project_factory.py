@@ -1149,6 +1149,21 @@ class ProjectFactory:
             )
 
     def _save(self, project: FactoryProject) -> None:
+        # Enforce the same trust boundary on every write, not just when older
+        # snapshots are restored. Plans can accumulate model-generated evidence
+        # and stage diagnostics during execution.
+        project.mission = self._safe_mission(project.mission)
+        project.plan = self._safe_plan(project.plan)
+        project.last_error = (
+            self._safe_error_detail(project.last_error)
+            if project.last_error
+            else None
+        )
+        project.retry_feedback = (
+            self._safe_error_detail(project.retry_feedback)
+            if project.retry_feedback
+            else None
+        )
         if self.store is not None:
             self.store.save(project)
 
@@ -1173,7 +1188,16 @@ class ProjectFactory:
 
     def _save_job(self, job: MissionJob) -> None:
         if self.job_store is not None:
-            self.job_store.save(job)
+            # model_copy(update=...) bypasses Pydantic validators, so sanitize
+            # the nested mission/plan and diagnostic message explicitly here.
+            safe_job = job.model_copy(
+                update={
+                    "mission": self._safe_mission(job.mission),
+                    "plan": self._safe_plan(job.plan),
+                    "message": redact_sensitive_text(str(job.message))[:4000],
+                }
+            )
+            self.job_store.save(safe_job)
 
     def _transition_job(
         self,
