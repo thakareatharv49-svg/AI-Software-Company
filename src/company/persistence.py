@@ -511,7 +511,9 @@ class ProjectStore:
                     safe_mission = mission.model_dump(mode="json")
                     safe_plan = plan.model_dump(mode="json")
                 except (TypeError, ValueError, OverflowError):
-                    logging.getLogger(__name__).exception(
+                    # Keep diagnostics generic: validation errors can echo
+                    # untrusted persisted values, including secret-like text.
+                    logging.getLogger(__name__).error(
                         "Skipping malformed pending factory snapshot"
                     )
                     continue
