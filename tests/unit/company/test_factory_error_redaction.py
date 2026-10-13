@@ -92,3 +92,55 @@ def test_manual_retry_feedback_is_redacted_before_being_reused():
     assert "supersecret123456" not in project.retry_feedback
     assert "api_key=[REDACTED]" in project.retry_feedback
 
+def test_revision_feedback_is_redacted_before_persistence_and_audit():
+    mission = CompanyMission(
+        name="Revision secret safety",
+        objective="Build a safe product",
+    )
+    plan = build_mission_plan(mission)
+    job = MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=plan,
+        status=MissionJobStatus.COMPLETED,
+        message="completed",
+        attempts=1,
+    )
+    saved_jobs = []
+    saved_projects = []
+    audit_entries = []
+
+    class JobStore:
+        def get(self, _mission_id):
+            return job
+
+        def save(self, saved_job):
+            saved_jobs.append(saved_job)
+
+    class Store:
+        def save(self, project):
+            saved_projects.append(project)
+
+    class Audit:
+        def append(self, entry):
+            audit_entries.append(entry)
+
+    factory = object.__new__(ProjectFactory)
+    factory.job_store = JobStore()
+    factory.store = Store()
+    factory.audit_store = Audit()
+    factory.queue = []
+    factory._running = False
+    factory._last_autonomous_result = object()
+    factory.orchestrator = SimpleNamespace(
+        stop=lambda: None,
+        events=SimpleNamespace(publish=lambda _event: None),
+    )
+
+    factory.revise(mission.id, "Please use api_key=supersecret123456 for the integration")
+
+    revised_job = saved_jobs[-1]
+    assert "supersecret123456" not in revised_job.mission.objective
+    assert "api_key=[REDACTED]" in revised_job.mission.objective
+    assert "supersecret123456" not in audit_entries[-1].details["feedback"]
+    assert "api_key=[REDACTED]" in audit_entries[-1].details["feedback"]
