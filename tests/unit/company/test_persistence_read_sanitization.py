@@ -316,5 +316,8 @@ def test_pending_project_restore_skips_malformed_snapshot_and_keeps_healthy_rows
     assert pending[0]["status"] == "queued"
     assert pending[0]["stages_executed"] == 1
     assert pending[0]["attempts"] == 2
-    assert "Skipping malformed pending factory snapshot" in caplog.text
-    assert sessions[0].commits == 0
+    assert "Quarantining malformed pending factory snapshot" in caplog.text
+    assert "unexpected" not in caplog.text
+    assert malformed.status == "blocked"
+    assert malformed.updated_at >= now
+    assert sessions[0].commits == 1
