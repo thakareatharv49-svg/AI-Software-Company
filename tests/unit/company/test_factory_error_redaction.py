@@ -95,7 +95,7 @@ def test_manual_retry_feedback_is_redacted_before_being_reused():
 def test_revision_feedback_is_redacted_before_persistence_and_audit():
     mission = CompanyMission(
         name="Revision secret safety",
-        objective="Build a safe product",
+        objective="Build a safe product using api_key=legacysecret123456",
     )
     plan = build_mission_plan(mission)
     job = MissionJob(
@@ -141,6 +141,7 @@ def test_revision_feedback_is_redacted_before_persistence_and_audit():
 
     revised_job = saved_jobs[-1]
     assert "supersecret123456" not in revised_job.mission.objective
+    assert "legacysecret123456" not in revised_job.mission.objective
     assert "api_key=[REDACTED]" in revised_job.mission.objective
     assert "supersecret123456" not in audit_entries[-1].metadata["feedback"]
     assert "api_key=[REDACTED]" in audit_entries[-1].metadata["feedback"]
