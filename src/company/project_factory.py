@@ -378,13 +378,19 @@ class ProjectFactory:
         if len(feedback) > 10000:
             raise ValueError("Revision feedback exceeds 10000 characters")
 
-        revised_mission = job.mission.model_copy(update={
-            "objective": (
+        # Older missions may have been stored before write-time redaction.
+        # Sanitize the full objective, not only new feedback, before persisting
+        # it or sending it back through the planner/model pipeline.
+        revised_objective = redact_sensitive_text(
+            (
                 f"{job.mission.objective.rstrip()}\n\n"
                 "OWNER-REQUESTED REVISION FEEDBACK:\n"
                 f"{feedback}"
-            ),
-        })
+            )
+        )
+        revised_mission = job.mission.model_copy(
+            update={"objective": revised_objective}
+        )
         plan = build_mission_plan(revised_mission)
         now = datetime.now(UTC)
         queued_job = job.model_copy(update={
