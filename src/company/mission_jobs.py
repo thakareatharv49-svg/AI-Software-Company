@@ -42,7 +42,9 @@ class MissionJob(BaseModel):
     status: MissionJobStatus
     message: str
     workspace_id: str | None = None
-    attempts: int = 0
+    # Attempts are persisted and surfaced in the dashboard; reject negative
+    # values at the model boundary rather than relying only on storage cleanup.
+    attempts: int = Field(default=0, ge=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
