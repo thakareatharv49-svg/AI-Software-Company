@@ -17,7 +17,10 @@ class FakeRuntime:
         return ModelResponse(content="stage completed", model="fake", provider="fake")
 
 
-@pytest.mark.parametrize("timeout", [0, -1, math.inf, -math.inf, math.nan])
+@pytest.mark.parametrize(
+    "timeout",
+    [0, -1, math.inf, -math.inf, math.nan, None, "10", True, False],
+)
 @pytest.mark.asyncio
 async def test_invalid_execution_timeout_does_not_dequeue_mission(timeout: float) -> None:
     orchestrator = CompanyOrchestrator()

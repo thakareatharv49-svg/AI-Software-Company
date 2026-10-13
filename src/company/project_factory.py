@@ -591,9 +591,12 @@ class ProjectFactory:
     ) -> FactoryProject | None:
         if max_retries < 0:
             raise ValueError("max_retries must be non-negative")
+        timeout = self.execution_timeout_seconds
         if (
-            not math.isfinite(self.execution_timeout_seconds)
-            or self.execution_timeout_seconds <= 0
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or timeout <= 0
         ):
             raise ValueError(
                 "execution_timeout_seconds must be a finite positive number"
