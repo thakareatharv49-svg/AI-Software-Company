@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -115,6 +116,10 @@ def _bounded_audit_value(value: Any, *, depth: int = 0) -> Any:
         return {str(key)[:120]: _bounded_audit_value(item, depth=depth + 1) for key, item in list(value.items())[:100]}
     if isinstance(value, (list, tuple)):
         return [_bounded_audit_value(item, depth=depth + 1) for item in value[:100]]
+    if isinstance(value, float) and not math.isfinite(value):
+        # Legacy JSON columns can contain NaN/Infinity on permissive engines;
+        # normalize them so API serialization stays standards-compliant.
+        return "[INVALID_NUMBER]"
     if isinstance(value, (int, float, bool)) or value is None:
         return value
     return redact_sensitive_text(str(value))[:500]
