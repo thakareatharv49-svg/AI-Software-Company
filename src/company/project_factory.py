@@ -99,18 +99,29 @@ class ProjectFactory:
                 continue
             # Older snapshots may predate write-time redaction. Sanitize text
             # before any restored mission or plan can be reused by an agent.
-            project.mission = self._safe_mission(project.mission)
-            project.plan = self._safe_plan(project.plan)
-            project.last_error = (
-                self._safe_error_detail(project.last_error)
-                if project.last_error
-                else None
-            )
-            project.retry_feedback = (
-                self._safe_error_detail(project.retry_feedback)
-                if project.retry_feedback
-                else None
-            )
+            # Keep sanitation inside the per-snapshot recovery boundary: legacy
+            # model_copy payloads can bypass validation and contain malformed
+            # nested values even when FactoryProject itself was constructed.
+            try:
+                project.mission = self._safe_mission(project.mission)
+                project.plan = self._safe_plan(project.plan)
+                project.last_error = (
+                    self._safe_error_detail(project.last_error)
+                    if project.last_error
+                    else None
+                )
+                project.retry_feedback = (
+                    self._safe_error_detail(project.retry_feedback)
+                    if project.retry_feedback
+                    else None
+                )
+            except (AttributeError, KeyError, TypeError, ValueError):
+                import logging
+
+                logging.getLogger(__name__).error(
+                    "Skipping malformed pending factory snapshot"
+                )
+                continue
             job = self._load_job(project.mission.id)
             if job is not None:
                 safe_job_mission = self._safe_mission(job.mission)
