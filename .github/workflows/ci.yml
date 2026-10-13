@@ -43,5 +43,8 @@ jobs:
         run: docker build --tag asc-sandbox:ci docker/sandbox
       - name: Tests
         env:
+          # Most unit tests use the explicitly selected host backend for determinism.
+          # The container isolation suite explicitly requests container mode.
+          SANDBOX_MODE: host
           ASC_SANDBOX_TEST_IMAGE: asc-sandbox:ci
         run: pytest -q
