@@ -1322,3 +1322,25 @@ def test_loaded_legacy_mission_job_is_sanitized_before_use_and_rewritten() -> No
     assert len(loaded.message) <= 4000
     assert store.saved
     assert store.saved[-1].model_dump() == loaded.model_dump()
+
+
+@pytest.mark.asyncio
+async def test_run_next_rejects_negative_retry_budget_without_mutating_queue() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    project = factory.enqueue(
+        CompanyMission(name="Retry budget", objective="Keep queue unchanged")
+    )
+
+    with pytest.raises(ValueError, match="max_retries must be non-negative"):
+        await factory.run_next(max_retries=-1)
+
+    assert factory.queue == [project]
+    assert project.status == "queued"
+    assert project.attempts == 0

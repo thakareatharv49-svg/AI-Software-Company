@@ -588,6 +588,8 @@ class ProjectFactory:
         max_stages: int | None = None,
         max_retries: int = 2,
     ) -> FactoryProject | None:
+        if max_retries < 0:
+            raise ValueError("max_retries must be non-negative")
         if not self.queue:
             return None
 
