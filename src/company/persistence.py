@@ -494,18 +494,27 @@ class MissionAuditStore:
                 query.order_by(MissionAuditRow.timestamp.desc()).limit(_bounded_audit_limit(limit))
             ).all()
             rows.reverse()
-            return [
-                _safe_audit_entry(MissionAuditEntry(
-                    id=row.id,
-                    mission_id=row.mission_id,
-                    event_type=row.event_type,
-                    message=row.message,
-                    status=row.status,
-                    timestamp=row.timestamp,
-                    metadata=row.metadata,
-                ))
-                for row in rows
-            ]
+            entries: list[MissionAuditEntry] = []
+            for row in rows:
+                try:
+                    entry = _safe_audit_entry(MissionAuditEntry(
+                        id=row.id,
+                        mission_id=row.mission_id,
+                        event_type=row.event_type,
+                        message=row.message,
+                        status=row.status,
+                        timestamp=row.timestamp,
+                        metadata=row.metadata,
+                    ))
+                except (TypeError, ValueError, OverflowError):
+                    # Audit history is append-only; skip a malformed legacy row
+                    # without mutating or exposing its untrusted contents.
+                    logging.getLogger(__name__).error(
+                        "Skipping malformed mission-audit snapshot"
+                    )
+                    continue
+                entries.append(entry)
+            return entries
 
     def close(self) -> None:
         self._engine.dispose()
