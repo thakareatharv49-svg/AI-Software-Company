@@ -17,7 +17,54 @@ from src.company.mission_jobs import (
 from src.company.models.contracts import CompanyMission
 from src.company.project_outputs import ProjectOutputManifest
 from src.config.settings import settings
+from src.security.redaction import redact_sensitive_text
 from src.db.base import Base
+
+
+def _safe_mission(mission: CompanyMission) -> CompanyMission:
+    """Normalize legacy persisted mission text before it reaches callers or agents."""
+    def safe_text(value: str, limit: int) -> str:
+        return redact_sensitive_text(str(value))[:limit]
+    return mission.model_copy(update={
+        "name": safe_text(mission.name, 500),
+        "objective": safe_text(mission.objective, 8000),
+        "constraints": [safe_text(value, 2000) for value in mission.constraints],
+    })
+
+
+def _safe_plan(plan: MissionPlan) -> MissionPlan:
+    """Bound and redact free text in legacy plans loaded directly from storage."""
+    safe = plan.model_copy(deep=True)
+    def safe_text(value: str, limit: int) -> str:
+        return redact_sensitive_text(str(value))[:limit]
+    for name, limit in (("name", 500), ("objective", 8000), ("qa_status", 120),
+                        ("qa_evidence", 5200), ("security_status", 120),
+                        ("security_summary", 1000), ("security_evidence", 2000)):
+        value = getattr(safe, name, None)
+        if isinstance(value, str):
+            setattr(safe, name, safe_text(value, limit))
+    safe.constraints = [safe_text(value, 2000) for value in safe.constraints]
+    safe.acceptance_criteria = [safe_text(value, 4000) for value in safe.acceptance_criteria]
+    safe.qa_command = [safe_text(value, 500) for value in safe.qa_command]
+    for step in safe.steps:
+        step.objective = safe_text(step.objective, 2000)
+        step.agent_role = safe_text(step.agent_role, 120)
+        step.status = safe_text(step.status, 120)
+        if step.detail:
+            step.detail = safe_text(step.detail, 4000)
+    for task in safe.engineering_tasks:
+        task.title = safe_text(task.title, 500)
+        task.requirement = safe_text(task.requirement, 4000)
+        task.workstream = safe_text(task.workstream, 200)
+        task.agent_role = safe_text(task.agent_role, 120)
+        task.acceptance_check = safe_text(task.acceptance_check, 2000)
+        task.status = safe_text(task.status, 120)
+    return safe
+
+
+def _safe_job(job: MissionJob) -> MissionJob:
+    return job.model_copy(update={"mission": _safe_mission(job.mission), "plan": _safe_plan(job.plan)})
+
 
 if TYPE_CHECKING:
     from src.company.project_factory import FactoryProject
@@ -113,7 +160,7 @@ class MissionJobStore:
             row = session.get(MissionJobRow, job_id)
             if row is None:
                 return None
-            return MissionJob(
+            return _safe_job(MissionJob(
                 id=row.id,
                 mission=CompanyMission.model_validate(row.mission),
                 plan=MissionPlan.model_validate(row.plan),
@@ -123,7 +170,7 @@ class MissionJobStore:
                 attempts=row.attempts,
                 created_at=row.created_at,
                 updated_at=row.updated_at,
-            )
+            ))
 
     def recover_running(self) -> list[MissionJob]:
         recovered: list[MissionJob] = []
@@ -132,7 +179,7 @@ class MissionJobStore:
                 select(MissionJobRow).where(MissionJobRow.status == MissionJobStatus.RUNNING.value)
             ).all()
             for row in rows:
-                job = MissionJob(
+                job = _safe_job(MissionJob(
                     id=row.id,
                     mission=CompanyMission.model_validate(row.mission),
                     plan=MissionPlan.model_validate(row.plan),
@@ -142,7 +189,7 @@ class MissionJobStore:
                     attempts=row.attempts,
                     created_at=row.created_at,
                     updated_at=row.updated_at,
-                )
+                ))
                 job = recover_running_job(job)
                 row.status = job.status.value
                 row.plan = job.plan.model_dump(mode="json")
@@ -158,7 +205,7 @@ class MissionJobStore:
                 select(MissionJobRow).order_by(MissionJobRow.created_at.desc())
             ).all()
             return [
-                MissionJob(
+                _safe_job(MissionJob(
                     id=row.id,
                     mission=CompanyMission.model_validate(row.mission),
                     plan=MissionPlan.model_validate(row.plan),
@@ -167,7 +214,7 @@ class MissionJobStore:
                     attempts=row.attempts,
                     created_at=row.created_at,
                     updated_at=row.updated_at,
-                )
+                ))
                 for row in rows
             ]
 
@@ -339,11 +386,11 @@ class ProjectStore:
             ).all()
             return [
                 {
-                    "mission": CompanyMission.model_validate(row.mission),
+                    "mission": _safe_mission(CompanyMission.model_validate(row.mission)),
                     "plan": (
-                        recover_running_plan(MissionPlan.model_validate(row.plan))
+                        recover_running_plan(_safe_plan(MissionPlan.model_validate(row.plan)))
                         if row.status == "running"
-                        else MissionPlan.model_validate(row.plan)
+                        else _safe_plan(MissionPlan.model_validate(row.plan))
                     ),
                     "status": "queued" if row.status == "running" else row.status,
                     "stages_executed": row.stages_executed,
