@@ -99,14 +99,18 @@ The recent “Milestone 1, 2, ...” PR series is a separate short-term hardenin
 | 31 | #304 | Redact and bound durable project-output manifests on write and read. |
 | 32 | #305 | Redact and bound durable audit entries on write and legacy reads. |
 | 33 | #306 | Cap durable audit-history reads and return a chronological page of newest entries. |
+| 34 | #307 | Sanitize mission and plan fields before durable factory snapshot writes; clamp snapshot counters. |
+| 35 | In progress | Normalize mission-job mission/plan text, diagnostics, and retry counters at the durable write boundary. |
 
-Most recent confirmed merged PR at this review: [#306 — Milestone 33: bound audit-history reads](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/306), merge commit `40b0c8c81c0755d3eab90ea0ee242e8625ec3f6e`. All four required workflows passed on the exact PR head before merge. Milestone 34 sanitizes factory project snapshots before durable writes.
+Most recent confirmed merged PR at this review: [#307 — Milestone 34: sanitize factory snapshot writes](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/307), merge commit `e84ab9c538a6f7ba66ce83cd3a053c4b9c11c433`. All required CI, secret scanning, dependency audit, and CodeQL checks passed on the exact PR head before merge. Milestone 35 is hardening durable mission-job writes.
 
 ## 5. Latest hardening details
 
 - M31 (#304) sanitizes durable project-output manifests on writes and reconstructed reads, redacting credential-bearing repository/product URLs and bounding publication messages.
 - M32 (#305) redacts and bounds durable audit entries before writes and after legacy reads, including nested metadata.
 - M33 (#306) caps audit-history reads at 500 records by default and returns the newest page in chronological order.
+- M34 (#307) sanitizes factory snapshot mission/plan text before writes and clamps persisted counters.
+- M35 hardens the remaining durable mission-job write boundary by reusing read-time normalization for mission/plan content, redacting/bounding diagnostics, and clamping negative retry counters.
 
 The reliability/security sequence has been strengthening the mission lifecycle and the durable-data trust boundaries:
 - Cancellation, restart, retries, stale project snapshots, and durable job state are reconciled so interrupted work can resume without duplicating or resurrecting terminal work.
