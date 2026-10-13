@@ -5,10 +5,9 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.security.redaction import redact_sensitive_text
-
 from src.company.mission_controller.models import MissionPlan
 from src.company.models.contracts import CompanyMission
+from src.security.redaction import redact_sensitive_text
 
 
 class MissionJobStatus(StrEnum):
