@@ -58,10 +58,33 @@ class SandboxExecutor:
     def _validate(self, request: SandboxRequest) -> Path:
         if not request.command:
             raise ValueError("Sandbox command cannot be empty")
-        executable = Path(request.command[0]).name.lower()
+        if len(request.command) > 256:
+            raise ValueError("Sandbox command exceeds the 256-argument limit")
+        total_argument_bytes = 0
+        for argument in request.command:
+            if "\\x00" in argument:
+                raise ValueError("Sandbox command arguments cannot contain NUL bytes")
+            argument_bytes = len(argument.encode("utf-8"))
+            if argument_bytes > 65_536:
+                raise ValueError("Sandbox command argument exceeds the 64 KiB limit")
+            total_argument_bytes += argument_bytes
+        if total_argument_bytes > 1_048_576:
+            raise ValueError("Sandbox command exceeds the 1 MiB argument limit")
+
+        # Match the executable token itself, not only its basename. Otherwise an
+        # attacker could supply an arbitrary executable named "python" or "node"
+        # from an untrusted workspace and pass the allow-list check.
+        executable_token = request.command[0]
+        if (
+            "/" in executable_token
+            or "\\\\" in executable_token
+            or Path(executable_token).name != executable_token
+        ):
+            raise PermissionError("Sandbox executable must be an allow-listed command name")
+        executable = executable_token.lower()
         if executable not in {command.lower() for command in self.allowed_commands}:
             raise PermissionError(
-                f"Command '{request.command[0]}' is not allowed in sandbox"
+                f"Command '{executable_token}' is not allowed in sandbox"
             )
 
         working_directory = Path(request.working_directory).resolve()
