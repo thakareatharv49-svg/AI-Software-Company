@@ -442,6 +442,25 @@ class ProjectFactory:
                         on_progress=lambda _plan: self._persist_plan_progress(project),
                     )
                 else:
+                    # Older adapters cannot publish stage-level progress. Mark
+                    # execution as active before awaiting them so the dashboard
+                    # does not display a long-running mission as entirely planned.
+                    execution_step = next(
+                        (
+                            step
+                            for step in project.plan.steps
+                            if step.stage.value == "execution"
+                            and step.status == "planned"
+                        ),
+                        None,
+                    )
+                    if execution_step is not None:
+                        execution_step.status = "running"
+                        execution_step.detail = (
+                            "Autonomous runner is executing; detailed stage "
+                            "telemetry is unavailable for this runner."
+                        )
+                        self._persist_plan_progress(project)
                     execution = runner(attempt_mission, project.plan)
                 autonomous_result = await asyncio.wait_for(
                     execution,
