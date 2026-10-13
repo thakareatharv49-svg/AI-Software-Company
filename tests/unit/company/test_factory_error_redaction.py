@@ -227,7 +227,14 @@ def test_restore_redacts_legacy_mission_and_plan_without_losing_progress():
 
     class Store:
         def load_pending(self):
-            return [project.model_dump()]
+            return [{
+                "mission": mission,
+                "plan": plan,
+                "status": "queued",
+                "attempts": 2,
+                "last_error": "password=legacyerror123456",
+                "retry_feedback": "token=legacyfeedback123456",
+            }]
 
         def save(self, item):
             saved.append(item)
