@@ -59,8 +59,6 @@ PowerShell:
 Create `.env` from `.env.example`, build the restricted execution image, start PostgreSQL, then:
 
     docker build -t ai-software-company-sandbox:latest docker/sandbox
-
-
     alembic upgrade head
     uvicorn src.main:app --reload
 
@@ -81,6 +79,6 @@ GitHub delivery can be enabled with a GitHub token:
     GITHUB_DEFAULT_BRANCH=main
     GITHUB_BRANCH_PREFIX=factory
 
-Each successful mission gets its own GitHub repository and the generated project is committed directly to its default branch. No pull request is required.
+GitHub publishing is gated by the review workflow: required tests and security checks must pass, and the user must approve the exact artifact before publication. If the artifact changes after approval, publishing is rejected. Configure GitHub writes only when you are ready to enable this integration.
 
 GitHub and deployment integrations remain optional and are protected by the existing gates.
