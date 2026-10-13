@@ -184,3 +184,32 @@ def test_sandbox_timeout_terminates_child_process_group(tmp_path: Path) -> None:
     assert result.status == SandboxStatus.TIMEOUT
     time.sleep(1.7)
     assert not marker.exists()
+
+def test_sandbox_rejects_executable_paths_even_when_basename_is_allowed(tmp_path: Path) -> None:
+    executor = SandboxExecutor(workspace=tmp_path)
+    for executable in (str(tmp_path / "python"), f"{tmp_path}\\\\python.exe", "./python"):
+        with pytest.raises(PermissionError, match="allow-listed command name"):
+            executor.execute_sync(SandboxRequest(
+                command=[executable, "-c", "print('must not run')"],
+                working_directory=str(tmp_path),
+            ))
+
+
+@pytest.mark.parametrize(
+    ("command", "message"),
+    [
+        (["python", "-c", "print('x')\\x00"], "NUL"),
+        (["python", *("x" for _ in range(256))], "256-argument"),
+        (["python", "x" * 65_537], "64 KiB"),
+        (["python", "x" * 1_048_577], "64 KiB"),
+    ],
+)
+def test_sandbox_rejects_malformed_or_oversized_arguments(
+    tmp_path: Path, command: list[str], message: str
+) -> None:
+    executor = SandboxExecutor(workspace=tmp_path)
+    with pytest.raises(ValueError, match=message):
+        executor.execute_sync(SandboxRequest(
+            command=command,
+            working_directory=str(tmp_path),
+        ))
