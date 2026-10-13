@@ -653,7 +653,7 @@ class ProjectFactory:
                 self._reset_for_retry(project, reset_completed=True)
                 # A transiently failing mission must not monopolize the worker.
                 # Let already queued missions run before this mission's next attempt.
-                self.queue.append(project)
+                self._requeue_for_fairness(project)
                 self._transition_job(
                     project,
                     MissionJobStatus.QUEUED,
@@ -690,7 +690,7 @@ class ProjectFactory:
                 self._reset_for_retry(project, reset_completed=True)
                 # A transiently failing mission must not monopolize the worker.
                 # Let already queued missions run before this mission's next attempt.
-                self.queue.append(project)
+                self._requeue_for_fairness(project)
                 self._transition_job(
                     project,
                     MissionJobStatus.QUEUED,
@@ -756,7 +756,7 @@ class ProjectFactory:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=max_stages is None)
                 # Preserve FIFO fairness when resuming a paused or failed attempt.
-                self.queue.append(project)
+                self._requeue_for_fairness(project)
                 self._transition_job(
                     project,
                     MissionJobStatus.QUEUED,
@@ -772,7 +772,7 @@ class ProjectFactory:
                 )
                 event_type = "FACTORY_PROJECT_PAUSED"
                 # A bounded pause yields to other missions already in the queue.
-                self.queue.append(project)
+                self._requeue_for_fairness(project)
 
         self._save(project)
         job = self._load_job(project.mission.id)
@@ -802,6 +802,11 @@ class ProjectFactory:
         )
         self._active_project = None
         return project
+
+    def _requeue_for_fairness(self, project: FactoryProject) -> None:
+        """Append a retry behind already-waiting missions without duplicating it."""
+        if not any(item.mission.id == project.mission.id for item in self.queue):
+            self.queue.append(project)
 
     @staticmethod
     def _safe_error_detail(value: str) -> str:
