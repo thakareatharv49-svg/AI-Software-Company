@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -496,16 +497,24 @@ class ProjectStore:
             pending: list[dict] = []
             changed = False
             for row in rows:
-                mission = _safe_mission(CompanyMission.model_validate(row.mission))
-                plan = _safe_plan(MissionPlan.model_validate(row.plan))
-                status = row.status
-                if status == "running":
-                    plan = recover_running_plan(plan)
-                    status = "queued"
-                stages_executed = max(0, int(row.stages_executed))
-                attempts = max(0, int(row.attempts))
-                safe_mission = mission.model_dump(mode="json")
-                safe_plan = plan.model_dump(mode="json")
+                # A single malformed legacy snapshot must not prevent every
+                # other queued mission from being recovered after restart.
+                try:
+                    mission = _safe_mission(CompanyMission.model_validate(row.mission))
+                    plan = _safe_plan(MissionPlan.model_validate(row.plan))
+                    status = row.status
+                    if status == "running":
+                        plan = recover_running_plan(plan)
+                        status = "queued"
+                    stages_executed = max(0, int(row.stages_executed))
+                    attempts = max(0, int(row.attempts))
+                    safe_mission = mission.model_dump(mode="json")
+                    safe_plan = plan.model_dump(mode="json")
+                except (TypeError, ValueError, OverflowError):
+                    logging.getLogger(__name__).exception(
+                        "Skipping malformed pending factory snapshot"
+                    )
+                    continue
                 if (
                     row.mission != safe_mission
                     or row.plan != safe_plan
