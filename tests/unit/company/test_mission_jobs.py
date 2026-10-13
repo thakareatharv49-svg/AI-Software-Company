@@ -174,3 +174,29 @@ def test_large_mission_breaks_each_acceptance_criterion_into_traceable_tasks() -
         assert verification.agent_role == "test_engineer"
         assert requirement in verification.acceptance_check
         assert {design.status, implementation.status, verification.status} == {"planned"}
+
+
+def test_mission_job_redacts_and_bounds_messages_on_construction() -> None:
+    job = make_job()
+    unsafe = job.model_copy(update={"message": "api_key=storedSecret123456"})
+    # Re-validation is used for durable snapshots loaded from older versions.
+    restored = MissionJob.model_validate(unsafe.model_dump())
+
+    assert "storedSecret123456" not in restored.message
+    assert "api_key=[REDACTED]" in restored.message
+
+    bounded = MissionJob.model_validate(
+        {**job.model_dump(), "message": "diagnostic " * 1000}
+    )
+    assert len(bounded.message) == 4000
+
+
+def test_mission_job_transition_redacts_untrusted_diagnostics() -> None:
+    job = transition_job(
+        make_job(),
+        MissionJobStatus.RUNNING,
+        "Worker failed: password=jobSecret123456",
+    )
+
+    assert "jobSecret123456" not in job.message
+    assert "password=[REDACTED]" in job.message
