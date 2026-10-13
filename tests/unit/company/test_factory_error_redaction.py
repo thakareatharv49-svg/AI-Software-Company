@@ -38,3 +38,52 @@ def test_retry_feedback_is_redacted_before_being_reused():
     assert "supersecret123456" not in project.retry_feedback
     assert "api_key=[REDACTED]" in project.retry_feedback
     assert project.last_error is None
+
+
+def test_manual_retry_feedback_is_redacted_before_being_reused():
+    mission = CompanyMission(
+        name="Manual retry secret safety",
+        objective="Do not echo credentials from failed stages into the next model prompt",
+    )
+    plan = build_mission_plan(mission)
+    failed_step = plan.steps[0]
+    failed_step.status = "failed"
+    failed_step.detail = "Build failed: api_key=supersecret123456"
+    job = SimpleNamespace(
+        status=__import__("src.company.mission_jobs", fromlist=["MissionJobStatus"]).MissionJobStatus.BLOCKED,
+        mission=mission,
+        plan=plan,
+        attempts=1,
+        message="blocked",
+        model_copy=lambda **kwargs: SimpleNamespace(
+            status=kwargs.get("update", {}).get("status", __import__("src.company.mission_jobs", fromlist=["MissionJobStatus"]).MissionJobStatus.QUEUED),
+            mission=kwargs.get("update", {}).get("mission", mission),
+            plan=kwargs.get("update", {}).get("plan", plan),
+            attempts=kwargs.get("update", {}).get("attempts", 1),
+            message=kwargs.get("update", {}).get("message", "queued"),
+        ),
+    )
+    class JobStore:
+        def get(self, _mission_id):
+            return job
+        def save(self, _job):
+            pass
+    class Store:
+        def save(self, _project):
+            pass
+    class Audit:
+        def append(self, _entry):
+            pass
+    factory = object.__new__(ProjectFactory)
+    factory.job_store = JobStore()
+    factory.store = Store()
+    factory.audit_store = Audit()
+    factory.queue = []
+    factory._running = False
+    factory.orchestrator = SimpleNamespace(events=SimpleNamespace(publish=lambda _event: None))
+    queued = factory.retry(mission.id)
+    project = factory.queue[0]
+    assert project.retry_feedback is not None
+    assert "supersecret123456" not in project.retry_feedback
+    assert "api_key=[REDACTED]" in project.retry_feedback
+
