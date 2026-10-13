@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from inspect import signature
@@ -590,6 +591,8 @@ class ProjectFactory:
     ) -> FactoryProject | None:
         if max_retries < 0:
             raise ValueError("max_retries must be non-negative")
+        if not math.isfinite(self.execution_timeout_seconds) or self.execution_timeout_seconds <= 0:
+            raise ValueError("execution_timeout_seconds must be a finite positive number")
         if not self.queue:
             return None
 
