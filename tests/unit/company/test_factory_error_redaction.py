@@ -202,3 +202,62 @@ def test_enqueue_redacts_secrets_from_mission_fields_before_persistence_and_plan
     assert "api_key=[REDACTED]" in persisted.mission.name
     assert "password=[REDACTED]" in persisted.mission.objective
     assert "database_url=[REDACTED]" in persisted.mission.constraints[0]
+
+
+
+def test_restore_redacts_legacy_mission_and_plan_without_losing_progress():
+    mission = CompanyMission(
+        name="Legacy api_key=legacyname123456",
+        objective="Build app password=legacyobjective123456",
+        constraints=["database_url=legacyconstraint123456"],
+    )
+    plan = build_mission_plan(mission)
+    plan.steps[0].status = "completed"
+    plan.steps[0].detail = "Finished with token=legacystep123456"
+    plan.engineering_tasks[0].requirement = "api_key=legacytask123456"
+    project = FactoryProject(
+        mission=mission,
+        plan=plan,
+        status="queued",
+        attempts=2,
+        last_error="password=legacyerror123456",
+        retry_feedback="token=legacyfeedback123456",
+    )
+    saved = []
+
+    class Store:
+        def load_pending(self):
+            return [project.model_dump()]
+
+        def save(self, item):
+            saved.append(item)
+
+    class JobStore:
+        def get(self, _mission_id):
+            return None
+
+        def save(self, _job):
+            pass
+
+    factory = object.__new__(ProjectFactory)
+    factory.store = Store()
+    factory.job_store = JobStore()
+    factory.queue = []
+
+    assert factory.restore() == 1
+    restored = factory.queue[0]
+    serialized = str(restored.model_dump())
+
+    for secret in (
+        "legacyname123456",
+        "legacyobjective123456",
+        "legacyconstraint123456",
+        "legacystep123456",
+        "legacytask123456",
+        "legacyerror123456",
+        "legacyfeedback123456",
+    ):
+        assert secret not in serialized
+
+    assert restored.plan.steps[0].status == "completed"
+    assert restored.attempts == 2
