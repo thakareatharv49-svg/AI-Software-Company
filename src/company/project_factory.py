@@ -155,8 +155,15 @@ class ProjectFactory:
         return restored
 
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
-        plan = build_mission_plan(mission)
         job = self._load_job(mission.id)
+        # If the durable job is already queued but its in-memory/project snapshot
+        # is missing, treat that job as the source of truth. Rebuilding a fresh
+        # plan here would silently erase recovered stage progress and attempts.
+        if job is not None and job.status == MissionJobStatus.QUEUED:
+            mission = job.mission
+            plan = job.plan.model_copy(deep=True)
+        else:
+            plan = build_mission_plan(mission)
         existing = next(
             (item for item in self.queue if item.mission.id == mission.id),
             None,
@@ -197,7 +204,11 @@ class ProjectFactory:
                         f"Project re-queued: {mission.name}",
                     )
                 )
-        project = FactoryProject(mission=mission, plan=plan)
+        project = FactoryProject(
+            mission=mission,
+            plan=plan,
+            attempts=job.attempts if job is not None and job.status == MissionJobStatus.QUEUED else 0,
+        )
         # Preserve FIFO ordering: the first submitted mission must execute first.
         # A terminal failure is recorded per mission; it must not discard unrelated work.
         self.queue.append(project)
