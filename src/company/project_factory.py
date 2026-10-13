@@ -82,9 +82,21 @@ class ProjectFactory:
         restored = 0
         known_ids = {item.mission.id for item in self.queue}
         for item in self.store.load_pending():
-            if item["mission"].id in known_ids:
+            # Treat each snapshot as an independent recovery unit. A malformed
+            # entry from a custom/legacy store must not prevent later valid
+            # missions from being restored after restart.
+            try:
+                mission_id = item["mission"].id
+                if mission_id in known_ids:
+                    continue
+                project = FactoryProject(**item)
+            except (AttributeError, KeyError, TypeError, ValueError):
+                import logging
+
+                logging.getLogger(__name__).error(
+                    "Skipping malformed pending factory snapshot"
+                )
                 continue
-            project = FactoryProject(**item)
             # Older snapshots may predate write-time redaction. Sanitize text
             # before any restored mission or plan can be reused by an agent.
             project.mission = self._safe_mission(project.mission)
