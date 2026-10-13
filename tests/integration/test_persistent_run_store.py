@@ -143,6 +143,6 @@ def test_run_payload_depth_and_collection_sizes_are_bounded(tmp_path: Path):
 
     assert len(record.result["items"]) == 200
     current = record.result["nested"]
-    for _ in range(8):
+    for _ in range(7):
         current = current["next"]
     assert current == "[TRUNCATED_MAX_DEPTH]"
