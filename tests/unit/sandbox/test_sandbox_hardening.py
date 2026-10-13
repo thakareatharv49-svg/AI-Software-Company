@@ -184,3 +184,16 @@ def test_sandbox_timeout_terminates_child_process_group(tmp_path: Path) -> None:
     assert result.status == SandboxStatus.TIMEOUT
     time.sleep(1.7)
     assert not marker.exists()
+
+
+def test_container_always_uses_dedicated_non_root_identity() -> None:
+    assert SandboxExecutor._container_uid_gid() == "10001:10001"
+
+
+def test_host_sandbox_is_rejected_outside_development(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.config.settings import settings
+
+    monkeypatch.setattr(settings, "environment", "production")
+
+    with pytest.raises(ValueError, match="only allowed in development/test"):
+        SandboxExecutor(mode="host")
