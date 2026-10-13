@@ -77,7 +77,13 @@ def _safe_factory_snapshot(project: FactoryProject) -> dict[str, Any]:
 
 
 def _safe_job(job: MissionJob) -> MissionJob:
-    return job.model_copy(update={"mission": _safe_mission(job.mission), "plan": _safe_plan(job.plan)})
+    """Normalize durable mission-job fields even when model_copy bypassed validators."""
+    return job.model_copy(update={
+        "mission": _safe_mission(job.mission),
+        "plan": _safe_plan(job.plan),
+        "message": redact_sensitive_text(str(job.message))[:4000],
+        "attempts": max(0, int(job.attempts)),
+    })
 
 
 def _bounded_audit_value(value: Any, *, depth: int = 0) -> Any:
@@ -204,6 +210,7 @@ class MissionJobStore:
         self._engine = create_engine(url, pool_pre_ping=True)
 
     def save(self, job: MissionJob) -> None:
+        job = _safe_job(job)
         with Session(self._engine) as session:
             row = session.get(MissionJobRow, job.id)
             values = {
