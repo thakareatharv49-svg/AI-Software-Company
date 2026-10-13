@@ -85,6 +85,21 @@ class ProjectFactory:
             if item["mission"].id in known_ids:
                 continue
             project = FactoryProject(**item)
+            job = self._load_job(project.mission.id)
+            # The project store can contain a stale snapshot if shutdown or
+            # cancellation happened between persistence operations. Durable
+            # terminal job state wins: never resurrect completed, failed,
+            # blocked, or cancelled work into the active queue.
+            if job is not None and job.status in {
+                MissionJobStatus.COMPLETED,
+                MissionJobStatus.FAILED,
+                MissionJobStatus.BLOCKED,
+                MissionJobStatus.CANCELLED,
+            }:
+                delete_many = getattr(self.store, "delete_many", None)
+                if callable(delete_many):
+                    delete_many({project.mission.id})
+                continue
             # The durable project queue can outlive the process that owned a
             # running item. Never restore it as actively running: the new worker
             # must reclaim it as queued and reset only interrupted stages.
@@ -107,7 +122,6 @@ class ProjectFactory:
                 # Keep the durable job record aligned with the recovered queue.
                 # Otherwise the dashboard can remain stuck on "running" after a
                 # process restart even though the project is safely queued again.
-                job = self._load_job(project.mission.id)
                 if job is not None and job.status == MissionJobStatus.RUNNING:
                     recovered_job = recover_running_job(
                         job.model_copy(update={"plan": project.plan})
