@@ -141,3 +141,70 @@ def test_restore_reconciles_running_job_when_project_snapshot_is_still_queued():
     assert recovered_job.status == MissionJobStatus.QUEUED
     assert recovered_job.plan.steps[0].status == "completed"
     assert recovered_job.plan.steps[1].status == "planned"
+
+
+def test_restore_prefers_newer_queued_job_plan_and_is_idempotent():
+    mission = CompanyMission(
+        name="Queued snapshot reconciliation",
+        objective="Keep the newest durable queued progress after a crash",
+    )
+    stale_plan = build_mission_plan(mission)
+    durable_plan = build_mission_plan(mission)
+    durable_plan.steps[0].status = "completed"
+    durable_plan.steps[0].detail = "Research preserved"
+    project_data = {
+        "mission": mission,
+        "plan": stale_plan,
+        "status": "queued",
+        "stages_executed": 0,
+        "attempts": 0,
+        "last_error": None,
+        "retry_feedback": None,
+    }
+    job = MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=durable_plan,
+        status=MissionJobStatus.QUEUED,
+        message="Paused and queued",
+        attempts=2,
+    )
+
+    class ProjectStore:
+        def __init__(self):
+            self.saved = []
+
+        def save(self, project):
+            self.saved.append(project)
+
+        def load_pending(self):
+            return [project_data, project_data]
+
+    class JobStore:
+        def __init__(self):
+            self.jobs = {mission.id: job}
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, saved):
+            self.jobs[saved.id] = saved
+
+    factory = object.__new__(ProjectFactory)
+    factory.store = ProjectStore()
+    factory.job_store = JobStore()
+    factory.queue = []
+    factory._active_project = None
+
+    assert factory.restore() == 1
+    assert len(factory.queue) == 1
+    restored = factory.queue[0]
+    assert restored.attempts == 2
+    assert restored.plan.steps[0].status == "completed"
+    assert restored.plan.steps[0].detail == "Research preserved"
+
+    # A second restore must not duplicate the mission or reset its progress.
+    assert factory.restore() == 0
+    assert len(factory.queue) == 1
+    assert factory.queue[0].plan.steps[0].status == "completed"
+    assert factory.queue[0].attempts == 2
