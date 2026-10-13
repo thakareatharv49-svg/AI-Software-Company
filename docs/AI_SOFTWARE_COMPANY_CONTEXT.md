@@ -14,13 +14,17 @@ Last updated: 2026-10-14
 - M45, PR #329: normalize restored factory counters — merged.
 - M46, PR #330: tolerate factory snapshot-store outages — merged after all four required workflows passed on head `c130d406fa02d99961f500e3f28ad85ecf1609aa`. Merge commit: `509feb05ba5fb2ed091a8b1b4541c7b06c18ae95`.
 - M47, PR #331: validate factory retry budgets — merged after all four required workflows passed on head `b2b35f4cabff287f1dbd7b51fa4729712fc4cd6e`. Merge commit: `929015fa30afa827528405d2bbc6c831b0889acf`.
+- M48, PR #332: validate factory execution timeouts — open; head `2f23f2a6353e39833b92175a1970f8d6701681d0`; rejects zero, negative, infinite, and NaN timeout configuration before dequeueing a mission, with regression tests that assert the queue/attempt state is unchanged.
 
 ## Open reliability work to resume
 - PR #313, M40: https://github.com/thakareatharv49-svg/AI-Software-Company/pull/313
   - Branch: `fix/recover-orphaned-continuous-missions`; head `b53a7f48caf8b8291a4f64de1f381a3cb1c7708d`; base `main`.
   - Recovers durable RUNNING jobs to QUEUED after continuous factory worker exceptions, synchronizes durable job and in-memory queue, saves snapshot, and emits a sanitized error event.
   - Secret scan, dependency audit, and CodeQL succeeded. CI run `38471192694` was still in progress at the last check, in the Tests step. Older CI run `38469943049` was also still in progress. Do not merge until current required checks complete successfully; investigate if tests fail or remain stuck.
-- PR #314, M41: https://github.com/thakareatharv49-svg/AI-Software-Company/pull/314
+- PR #332, M48: https://github.com/thakareatharv49-svg/AI-Software-Company/pull/332
+  - Branch: `fix/validate-factory-execution-timeout`; base `main`; head `2f23f2a6353e39833b92175a1970f8d6701681d0`.
+  - Required CI, secret scan, dependency audit, and CodeQL were still running/queued at the last check. Do not merge until all required workflows pass on the exact current head SHA.
+- PR #314, M41: https://github.com/thakareathv49-svg/AI-Software-Company/pull/314
   - Branch: `test/factory-continues-after-persistence-error`; head `67429f0cef113fc5873f482957a0bfdc1831e999`; base `fix/recover-orphaned-continuous-missions` (stacked on PR #313).
   - Tests that one mission's snapshot-save failure is safely handled and the next queued mission can complete.
   - CI run `38470664447` was still in progress at the last check; test step was pending.
