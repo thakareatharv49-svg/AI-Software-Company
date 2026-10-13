@@ -43,4 +43,4 @@ def test_audit_entry_bounds_depth_and_identifier_text() -> None:
 
     assert len(safe.id) == 100
     assert len(safe.event_type) == 100
-    assert safe.metadata["a"]["b"]["c"]["d"]["e"] == "[TRUNCATED]"
+    assert safe.metadata["a"]["b"]["c"]["d"]["e"]["f"] == "[TRUNCATED]"
