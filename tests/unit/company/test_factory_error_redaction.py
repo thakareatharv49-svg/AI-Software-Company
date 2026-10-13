@@ -245,7 +245,7 @@ def test_restore_redacts_legacy_mission_and_plan_without_losing_progress():
 
     assert factory.restore() == 1
     restored = factory.queue[0]
-    serialized = str(restored.model_dump())
+    serialized = str(restored)
 
     for secret in (
         "legacyname123456",
