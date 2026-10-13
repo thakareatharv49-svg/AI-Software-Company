@@ -243,7 +243,7 @@ def test_pending_project_restore_rewrites_unsafe_legacy_snapshot(monkeypatch) ->
     assert pending[0]["attempts"] == 0
     assert row.status == "queued"
     assert "legacySnapshotMissionSecret123456" not in row.mission["objective"]
-    assert "legacySnapshotSecret123456" not in row.plan["steps"][0]["detail"]
+    assert "legacySnapshotSecret123456" not in (row.plan["steps"][0]["detail"] or "")
     assert row.stages_executed == 0
     assert row.attempts == 0
     assert sessions[0].commits == 1
