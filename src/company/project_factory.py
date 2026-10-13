@@ -651,7 +651,9 @@ class ProjectFactory:
             if project.attempts <= max_retries and max_retries > 0:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=True)
-                self.queue.insert(0, project)
+                # A transiently failing mission must not monopolize the worker.
+                # Let already queued missions run before this mission's next attempt.
+                self.queue.append(project)
                 self._transition_job(
                     project,
                     MissionJobStatus.QUEUED,
@@ -686,7 +688,9 @@ class ProjectFactory:
             elif project.attempts <= max_retries:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=True)
-                self.queue.insert(0, project)
+                # A transiently failing mission must not monopolize the worker.
+                # Let already queued missions run before this mission's next attempt.
+                self.queue.append(project)
                 self._transition_job(
                     project,
                     MissionJobStatus.QUEUED,
@@ -751,7 +755,8 @@ class ProjectFactory:
             elif execution_failed:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=max_stages is None)
-                self.queue.insert(0, project)
+                # Preserve FIFO fairness when resuming a paused or failed attempt.
+                self.queue.append(project)
                 self._transition_job(
                     project,
                     MissionJobStatus.QUEUED,
@@ -766,7 +771,8 @@ class ProjectFactory:
                     f"Project paused and re-queued: {project.mission.name}",
                 )
                 event_type = "FACTORY_PROJECT_PAUSED"
-                self.queue.insert(0, project)
+                # A bounded pause yields to other missions already in the queue.
+                self.queue.append(project)
 
         self._save(project)
         job = self._load_job(project.mission.id)
