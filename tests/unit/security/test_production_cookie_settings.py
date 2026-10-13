@@ -100,3 +100,9 @@ def test_production_rejects_local_access_bypass() -> None:
             session_cookie_secure=True,
             sandbox_mode="container",
         )
+
+
+def test_development_defaults_to_container_sandbox(monkeypatch) -> None:
+    monkeypatch.delenv("SANDBOX_MODE", raising=False)
+    settings = Settings(_env_file=None, environment="development")
+    assert settings.sandbox_mode == "container"
