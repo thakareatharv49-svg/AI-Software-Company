@@ -522,8 +522,13 @@ class ProjectStore:
                     # Keep diagnostics generic: validation errors can echo
                     # untrusted persisted values, including secret-like text.
                     logging.getLogger(__name__).error(
-                        "Skipping malformed pending factory snapshot"
+                        "Quarantining malformed pending factory snapshot"
                     )
+                    # Remove the row from the pending query on future starts,
+                    # while preserving it for operator inspection.
+                    row.status = "blocked"
+                    row.updated_at = datetime.now(UTC)
+                    changed = True
                     continue
                 if (
                     row.mission != safe_mission
