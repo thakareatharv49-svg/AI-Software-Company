@@ -1119,7 +1119,11 @@ def test_factory_write_boundaries_sanitize_project_and_durable_job() -> None:
     from src.company.mission_jobs import MissionJob, MissionJobStatus
     from src.company.project_factory import FactoryProject
 
-    mission = CompanyMission(name="Write boundary", objective="Safe objective")
+    mission = CompanyMission(
+        name="Write boundary " + "N" * 600,
+        objective="token=missionSecret123456 " + "O" * 9000,
+        constraints=["password=constraintSecret123456 " + "C" * 3000],
+    )
     plan = build_mission_plan(mission)
     plan.qa_evidence = "token=writeSecret123456 " + "Q" * 6000
     plan.steps[0].detail = "password=stageSecret123456 " + "D" * 5000
@@ -1173,6 +1177,13 @@ def test_factory_write_boundaries_sanitize_project_and_durable_job() -> None:
     assert project_saved and job_saved
     persisted_project = project_saved[0]
     persisted_job = job_saved[0]
+    for persisted_mission in (persisted_project.mission, persisted_job.mission):
+        assert len(persisted_mission.name) == 500
+        assert len(persisted_mission.objective) == 8000
+        assert len(persisted_mission.constraints[0]) == 2000
+        serialized_mission = persisted_mission.model_dump_json()
+        assert "missionSecret123456" not in serialized_mission
+        assert "constraintSecret123456" not in serialized_mission
     assert "writeSecret123456" not in persisted_project.plan.qa_evidence
     assert len(persisted_project.plan.qa_evidence) == 5200
     assert "stageSecret123456" not in persisted_project.plan.steps[0].detail
