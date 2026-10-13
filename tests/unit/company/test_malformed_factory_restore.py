@@ -48,3 +48,49 @@ def test_restore_skips_malformed_snapshot_and_recovers_later_valid_mission():
     assert len(factory.queue) == 1
     assert factory.queue[0].mission.id == valid_mission.id
     assert factory.queue[0].stages_executed == 2
+
+def test_restore_skips_snapshot_with_malformed_nested_mission_and_continues():
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    malformed_mission = CompanyMission(
+        name="Malformed", objective="Invalid legacy payload"
+    ).model_copy(update={"constraints": None})
+    valid_mission = CompanyMission(
+        name="Still recoverable", objective="Restore valid work"
+    )
+    snapshots = [
+        {
+            "mission": malformed_mission,
+            "plan": build_mission_plan(CompanyMission(
+                name="Malformed", objective="Invalid legacy payload"
+            )),
+            "status": "queued",
+            "stages_executed": 0,
+            "attempts": 0,
+        },
+        {
+            "mission": valid_mission,
+            "plan": build_mission_plan(valid_mission),
+            "status": "queued",
+            "stages_executed": 1,
+            "attempts": 0,
+        },
+    ]
+
+    class Store:
+        def load_pending(self):
+            return snapshots
+
+        def save(self, project):
+            pass
+
+    factory = ProjectFactory(orchestrator, controller, pipeline, store=Store())
+
+    assert factory.restore() == 1
+    assert [project.mission.id for project in factory.queue] == [valid_mission.id]
+
