@@ -124,3 +124,27 @@ def test_restore_normalizes_legacy_snapshot_counters():
     assert factory.queue[0].attempts == 0
     assert factory.queue[0].stages_executed == 0
 
+
+def test_restore_defers_safely_when_snapshot_store_is_unavailable():
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    mission = CompanyMission(name="Already queued", objective="Preserve in-memory work")
+
+    class UnavailableStore:
+        def load_pending(self):
+            raise OSError("private storage detail")
+
+        def save(self, project):
+            pass
+
+    factory = ProjectFactory(orchestrator, controller, pipeline, store=UnavailableStore())
+    existing = factory.enqueue(mission)
+
+    assert factory.restore() == 0
+    assert factory.queue == [existing]
+    assert existing.status == "queued"
