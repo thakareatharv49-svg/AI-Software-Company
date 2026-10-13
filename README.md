@@ -60,6 +60,8 @@ Create `.env` from `.env.example`, build the restricted execution image, start P
 
     docker build -t ai-software-company-sandbox:latest docker/sandbox
     alembic upgrade head
+
+For an existing installation, `.env` overrides the new defaults: set `SANDBOX_MODE=container` in your current `.env`, build the image above, and restart the server. `SANDBOX_MODE=host` is an explicit local-development exception and does not provide OS-level isolation.
     uvicorn src.main:app --reload
 
 Open http://127.0.0.1:8000/app. To avoid the separate owner sign-in for your local instance, add `LOCAL_ACCESS_ENABLED=true` to `.env` and restart the server.
