@@ -247,3 +247,74 @@ def test_pending_project_restore_rewrites_unsafe_legacy_snapshot(monkeypatch) ->
     assert row.stages_executed == 0
     assert row.attempts == 0
     assert sessions[0].commits == 1
+
+
+def test_pending_project_restore_skips_malformed_snapshot_and_keeps_healthy_rows(monkeypatch, caplog) -> None:
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    import src.company.persistence as persistence
+
+    healthy_mission = CompanyMission(name="Healthy pending", objective="Continue after corrupt row")
+    healthy_plan = build_mission_plan(healthy_mission)
+    now = datetime.now(UTC)
+    malformed = SimpleNamespace(
+        id="malformed-snapshot",
+        mission={"unexpected": "shape"},
+        plan={"steps": "not-a-list"},
+        status="queued",
+        stages_executed=0,
+        attempts=0,
+        updated_at=now,
+    )
+    healthy = SimpleNamespace(
+        id=healthy_mission.id,
+        mission=healthy_mission.model_dump(mode="json"),
+        plan=healthy_plan.model_dump(mode="json"),
+        status="queued",
+        stages_executed=1,
+        attempts=2,
+        updated_at=now,
+    )
+
+    class FakeScalars:
+        def all(self):
+            return [malformed, healthy]
+
+    class FakeSession:
+        def __init__(self, _engine):
+            self.commits = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def scalars(self, _statement):
+            return FakeScalars()
+
+        def commit(self):
+            self.commits += 1
+
+    sessions = []
+
+    def fake_session(engine):
+        session = FakeSession(engine)
+        sessions.append(session)
+        return session
+
+    monkeypatch.setattr(persistence, "Session", fake_session)
+    store = persistence.ProjectStore.__new__(persistence.ProjectStore)
+    store._engine = object()
+
+    with caplog.at_level("ERROR"):
+        pending = store.load_pending()
+
+    assert len(pending) == 1
+    assert pending[0]["mission"].id == healthy_mission.id
+    assert pending[0]["status"] == "queued"
+    assert pending[0]["stages_executed"] == 1
+    assert pending[0]["attempts"] == 2
+    assert "Skipping malformed pending factory snapshot" in caplog.text
+    assert sessions[0].commits == 0
