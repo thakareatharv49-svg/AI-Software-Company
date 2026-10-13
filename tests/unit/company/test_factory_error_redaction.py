@@ -260,3 +260,46 @@ def test_restore_redacts_legacy_mission_and_plan_without_losing_progress():
 
     assert restored.plan.steps[0].status == "completed"
     assert restored.attempts == 2
+
+
+def test_audit_redacts_nested_metadata_and_message_before_persistence():
+    from src.company.project_factory import ProjectFactory
+
+    entries = []
+
+    class Audit:
+        def append(self, entry):
+            entries.append(entry)
+
+    factory = object.__new__(ProjectFactory)
+    factory.audit_store = Audit()
+
+    factory._audit(
+        "mission-safe-id",
+        "MISSION_DIAGNOSTIC",
+        "Worker failed with api_key=messageSecret123456",
+        "blocked",
+        {
+            "error": "token=metadataSecret123456",
+            "nested": {
+                "authorization": "Bearer verySensitiveCredentialValue123",
+                "summary": "password=nestedSecret123456",
+            },
+            "attempt": 2,
+        },
+    )
+
+    entry = entries[0]
+    serialized = str(entry.model_dump())
+    for secret in (
+        "messageSecret123456",
+        "metadataSecret123456",
+        "verySensitiveCredentialValue123",
+        "nestedSecret123456",
+    ):
+        assert secret not in serialized
+    assert "api_key=[REDACTED]" in entry.message
+    assert entry.metadata["error"] == "token=[REDACTED_TOKEN]"
+    assert entry.metadata["nested"]["authorization"] == "[REDACTED]"
+    assert "password=[REDACTED]" in entry.metadata["nested"]["summary"]
+    assert entry.metadata["attempt"] == 2
