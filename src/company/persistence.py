@@ -411,7 +411,25 @@ class ProjectOutputStore:
                 .where(ProjectOutputRow.mission_id == mission_id)
                 .order_by(ProjectOutputRow.created_at.desc())
             ).all()
-            return [self._model(row) for row in rows]
+            manifests: list[ProjectOutputManifest] = []
+            changed = False
+            for row in rows:
+                try:
+                    manifest = self._model(row)
+                except (TypeError, ValueError, OverflowError):
+                    # One malformed output must not hide healthy outputs for a mission.
+                    logging.getLogger(__name__).error(
+                        "Quarantining malformed project-output snapshot"
+                    )
+                    row.status = "blocked"
+                    row.github_message = "Blocked because the persisted project-output snapshot is invalid."
+                    row.updated_at = datetime.now(UTC)
+                    changed = True
+                    continue
+                manifests.append(manifest)
+            if changed:
+                session.commit()
+            return manifests
 
     def _model(self, row: ProjectOutputRow) -> ProjectOutputManifest:
         return _safe_output_manifest(ProjectOutputManifest(
