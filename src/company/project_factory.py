@@ -90,6 +90,14 @@ class ProjectFactory:
                 if mission_id in known_ids:
                     continue
                 project = FactoryProject(**item)
+                # Legacy snapshots predate strict counter validation. Normalize
+                # counters before comparisons or queue scheduling can consume them.
+                for counter_name in ("attempts", "stages_executed"):
+                    try:
+                        counter = max(0, int(getattr(project, counter_name)))
+                    except (TypeError, ValueError, OverflowError):
+                        counter = 0
+                    setattr(project, counter_name, counter)
             except (AttributeError, KeyError, TypeError, ValueError):
                 import logging
 
