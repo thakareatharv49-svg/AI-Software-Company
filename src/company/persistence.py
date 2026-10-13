@@ -86,6 +86,24 @@ def _safe_job(job: MissionJob) -> MissionJob:
     })
 
 
+def _rewrite_safe_job_row(row: MissionJobRow, job: MissionJob) -> bool:
+    """Rewrite normalized legacy mission-job fields so unsafe values do not persist."""
+    mission = job.mission.model_dump(mode="json")
+    plan = job.plan.model_dump(mode="json")
+    changed = (
+        row.mission != mission
+        or row.plan != plan
+        or row.message != job.message
+        or row.attempts != job.attempts
+    )
+    if changed:
+        row.mission = mission
+        row.plan = plan
+        row.message = job.message
+        row.attempts = job.attempts
+    return changed
+
+
 def _bounded_audit_value(value: Any, *, depth: int = 0) -> Any:
     """Bound nested audit metadata so legacy records cannot grow without limit."""
     if depth >= 6:
@@ -235,7 +253,7 @@ class MissionJobStore:
             row = session.get(MissionJobRow, job_id)
             if row is None:
                 return None
-            return _safe_job(MissionJob(
+            job = _safe_job(MissionJob(
                 id=row.id,
                 mission=CompanyMission.model_validate(row.mission),
                 plan=MissionPlan.model_validate(row.plan),
@@ -246,6 +264,9 @@ class MissionJobStore:
                 created_at=row.created_at,
                 updated_at=row.updated_at,
             ))
+            if _rewrite_safe_job_row(row, job):
+                session.commit()
+            return job
 
     def recover_running(self) -> list[MissionJob]:
         recovered: list[MissionJob] = []
@@ -283,8 +304,10 @@ class MissionJobStore:
             rows = session.scalars(
                 select(MissionJobRow).order_by(MissionJobRow.created_at.desc())
             ).all()
-            return [
-                _safe_job(MissionJob(
+            jobs: list[MissionJob] = []
+            changed = False
+            for row in rows:
+                job = _safe_job(MissionJob(
                     id=row.id,
                     mission=CompanyMission.model_validate(row.mission),
                     plan=MissionPlan.model_validate(row.plan),
@@ -295,8 +318,11 @@ class MissionJobStore:
                     created_at=row.created_at,
                     updated_at=row.updated_at,
                 ))
-                for row in rows
-            ]
+                changed = _rewrite_safe_job_row(row, job) or changed
+                jobs.append(job)
+            if changed:
+                session.commit()
+            return jobs
 
     def delete_many(self, mission_ids: set[str]) -> int:
         if not mission_ids:

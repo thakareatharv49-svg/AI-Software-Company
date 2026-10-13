@@ -103,3 +103,75 @@ def test_mission_job_list_preserves_workspace_ownership(monkeypatch) -> None:
 
     assert len(jobs) == 1
     assert jobs[0].workspace_id == "workspace-owned-123"
+
+
+def test_mission_job_list_rewrites_unsafe_legacy_fields(monkeypatch) -> None:
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    import src.company.persistence as persistence
+    from src.company.mission_jobs import MissionJobStatus
+
+    mission = CompanyMission(name="Legacy", objective="Safe objective")
+    plan = build_mission_plan(mission)
+    unsafe_mission = mission.model_dump(mode="json")
+    unsafe_mission["objective"] = "api_key=legacyReadSecret123456 " + ("legacy " * 1500)
+    unsafe_plan = plan.model_dump(mode="json")
+    unsafe_plan["steps"][0]["detail"] = "password=legacyPlanSecret123456 " + ("detail " * 700)
+    now = datetime.now(UTC)
+    row = SimpleNamespace(
+        id=mission.id,
+        mission=unsafe_mission,
+        plan=unsafe_plan,
+        status=MissionJobStatus.QUEUED.value,
+        message="token=legacyMessageSecret123456 " + ("message " * 700),
+        workspace_id="workspace-123",
+        attempts=-4,
+        created_at=now,
+        updated_at=now,
+    )
+
+    class FakeScalars:
+        def all(self):
+            return [row]
+
+    class FakeSession:
+        def __init__(self, _engine):
+            self.commits = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def scalars(self, _statement):
+            return FakeScalars()
+
+        def commit(self):
+            self.commits += 1
+
+    sessions = []
+
+    def fake_session(engine):
+        session = FakeSession(engine)
+        sessions.append(session)
+        return session
+
+    monkeypatch.setattr(persistence, "Session", fake_session)
+    store = persistence.MissionJobStore.__new__(persistence.MissionJobStore)
+    store._engine = object()
+
+    jobs = store.list_all()
+
+    assert len(jobs) == 1
+    assert "legacyReadSecret123456" not in jobs[0].mission.objective
+    assert "legacyPlanSecret123456" not in (jobs[0].plan.steps[0].detail or "")
+    assert "legacyMessageSecret123456" not in jobs[0].message
+    assert jobs[0].attempts == 0
+    assert jobs[0].workspace_id == "workspace-123"
+    assert "legacyReadSecret123456" not in row.mission["objective"]
+    assert "legacyPlanSecret123456" not in row.plan["steps"][0]["detail"]
+    assert "legacyMessageSecret123456" not in row.message
+    assert row.attempts == 0
+    assert sessions[0].commits == 1
