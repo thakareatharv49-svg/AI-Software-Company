@@ -254,17 +254,29 @@ class MissionJobStore:
             row = session.get(MissionJobRow, job_id)
             if row is None:
                 return None
-            job = _safe_job(MissionJob(
-                id=row.id,
-                mission=CompanyMission.model_validate(row.mission),
-                plan=MissionPlan.model_validate(row.plan),
-                status=MissionJobStatus(row.status),
-                message=row.message,
-                workspace_id=row.workspace_id,
-                attempts=row.attempts,
-                created_at=row.created_at,
-                updated_at=row.updated_at,
-            ))
+            try:
+                job = _safe_job(MissionJob(
+                    id=row.id,
+                    mission=CompanyMission.model_validate(row.mission),
+                    plan=MissionPlan.model_validate(row.plan),
+                    status=MissionJobStatus(row.status),
+                    message=row.message,
+                    workspace_id=row.workspace_id,
+                    attempts=row.attempts,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                ))
+            except (TypeError, ValueError, OverflowError):
+                # A corrupt individual record should not break callers that
+                # are checking another mission's state.
+                logging.getLogger(__name__).error(
+                    "Quarantining malformed mission-job snapshot during lookup"
+                )
+                row.status = MissionJobStatus.BLOCKED.value
+                row.message = "Blocked because the persisted mission snapshot is invalid."
+                row.updated_at = datetime.now(UTC)
+                session.commit()
+                return None
             if _rewrite_safe_job_row(row, job):
                 session.commit()
             return job
