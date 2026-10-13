@@ -59,3 +59,46 @@ def test_quality_evidence_caps_subprocess_output_and_security_summary():
     assert len(evidence["security_summary"]) == 1000
     assert len(evidence["security_evidence"]) <= 1100
     assert evidence["qa_duration_ms"] == 125
+
+
+def test_stage_progress_redacts_and_bounds_durable_failure_details():
+    from types import SimpleNamespace
+
+    secret = "ghp_" + "Q" * 32
+    qa_step = SimpleNamespace(stage=SimpleNamespace(value="qa"), status="planned", detail=None)
+    plan = SimpleNamespace(steps=[qa_step])
+
+    FactoryAutonomousRunner._record_stage_progress(
+        plan,
+        "engineering_qa_security_github",
+        "failed",
+        f"QA failed: password=super-secret token={secret} " + ("x" * 5000),
+    )
+
+    assert qa_step.status == "failed"
+    assert "super-secret" not in qa_step.detail
+    assert secret not in qa_step.detail
+    assert "[REDACTED_TOKEN]" in qa_step.detail
+    assert len(qa_step.detail) <= 4000
+
+
+def test_runner_failure_diagnostics_redact_secrets():
+    from types import SimpleNamespace
+
+    secret = "ghp_" + "R" * 32
+    execution_step = SimpleNamespace(
+        stage=SimpleNamespace(value="execution"),
+        status="running",
+        detail=None,
+    )
+    plan = SimpleNamespace(steps=[execution_step])
+
+    FactoryAutonomousRunner._record_runner_failure(
+        plan,
+        RuntimeError(f"generation crashed password=super-secret token={secret}"),
+    )
+
+    assert execution_step.status == "failed"
+    assert "super-secret" not in execution_step.detail
+    assert secret not in execution_step.detail
+    assert "[REDACTED_TOKEN]" in execution_step.detail
