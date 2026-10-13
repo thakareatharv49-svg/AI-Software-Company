@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from src.company.mission_controller.planner import build_mission_plan
 from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission
@@ -57,3 +59,36 @@ def test_enqueue_preserves_existing_durable_queued_progress_when_snapshot_is_mis
     assert factory.job_store.jobs[mission.id].plan.steps[0].status == "completed"
     assert len(factory.queue) == 1
     assert len(factory.store.saved) == 1
+
+
+
+def test_enqueue_rejects_durable_running_mission_until_restore_recovers_it():
+    mission = CompanyMission(
+        name="Interrupted mission",
+        objective="Do not replace a running durable plan with a fresh plan",
+    )
+    job = MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=build_mission_plan(mission),
+        status=MissionJobStatus.RUNNING,
+        message="Worker was running",
+        attempts=1,
+    )
+
+    class JobStore:
+        def get(self, job_id):
+            return job if job_id == mission.id else None
+
+        def save(self, saved):
+            raise AssertionError("enqueue must not mutate a running durable job")
+
+    factory = object.__new__(ProjectFactory)
+    factory.job_store = JobStore()
+    factory.queue = []
+    factory._running = False
+
+    with pytest.raises(ValueError, match="recover it before re-enqueueing"):
+        factory.enqueue(mission)
+
+    assert factory.queue == []

@@ -181,8 +181,13 @@ class ProjectFactory:
             raise ValueError(
                 f"Mission '{mission.id}' already has lifecycle state '{job.status.value}'"
             )
-        if job is not None and job.status == MissionJobStatus.RUNNING and self._running:
-            raise ValueError(f"Mission '{mission.id}' is already running in the factory")
+        if job is not None and job.status == MissionJobStatus.RUNNING:
+            # A durable RUNNING record may belong to a worker interrupted by a
+            # process restart. Enqueue must not overwrite it with a fresh plan;
+            # restore() is responsible for recovering its in-flight progress.
+            raise ValueError(
+                f"Mission '{mission.id}' is already running; recover it before re-enqueueing"
+            )
         if job is None:
             self._save_job(
                 MissionJob(
