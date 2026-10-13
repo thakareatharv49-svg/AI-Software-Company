@@ -1,10 +1,12 @@
-# AI Software Developer
+# AI Software Company
 
-The AI Software Developer venture runs an autonomous software factory with a browser control center. The GitHub repository name remains `AI-Software-Company` to preserve existing links and integrations.
+AI Software Company is an autonomous software factory with a browser control center. Nexora is the parent-company HQ identity. The GitHub repository name remains `AI-Software-Company` to preserve existing links and integrations.
+
+**Persistent engineering context:** Read [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) before continuing work. It records the current architecture, verified milestone/PR history, known issues, safety constraints, and the required handoff workflow. The permanent product roadmap remains in [docs/MILESTONES.md](docs/MILESTONES.md).
 
 ## Company structure
 
-Nexora HQ is the parent-company dashboard for tracking ventures, company-level activity, and integration health. AI Software Developer owns software mission execution, generated applications, previews, and its internal factory workflows. The optional `/api/hq/status` endpoint exposes aggregate mission counts to Nexora HQ using a dedicated bearer token; it does not expose mission details or any execution controls.
+Nexora HQ is the parent-company dashboard for tracking ventures, company-level activity, and integration health. AI Software Company owns software mission execution, generated applications, previews, and its internal factory workflows. The optional `/api/hq/status` endpoint exposes aggregate mission counts to Nexora HQ using a dedicated bearer token; it does not expose mission details or any execution controls.
 
 ## Security operations
 
@@ -16,7 +18,7 @@ The control center is served by the same FastAPI application:
 
 **http://127.0.0.1:8000/app**
 
-From the AI Software Developer control center you can:
+From the AI Software Company control center you can:
 - Create and launch missions.
 - Watch live company/factory status.
 - Inspect mission status and messages.
@@ -30,9 +32,9 @@ The browser UI is intentionally part of the main application, so there is no sep
 
 ### Nexora HQ read-only status integration
 
-To allow HQ to read aggregate factory status, set `NEXORA_HQ_STATUS_TOKEN` in the AI Software Developer server's `.env` to a randomly generated secret of at least 32 characters, then restart the server. The dedicated `GET /api/hq/status` endpoint requires `Authorization: Bearer <token>` and returns only explicit service status, active/queued/completed/blocked counts, and a UTC snapshot timestamp. It never exposes mission names, objectives, repository contents, credentials, or mutation endpoints.
+To allow HQ to read aggregate factory status, set `NEXORA_HQ_STATUS_TOKEN` in the AI Software Company server's `.env` to a randomly generated secret of at least 32 characters, then restart the server. The dedicated `GET /api/hq/status` endpoint requires `Authorization: Bearer <token>` and returns only explicit service status, active/queued/completed/blocked counts, and a UTC snapshot timestamp. It never exposes mission names, objectives, repository contents, credentials, or mutation endpoints.
 
-Configure Nexora HQ separately with `NEXORA_AI_SOFTWARE_DEVELOPER_URL` set to the AI Software Developer base URL and `NEXORA_AI_SOFTWARE_DEVELOPER_TOKEN` set to the same secret. Keep both values server-side. Use HTTPS outside local development; never put this token in browser code or commit a real token to Git.
+Configure Nexora HQ separately with the existing compatibility setting `NEXORA_AI_SOFTWARE_DEVELOPER_URL` set to the AI Software Company base URL and `NEXORA_AI_SOFTWARE_DEVELOPER_TOKEN` set to the same secret. These environment-variable names are retained for compatibility. Keep both values server-side. Use HTTPS outside local development; never put this token in browser code or commit a real token to Git.
 
 ### Local access without a separate owner login
 
@@ -40,7 +42,7 @@ For a single-user development instance, set `LOCAL_ACCESS_ENABLED=true` in your 
 
 The legacy owner console remains at **http://127.0.0.1:8000/owner** for deployments that use the sign-in flow.
 
-## What AI Software Developer does
+## What AI Software Company does
 
 1. You give the company a software mission from the web control center.
 2. The local Ollama model turns the mission into a small runnable project.
