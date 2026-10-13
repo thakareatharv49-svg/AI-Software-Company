@@ -71,3 +71,73 @@ def test_restore_reconciles_durable_running_job_and_preserves_completed_stages()
     assert recovered_job.plan.steps[0].status == "completed"
     assert recovered_job.plan.steps[1].status == "planned"
     assert "recovered after process restart" in recovered_job.message.lower()
+
+
+def test_restore_reconciles_running_job_when_project_snapshot_is_still_queued():
+    mission = CompanyMission(
+        name="Stale queued snapshot",
+        objective="Recover a job whose durable status advanced before its project snapshot",
+    )
+    stale_plan = build_mission_plan(mission)
+    latest_plan = build_mission_plan(mission)
+    latest_plan.steps[0].status = "completed"
+    latest_plan.steps[0].detail = "Research completed before crash"
+    latest_plan.steps[1].status = "running"
+    latest_plan.steps[1].detail = "Interrupted implementation"
+    project_data = {
+        "mission": mission,
+        "plan": stale_plan,
+        "status": "queued",
+        "stages_executed": 0,
+        "attempts": 0,
+        "last_error": None,
+        "retry_feedback": None,
+    }
+    job = MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=latest_plan,
+        status=MissionJobStatus.RUNNING,
+        message="Factory attempt started",
+        attempts=2,
+    )
+
+    class ProjectStore:
+        def __init__(self):
+            self.saved = []
+
+        def save(self, project):
+            self.saved.append(project)
+
+        def load_pending(self):
+            return [project_data]
+
+    class JobStore:
+        def __init__(self):
+            self.jobs = {mission.id: job}
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, saved):
+            self.jobs[saved.id] = saved
+
+    factory = object.__new__(ProjectFactory)
+    factory.store = ProjectStore()
+    factory.job_store = JobStore()
+    factory.queue = []
+    factory._active_project = None
+
+    assert factory.restore() == 1
+
+    restored = factory.queue[0]
+    recovered_job = factory.job_store.jobs[mission.id]
+    assert restored.status == "queued"
+    assert restored.attempts == 2
+    assert restored.plan.steps[0].status == "completed"
+    assert restored.plan.steps[0].detail == "Research completed before crash"
+    assert restored.plan.steps[1].status == "planned"
+    assert restored.plan.steps[1].detail is None
+    assert recovered_job.status == MissionJobStatus.QUEUED
+    assert recovered_job.plan.steps[0].status == "completed"
+    assert recovered_job.plan.steps[1].status == "planned"
