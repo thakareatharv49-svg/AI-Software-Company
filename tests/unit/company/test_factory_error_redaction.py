@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from src.company.models.contracts import CompanyMission
+from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.project_factory import FactoryProject, ProjectFactory
 from src.company.mission_controller.planner import build_mission_plan
 
@@ -39,7 +40,6 @@ def test_retry_feedback_is_redacted_before_being_reused():
     assert "api_key=[REDACTED]" in project.retry_feedback
     assert project.last_error is None
 
-from src.company.mission_jobs import MissionJob, MissionJobStatus
 
 
 def test_manual_retry_feedback_is_redacted_before_being_reused():
