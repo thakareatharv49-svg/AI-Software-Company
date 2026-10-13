@@ -204,7 +204,7 @@ class SandboxExecutor:
             "--security-opt=no-new-privileges", "--pids-limit=64",
             "--memory=512m", "--cpus=1", "--ulimit", "nofile=128:128",
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
-            "--tmpfs", "/workspace:rw,exec,nosuid,nodev,size=512m,mode=0700",
+            "--tmpfs", "/workspace:rw,exec,nosuid,nodev,size=512m,mode=0700,uid=10001,gid=10001",
             # Start from an existing writable tmpfs path: Docker creates the workdir
             # before mounting tmpfs, which fails when the image rootfs is read-only.
             "--workdir", "/tmp", "--user", uid_gid,
