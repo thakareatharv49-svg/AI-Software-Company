@@ -15,6 +15,7 @@ from src.company.generated_task_planning import build_generated_task_plan
 from src.company.mission_controller.models import MissionPlan
 from src.company.models.contracts import CompanyMission
 from src.company.workspace import ProjectExecutionService
+from src.security.redaction import redact_sensitive_text
 
 
 class AutonomousProjectRunnerProtocol(Protocol):
@@ -191,16 +192,26 @@ class FactoryAutonomousRunner:
         security = result.pipeline.review_result
         qa_status = str(getattr(qa.status, "value", qa.status))
         security_status = str(getattr(security.status, "value", security.status))
-        command = [str(part) for part in qa_command]
-        qa_exit_code = getattr(qa, 'exit_code', None)
-        qa_duration_ms = getattr(qa, 'duration_ms', None)
-        security_approved = bool(getattr(security, 'approved', security_status == 'approved'))
+        # Evidence should explain failures well enough to repair them, but never
+        # expose secrets or retain unbounded subprocess output in mission history.
+        command = [
+            redact_sensitive_text(str(part))[:500]
+            for part in qa_command
+        ]
+        qa_exit_code = getattr(qa, "exit_code", None)
+        qa_duration_ms = getattr(qa, "duration_ms", None)
+        security_approved = bool(getattr(security, "approved", security_status == "approved"))
+        stdout = redact_sensitive_text(str(getattr(qa, "stdout", "") or ""))[:2000]
+        stderr = redact_sensitive_text(str(getattr(qa, "stderr", "") or ""))[:2000]
         qa_evidence = (
             "Factory QA runner result: "
             f"status={qa_status}; exit_code={qa_exit_code}; "
-            f"duration_ms={qa_duration_ms}; command={' '.join(command)[:500]}"
-        )
-        security_summary = str(getattr(security, 'summary', '') or '')[:1000]
+            f"duration_ms={qa_duration_ms}; command={' '.join(command)[:500]}; "
+            f"stdout={stdout or '[empty]'}; stderr={stderr or '[empty]'}"
+        )[:5200]
+        security_summary = redact_sensitive_text(
+            str(getattr(security, "summary", "") or "")
+        )[:1000]
         security_evidence = (
             "Factory security reviewer result: "
             f"status={security_status}; approved={security_approved}; "
