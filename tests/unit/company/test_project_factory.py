@@ -1117,6 +1117,7 @@ def test_factory_recovers_interrupted_running_projects_as_queued() -> None:
 
 def test_factory_write_boundaries_sanitize_project_and_durable_job() -> None:
     from src.company.mission_jobs import MissionJob, MissionJobStatus
+    from src.company.project_factory import FactoryProject
 
     mission = CompanyMission(name="Write boundary", objective="Safe objective")
     plan = build_mission_plan(mission)
