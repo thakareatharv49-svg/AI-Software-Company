@@ -203,6 +203,9 @@ class ProjectFactory:
         """Remove explicitly selected non-running missions from the queue and store."""
         if not mission_ids:
             return
+        active = self._active_project
+        if active is not None and active.mission.id in mission_ids:
+            raise ValueError("Cannot delete a mission that is currently running")
         if any(
             item.mission.id in mission_ids and item.status == "running"
             for item in self.queue
