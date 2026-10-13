@@ -591,6 +591,12 @@ class ProjectFactory:
     ) -> FactoryProject | None:
         if max_retries < 0:
             raise ValueError("max_retries must be non-negative")
+        if max_stages is not None and (
+            isinstance(max_stages, bool)
+            or not isinstance(max_stages, int)
+            or max_stages < 0
+        ):
+            raise ValueError("max_stages must be a non-negative integer or None")
         timeout = self.execution_timeout_seconds
         if (
             isinstance(timeout, bool)
