@@ -265,10 +265,14 @@ class MissionJobStore:
                     created_at=row.created_at,
                     updated_at=row.updated_at,
                 ))
-                job = recover_running_job(job)
-                row.status = job.status.value
+                job = _safe_job(recover_running_job(job))
+                # Recovery is also a durable write boundary: rewrite every
+                # normalized field, not only the status and plan.
+                row.mission = job.mission.model_dump(mode="json")
                 row.plan = job.plan.model_dump(mode="json")
+                row.status = job.status.value
                 row.message = job.message
+                row.attempts = job.attempts
                 row.updated_at = job.updated_at
                 recovered.append(job)
             session.commit()

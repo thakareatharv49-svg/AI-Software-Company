@@ -24,3 +24,33 @@ def test_persisted_plan_text_is_bounded_without_losing_progress() -> None:
     assert safe.steps[0].status == "completed"
     assert len(safe.steps[0].detail) == 4000
     assert len(safe.engineering_tasks[0].requirement) == 4000
+
+
+def test_recovered_job_is_normalized_before_being_returned_or_rewritten() -> None:
+    from src.company.mission_jobs import MissionJob, MissionJobStatus
+    from src.company.persistence import _safe_job
+
+    mission = CompanyMission(name="Recovered", objective="Recover safely")
+    plan = build_mission_plan(mission)
+    unsafe_mission = mission.model_copy(update={
+        "objective": "api_key=recoverySecret123456 " + ("legacy " * 1500),
+    })
+    unsafe_plan = plan.model_copy(deep=True)
+    unsafe_plan.steps[0].detail = "password=recoveryPlanSecret123456 " + ("detail " * 700)
+    unsafe = MissionJob(
+        id=mission.id,
+        mission=unsafe_mission,
+        plan=unsafe_plan,
+        status=MissionJobStatus.RUNNING,
+        message="token=recoveryMessageSecret123456 " + ("message " * 700),
+        attempts=-3,
+    )
+
+    safe = _safe_job(unsafe)
+
+    assert "recoverySecret123456" not in safe.mission.objective
+    assert len(safe.mission.objective) <= 8000
+    assert "recoveryPlanSecret123456" not in (safe.plan.steps[0].detail or "")
+    assert "recoveryMessageSecret123456" not in safe.message
+    assert len(safe.message) <= 4000
+    assert safe.attempts == 0
