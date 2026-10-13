@@ -96,10 +96,13 @@ The recent “Milestone 1, 2, ...” PR series is a separate short-term hardenin
 | 28 | #299 | Sanitize restored mission jobs at read time; rewrite unsafe legacy records. |
 | 29 | #302 | Sanitize durable mission and project snapshot reads. |
 | 30 | #303 | Redact and bound persistent runtime-run results and errors. |
+| 31 | #304 | Redact and bound durable project-output manifests on write and read. |
 
-Most recent confirmed merged PR at this review: [#303 — Milestone 30: sanitize persistent runtime run records](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/303), merge commit `a2c17d1407ac9cb6b40a3ff2881bee34b97e067c`. The four required workflows passed on the PR head before merge. Milestone 31 continues the persistence trust-boundary work by sanitizing durable project-output manifests.
+Most recent confirmed merged PR at this review: [#304 — Milestone 31: sanitize durable project output manifests](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/304), merge commit `fbc1b319a4b412024b24d0098269b9bee1d55f91`. All required checks passed on the exact PR head before merge. Milestone 32 continues persistence trust-boundary work by bounding durable audit entries on write and legacy reads.
 
 ## 5. Latest hardening details
+
+- M31 (#304) sanitizes durable project-output manifests on writes and reconstructed reads, redacting credential-bearing repository/product URLs and bounding publication messages.
 
 The reliability/security sequence has been strengthening the mission lifecycle and the durable-data trust boundaries:
 - Cancellation, restart, retries, stale project snapshots, and durable job state are reconciled so interrupted work can resume without duplicating or resurrecting terminal work.
