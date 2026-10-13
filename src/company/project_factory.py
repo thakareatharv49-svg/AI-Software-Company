@@ -356,7 +356,7 @@ class ProjectFactory:
             mission=queued.mission,
             plan=plan,
             attempts=queued.attempts,
-            retry_feedback=retry_feedback[:2000] if retry_feedback else None,
+            retry_feedback=(self._safe_error_detail(retry_feedback)[:2000] if retry_feedback else None),
         )
         self.queue.append(project)
         self._save(project)
