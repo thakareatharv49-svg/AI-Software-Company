@@ -1,4 +1,3 @@
-import asyncio
 from threading import Lock
 from types import SimpleNamespace
 
