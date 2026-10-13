@@ -497,6 +497,54 @@ class ProjectFactory:
                     ),
                     timeout=self.execution_timeout_seconds,
                 )
+        except asyncio.CancelledError:
+            # Cancellation (for example, an application shutdown) bypasses
+            # the ordinary Exception handler on modern Python. Re-queue the
+            # active mission before propagating cancellation so persisted state
+            # is not stranded as running and completed stages remain resumable.
+            project.status = "queued"
+            project.last_error = "Factory execution cancelled; mission re-queued for safe resume."
+            project.plan = recover_running_plan(project.plan)
+            if not any(item.mission.id == project.mission.id for item in self.queue):
+                self.queue.insert(0, project)
+            try:
+                self.orchestrator.stop()
+            except Exception:
+                pass
+            try:
+                self._save(project)
+            except Exception:
+                pass
+            try:
+                job = self._load_job(project.mission.id)
+                if job is not None and job.status == MissionJobStatus.RUNNING:
+                    self._save_job(
+                        transition_job(
+                            job.model_copy(
+                                update={
+                                    "plan": project.plan,
+                                    "attempts": project.attempts,
+                                }
+                            ),
+                            MissionJobStatus.QUEUED,
+                            f"Execution interrupted; mission safely re-queued: {project.mission.name}",
+                        )
+                    )
+            except Exception:
+                pass
+            try:
+                self._audit(
+                    project.mission.id,
+                    "MISSION_EXECUTION_CANCELLED",
+                    project.last_error,
+                    MissionJobStatus.QUEUED.value,
+                    {"attempt": project.attempts, "recovered_for_resume": True},
+                )
+            except Exception:
+                pass
+            finally:
+                self._active_project = None
+            raise
         except Exception as exc:
             if isinstance(exc, TimeoutError):
                 project.last_error = (
