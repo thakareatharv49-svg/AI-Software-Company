@@ -200,3 +200,29 @@ def test_mission_job_transition_redacts_untrusted_diagnostics() -> None:
 
     assert "jobSecret123456" not in job.message
     assert "password=[REDACTED]" in job.message
+
+
+def test_durable_job_normalization_sanitizes_fields_even_after_model_copy() -> None:
+    from src.company.persistence import _safe_job
+
+    job = make_job()
+    unsafe_mission = job.mission.model_copy(update={
+        "objective": "api_key=missionSecret123456 " + ("objective " * 1200),
+    })
+    unsafe_plan = job.plan.model_copy(deep=True)
+    unsafe_plan.steps[0].detail = "password=planSecret123456 " + ("detail " * 800)
+    unsafe = job.model_copy(update={
+        "mission": unsafe_mission,
+        "plan": unsafe_plan,
+        "message": "token=jobSecret123456 " + ("diagnostic " * 800),
+        "attempts": -9,
+    })
+
+    safe = _safe_job(unsafe)
+
+    assert "missionSecret123456" not in safe.mission.objective
+    assert len(safe.mission.objective) <= 8000
+    assert "planSecret123456" not in (safe.plan.steps[0].detail or "")
+    assert len(safe.message) <= 4000
+    assert "jobSecret123456" not in safe.message
+    assert safe.attempts == 0
