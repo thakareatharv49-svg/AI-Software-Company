@@ -81,6 +81,11 @@ def _bounded_audit_value(value: Any, *, depth: int = 0) -> Any:
     return redact_sensitive_text(str(value))[:500]
 
 
+def _bounded_audit_limit(limit: int) -> int:
+    """Clamp audit-history reads to a small, predictable page size."""
+    return max(1, min(int(limit), 500))
+
+
 def _safe_audit_entry(entry: MissionAuditEntry) -> MissionAuditEntry:
     """Redact and bound audit entries before durable writes and after legacy reads."""
     metadata = redact_sensitive_value(entry.metadata)
@@ -374,14 +379,19 @@ class MissionAuditStore:
         mission_id: str,
         event_type: str | None = None,
         status: str | None = None,
+        limit: int = 500,
     ) -> list[MissionAuditEntry]:
+        """Return the newest bounded page of audit entries in chronological order."""
         with Session(self._engine) as session:
             query = select(MissionAuditRow).where(MissionAuditRow.mission_id == mission_id)
             if event_type:
                 query = query.where(MissionAuditRow.event_type == event_type)
             if status:
                 query = query.where(MissionAuditRow.status == status)
-            rows = session.scalars(query.order_by(MissionAuditRow.timestamp.asc())).all()
+            rows = session.scalars(
+                query.order_by(MissionAuditRow.timestamp.desc()).limit(_bounded_audit_limit(limit))
+            ).all()
+            rows.reverse()
             return [
                 _safe_audit_entry(MissionAuditEntry(
                     id=row.id,
