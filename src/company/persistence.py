@@ -316,17 +316,28 @@ class MissionJobStore:
             jobs: list[MissionJob] = []
             changed = False
             for row in rows:
-                job = _safe_job(MissionJob(
-                    id=row.id,
-                    mission=CompanyMission.model_validate(row.mission),
-                    plan=MissionPlan.model_validate(row.plan),
-                    status=MissionJobStatus(row.status),
-                    message=row.message,
-                    workspace_id=row.workspace_id,
-                    attempts=row.attempts,
-                    created_at=row.created_at,
-                    updated_at=row.updated_at,
-                ))
+                try:
+                    job = _safe_job(MissionJob(
+                        id=row.id,
+                        mission=CompanyMission.model_validate(row.mission),
+                        plan=MissionPlan.model_validate(row.plan),
+                        status=MissionJobStatus(row.status),
+                        message=row.message,
+                        workspace_id=row.workspace_id,
+                        attempts=row.attempts,
+                        created_at=row.created_at,
+                        updated_at=row.updated_at,
+                    ))
+                except (TypeError, ValueError, OverflowError):
+                    # Quarantine one malformed record without hiding healthy jobs.
+                    logging.getLogger(__name__).error(
+                        "Quarantining malformed mission-job snapshot"
+                    )
+                    row.status = MissionJobStatus.BLOCKED.value
+                    row.message = "Blocked because the persisted mission snapshot is invalid."
+                    row.updated_at = datetime.now(UTC)
+                    changed = True
+                    continue
                 changed = _rewrite_safe_job_row(row, job) or changed
                 jobs.append(job)
             if changed:
