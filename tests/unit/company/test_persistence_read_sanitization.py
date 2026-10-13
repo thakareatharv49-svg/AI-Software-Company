@@ -175,3 +175,75 @@ def test_mission_job_list_rewrites_unsafe_legacy_fields(monkeypatch) -> None:
     assert "legacyMessageSecret123456" not in row.message
     assert row.attempts == 0
     assert sessions[0].commits == 1
+
+
+def test_pending_project_restore_rewrites_unsafe_legacy_snapshot(monkeypatch) -> None:
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    import src.company.persistence as persistence
+
+    mission = CompanyMission(name="Pending legacy", objective="Safe objective")
+    plan = build_mission_plan(mission)
+    plan.steps[0].status = "running"
+    plan.steps[0].detail = "password=legacySnapshotSecret123456 " + ("detail " * 700)
+    unsafe_mission = mission.model_dump(mode="json")
+    unsafe_mission["objective"] = "api_key=legacySnapshotMissionSecret123456 " + ("objective " * 900)
+    unsafe_plan = plan.model_dump(mode="json")
+    now = datetime.now(UTC)
+    row = SimpleNamespace(
+        id=mission.id,
+        mission=unsafe_mission,
+        plan=unsafe_plan,
+        status="running",
+        stages_executed=-2,
+        attempts=-3,
+        updated_at=now,
+    )
+
+    class FakeScalars:
+        def all(self):
+            return [row]
+
+    class FakeSession:
+        def __init__(self, _engine):
+            self.commits = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def scalars(self, _statement):
+            return FakeScalars()
+
+        def commit(self):
+            self.commits += 1
+
+    sessions = []
+
+    def fake_session(engine):
+        session = FakeSession(engine)
+        sessions.append(session)
+        return session
+
+    monkeypatch.setattr(persistence, "Session", fake_session)
+    store = persistence.ProjectStore.__new__(persistence.ProjectStore)
+    store._engine = object()
+
+    pending = store.load_pending()
+
+    assert len(pending) == 1
+    assert pending[0]["status"] == "queued"
+    assert pending[0]["plan"].steps[0].status == "planned"
+    assert "legacySnapshotMissionSecret123456" not in pending[0]["mission"].objective
+    assert "legacySnapshotSecret123456" not in (pending[0]["plan"].steps[0].detail or "")
+    assert pending[0]["stages_executed"] == 0
+    assert pending[0]["attempts"] == 0
+    assert row.status == "queued"
+    assert "legacySnapshotMissionSecret123456" not in row.mission["objective"]
+    assert "legacySnapshotSecret123456" not in row.plan["steps"][0]["detail"]
+    assert row.stages_executed == 0
+    assert row.attempts == 0
+    assert sessions[0].commits == 1
