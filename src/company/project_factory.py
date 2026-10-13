@@ -203,29 +203,44 @@ class ProjectFactory:
     def _safe_plan(plan: MissionPlan) -> MissionPlan:
         """Redact legacy free-text plan fields without resetting execution progress."""
         safe = plan.model_copy(deep=True)
-        for field_name in (
-            "name",
-            "objective",
-            "qa_evidence",
-            "security_summary",
-            "security_evidence",
+
+        def safe_text(value: str | None, limit: int) -> str | None:
+            if value is None:
+                return None
+            return redact_sensitive_text(str(value))[:limit]
+
+        # Legacy snapshots may contain unbounded user/model text. Bound every
+        # free-text field before the plan is restored into memory or reused.
+        for field_name, limit in (
+            ("name", 500),
+            ("objective", 8000),
+            ("qa_status", 120),
+            ("qa_evidence", 5200),
+            ("security_status", 120),
+            ("security_summary", 1000),
+            ("security_evidence", 2000),
         ):
             value = getattr(safe, field_name, None)
             if isinstance(value, str):
-                setattr(safe, field_name, redact_sensitive_text(value))
-        safe.constraints = [redact_sensitive_text(value) for value in safe.constraints]
+                setattr(safe, field_name, safe_text(value, limit))
+        safe.constraints = [safe_text(value, 2000) for value in safe.constraints]
         safe.acceptance_criteria = [
-            redact_sensitive_text(value) for value in safe.acceptance_criteria
+            safe_text(value, 4000) for value in safe.acceptance_criteria
         ]
-        safe.qa_command = [redact_sensitive_text(value) for value in safe.qa_command]
+        safe.qa_command = [safe_text(value, 500) for value in safe.qa_command]
         for step in safe.steps:
-            step.objective = redact_sensitive_text(step.objective)
+            step.objective = safe_text(step.objective, 2000)
+            step.agent_role = safe_text(step.agent_role, 120)
+            step.status = safe_text(step.status, 120)
             if step.detail:
-                step.detail = redact_sensitive_text(step.detail)
+                step.detail = safe_text(step.detail, 4000)
         for task in safe.engineering_tasks:
-            task.title = redact_sensitive_text(task.title)
-            task.requirement = redact_sensitive_text(task.requirement)
-            task.acceptance_check = redact_sensitive_text(task.acceptance_check)
+            task.title = safe_text(task.title, 500)
+            task.requirement = safe_text(task.requirement, 4000)
+            task.workstream = safe_text(task.workstream, 200)
+            task.agent_role = safe_text(task.agent_role, 120)
+            task.acceptance_check = safe_text(task.acceptance_check, 2000)
+            task.status = safe_text(task.status, 120)
         return safe
 
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
