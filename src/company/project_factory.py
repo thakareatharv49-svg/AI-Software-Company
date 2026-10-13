@@ -204,9 +204,7 @@ class ProjectFactory:
         """Redact legacy free-text plan fields without resetting execution progress."""
         safe = plan.model_copy(deep=True)
 
-        def safe_text(value: str | None, limit: int) -> str | None:
-            if value is None:
-                return None
+        def safe_text(value: str, limit: int) -> str:
             return redact_sensitive_text(str(value))[:limit]
 
         # Legacy snapshots may contain unbounded user/model text. Bound every
