@@ -120,7 +120,14 @@ def _bounded_audit_value(value: Any, *, depth: int = 0) -> Any:
         # Legacy JSON columns can contain NaN/Infinity on permissive engines;
         # normalize them so API serialization stays standards-compliant.
         return "[INVALID_NUMBER]"
-    if isinstance(value, (int, float, bool)) or value is None:
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int):
+        # Preserve exact integers across JavaScript-based dashboards and APIs.
+        # JSON numbers above this range silently lose precision in JS clients.
+        safe_integer = (1 << 53) - 1
+        return value if -safe_integer <= value <= safe_integer else str(value)
+    if isinstance(value, float):
         return value
     return redact_sensitive_text(str(value))[:500]
 
