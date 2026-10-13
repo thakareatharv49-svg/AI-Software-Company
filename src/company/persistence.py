@@ -493,21 +493,43 @@ class ProjectStore:
                 .where(FactoryProjectRow.status.in_(["queued", "running"]))
                 .order_by(FactoryProjectRow.updated_at)
             ).all()
-            return [
-                {
-                    "mission": _safe_mission(CompanyMission.model_validate(row.mission)),
-                    "plan": (
-                        recover_running_plan(_safe_plan(MissionPlan.model_validate(row.plan)))
-                        if row.status == "running"
-                        else _safe_plan(MissionPlan.model_validate(row.plan))
-                    ),
-                    "status": "queued" if row.status == "running" else row.status,
-                    "stages_executed": row.stages_executed,
-                    "attempts": row.attempts,
+            pending: list[dict] = []
+            changed = False
+            for row in rows:
+                mission = _safe_mission(CompanyMission.model_validate(row.mission))
+                plan = _safe_plan(MissionPlan.model_validate(row.plan))
+                status = row.status
+                if status == "running":
+                    plan = recover_running_plan(plan)
+                    status = "queued"
+                stages_executed = max(0, int(row.stages_executed))
+                attempts = max(0, int(row.attempts))
+                safe_mission = mission.model_dump(mode="json")
+                safe_plan = plan.model_dump(mode="json")
+                if (
+                    row.mission != safe_mission
+                    or row.plan != safe_plan
+                    or row.status != status
+                    or row.stages_executed != stages_executed
+                    or row.attempts != attempts
+                ):
+                    row.mission = safe_mission
+                    row.plan = safe_plan
+                    row.status = status
+                    row.stages_executed = stages_executed
+                    row.attempts = attempts
+                    changed = True
+                pending.append({
+                    "mission": mission,
+                    "plan": plan,
+                    "status": status,
+                    "stages_executed": stages_executed,
+                    "attempts": attempts,
                     "last_error": None,
-                }
-                for row in rows
-            ]
+                })
+            if changed:
+                session.commit()
+            return pending
 
     def delete_many(self, mission_ids: set[str]) -> int:
         if not mission_ids:
