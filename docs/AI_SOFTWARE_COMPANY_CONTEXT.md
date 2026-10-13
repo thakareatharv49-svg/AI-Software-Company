@@ -24,7 +24,7 @@ Last updated: 2026-10-14
 - PR #332, M48: https://github.com/thakareatharv49-svg/AI-Software-Company/pull/332
   - Branch: `fix/validate-factory-execution-timeout`; base `main`; head `2f23f2a6353e39833b92175a1970f8d6701681d0`.
   - Required CI, secret scan, dependency audit, and CodeQL were still running/queued at the last check. Do not merge until all required workflows pass on the exact current head SHA.
-- PR #314, M41: https://github.com/thakareathv49-svg/AI-Software-Company/pull/314
+- PR #314, M41: https://github.com/thakareatharv49-svg/AI-Software-Company/pull/314
   - Branch: `test/factory-continues-after-persistence-error`; head `67429f0cef113fc5873f482957a0bfdc1831e999`; base `fix/recover-orphaned-continuous-missions` (stacked on PR #313).
   - Tests that one mission's snapshot-save failure is safely handled and the next queued mission can complete.
   - CI run `38470664447` was still in progress at the last check; test step was pending.
