@@ -85,7 +85,32 @@ class ProjectFactory:
             if item["mission"].id in known_ids:
                 continue
             project = FactoryProject(**item)
+            # Older snapshots may predate write-time redaction. Sanitize text
+            # before any restored mission or plan can be reused by an agent.
+            project.mission = self._safe_mission(project.mission)
+            project.plan = self._safe_plan(project.plan)
+            project.last_error = (
+                self._safe_error_detail(project.last_error)
+                if project.last_error
+                else None
+            )
+            project.retry_feedback = (
+                self._safe_error_detail(project.retry_feedback)
+                if project.retry_feedback
+                else None
+            )
             job = self._load_job(project.mission.id)
+            if job is not None:
+                safe_job_mission = self._safe_mission(job.mission)
+                safe_job_plan = self._safe_plan(job.plan)
+                if (
+                    safe_job_mission.model_dump() != job.mission.model_dump()
+                    or safe_job_plan.model_dump() != job.plan.model_dump()
+                ):
+                    job = job.model_copy(
+                        update={"mission": safe_job_mission, "plan": safe_job_plan}
+                    )
+                    self._save_job(job)
             # The project store can contain a stale snapshot if shutdown or
             # cancellation happened between persistence operations. Durable
             # terminal job state wins: never resurrect completed, failed,
@@ -154,6 +179,7 @@ class ProjectFactory:
                     else None
                 )
                 self._save(project)
+            self._save(project)
             self.queue.append(project)
             known_ids.add(project.mission.id)
             restored += 1
@@ -172,6 +198,35 @@ class ProjectFactory:
                 ],
             }
         )
+
+    @staticmethod
+    def _safe_plan(plan: MissionPlan) -> MissionPlan:
+        """Redact legacy free-text plan fields without resetting execution progress."""
+        safe = plan.model_copy(deep=True)
+        for field_name in (
+            "name",
+            "objective",
+            "qa_evidence",
+            "security_summary",
+            "security_evidence",
+        ):
+            value = getattr(safe, field_name, None)
+            if isinstance(value, str):
+                setattr(safe, field_name, redact_sensitive_text(value))
+        safe.constraints = [redact_sensitive_text(value) for value in safe.constraints]
+        safe.acceptance_criteria = [
+            redact_sensitive_text(value) for value in safe.acceptance_criteria
+        ]
+        safe.qa_command = [redact_sensitive_text(value) for value in safe.qa_command]
+        for step in safe.steps:
+            step.objective = redact_sensitive_text(step.objective)
+            if step.detail:
+                step.detail = redact_sensitive_text(step.detail)
+        for task in safe.engineering_tasks:
+            task.title = redact_sensitive_text(task.title)
+            task.requirement = redact_sensitive_text(task.requirement)
+            task.acceptance_check = redact_sensitive_text(task.acceptance_check)
+        return safe
 
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
         job = self._load_job(mission.id)

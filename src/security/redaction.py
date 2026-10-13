@@ -25,6 +25,10 @@ _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         "[REDACTED_JWT]",
     ),
     (
+        re.compile(r"""(?i)(\btoken\b)(\s*[:=]\s*['"]?)[^\s,'";]+"""),
+        r"\1\2[REDACTED_TOKEN]",
+    ),
+    (
         re.compile(
             r"""(?i)\b(password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|database[_-]?url|connection[_-]?string)\b"""
             r"""(\s*[:=]\s*['"]?)[^\s,'";]+"""
