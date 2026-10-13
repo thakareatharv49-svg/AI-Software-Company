@@ -1,8 +1,10 @@
 import asyncio
+import io
 import os
 import signal
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import time
@@ -109,6 +111,30 @@ class SandboxExecutor:
                 output.extend(chunk[:remaining])
 
     @staticmethod
+    def _workspace_archive(root: Path, max_bytes: int = 512 * 1024 * 1024) -> bytes:
+        """Create a bounded archive of regular workspace files, rejecting symlinks."""
+        root = root.resolve()
+        archive = io.BytesIO()
+        total_bytes = 0
+        with tarfile.open(fileobj=archive, mode="w") as tar:
+            for path in sorted(root.rglob("*")):
+                if path.is_symlink():
+                    raise PermissionError("Sandbox workspace contains a symbolic link")
+                resolved = path.resolve()
+                try:
+                    relative = resolved.relative_to(root)
+                except ValueError as exc:
+                    raise PermissionError("Workspace entry escapes the sandbox root") from exc
+                if path.is_file():
+                    total_bytes += path.stat().st_size
+                    if total_bytes > max_bytes:
+                        raise ValueError("Sandbox workspace exceeds the 512 MiB staging limit")
+                elif not path.is_dir():
+                    raise PermissionError("Sandbox workspace contains a special file")
+                tar.add(path, arcname=relative.as_posix(), recursive=False)
+        return archive.getvalue()
+
+    @staticmethod
     def _terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
         """Kill the POSIX process group; fall back to terminating the direct child."""
         if process.poll() is not None:
@@ -128,7 +154,7 @@ class SandboxExecutor:
         return await asyncio.to_thread(self.execute_sync, request)
 
     def _execute_container(self, request: SandboxRequest) -> SandboxResult:
-        """Run generated code with network, capability, filesystem, and resource limits."""
+        """Run code in a networkless container with a size-limited ephemeral workspace."""
         command = list(request.command)
         executable = Path(command[0]).name.lower() if command else ""
         aliases = {
@@ -144,7 +170,7 @@ class SandboxExecutor:
         try:
             relative_workdir = working_directory.relative_to(mount_root).as_posix()
         except ValueError as exc:
-            raise PermissionError("Working directory is outside the container mount") from exc
+            raise PermissionError("Working directory is outside the container workspace") from exc
         container_workdir = (
             "/workspace" if relative_workdir == "." else "/workspace/" + relative_workdir
         )
@@ -154,33 +180,89 @@ class SandboxExecutor:
         cid_fd, cid_path = tempfile.mkstemp(prefix="asc-sandbox-", suffix=".cid")
         os.close(cid_fd)
         os.unlink(cid_path)
-        docker_command = [
-            "docker", "run", "--rm", "--pull=never", "--cidfile", cid_path,
+        cli_env = {"PATH": os.environ.get("PATH", "")}
+        for key in (
+            "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CERT_PATH",
+            "DOCKER_TLS_VERIFY", "DOCKER_CONFIG", "HOME", "USERPROFILE",
+        ):
+            if key in os.environ:
+                cli_env[key] = os.environ[key]
+        create_command = [
+            "docker", "run", "--rm", "--detach", "--pull=never", "--cidfile", cid_path,
             "--network=none", "--read-only", "--cap-drop=ALL",
             "--security-opt=no-new-privileges", "--pids-limit=64",
             "--memory=512m", "--cpus=1", "--ulimit", "nofile=128:128",
             "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
-            "--mount", f"type=bind,source={mount_root},target=/workspace",
-            "--workdir", container_workdir, "--user", uid_gid,
+            "--tmpfs", "/workspace:rw,exec,nosuid,nodev,size=512m,mode=1777",
+            # Start from an existing writable tmpfs path: Docker creates the workdir
+            # before mounting tmpfs, which fails when the image rootfs is read-only.
+            "--workdir", "/tmp", "--user", uid_gid,
             "--env", "PYTHONDONTWRITEBYTECODE=1",
             "--env", "PYTHONNOUSERSITE=1", "--env", "HOME=/tmp",
-            "--env", "TMPDIR=/tmp", self.container_image, *request.command,
+            "--env", "TMPDIR=/tmp", self.container_image, "sleep", "infinity",
         ]
         started = time.perf_counter()
         process: subprocess.Popen[bytes] | None = None
         stdout_bytes = bytearray()
         stderr_bytes = bytearray()
         timed_out = False
-        popen_kwargs: dict[str, object] = {}
-        if os.name == "posix":
-            popen_kwargs["start_new_session"] = True
         try:
+            created = subprocess.run(
+                create_command,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+                env=cli_env,
+            )
+            if created.returncode != 0:
+                return SandboxResult(
+                    status=SandboxStatus.FAILED,
+                    stderr=(created.stderr or created.stdout or "")[:2000],
+                    error="Could not start the isolated container",
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                )
+            container_id = Path(cid_path).read_text(encoding="utf-8").strip()
+            try:
+                workspace_archive = self._workspace_archive(mount_root)
+            except (OSError, ValueError, PermissionError) as exc:
+                return SandboxResult(
+                    status=SandboxStatus.FAILED,
+                    error=f"Workspace staging refused: {type(exc).__name__}",
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                )
+            staged = subprocess.run(
+                ["docker", "exec", "--user", uid_gid, "-i", container_id, "tar", "-x", "--no-same-owner", "-C", "/workspace"],
+                input=workspace_archive,
+                capture_output=True,
+                timeout=120,
+                check=False,
+                env=cli_env,
+            )
+            if staged.returncode != 0:
+                return SandboxResult(
+                    status=SandboxStatus.FAILED,
+                    stderr=(staged.stderr or staged.stdout or "")[:2000],
+                    error="Could not stage project into the bounded sandbox workspace",
+                    duration_ms=int((time.perf_counter() - started) * 1000),
+                )
+
+            docker_exec = [
+                "docker", "exec", "--workdir", container_workdir, "--user", uid_gid,
+                "--env", "PYTHONDONTWRITEBYTECODE=1", "--env", "PYTHONNOUSERSITE=1",
+                "--env", "HOME=/tmp", "--env", "TMPDIR=/tmp",
+                container_id, *request.command,
+            ]
+            popen_kwargs: dict[str, object] = {}
+            if os.name == "posix":
+                popen_kwargs["start_new_session"] = True
             process = subprocess.Popen(
-                docker_command,
+                docker_exec,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env={"PATH": os.environ.get("PATH", "")},
+                env=cli_env,
                 **popen_kwargs,
             )
             assert process.stdout is not None
@@ -203,7 +285,6 @@ class SandboxExecutor:
                 timed_out = True
                 self._terminate_process_tree(process)
                 process.wait()
-                self._stop_container(cid_path)
             stdout_thread.join()
             stderr_thread.join()
         except FileNotFoundError:
@@ -212,7 +293,14 @@ class SandboxExecutor:
                 error="Docker is unavailable; isolated execution was refused",
                 duration_ms=int((time.perf_counter() - started) * 1000),
             )
+        except subprocess.TimeoutExpired:
+            return SandboxResult(
+                status=SandboxStatus.TIMEOUT,
+                error="Timed out while preparing the isolated workspace",
+                duration_ms=int((time.perf_counter() - started) * 1000),
+            )
         finally:
+            self._stop_container(cid_path)
             try:
                 Path(cid_path).unlink(missing_ok=True)
             except OSError:
@@ -242,7 +330,7 @@ class SandboxExecutor:
 
     @staticmethod
     def _stop_container(cid_path: str) -> None:
-        """Stop a daemon-side container if its Docker client times out."""
+        """Stop/remove the isolated container if it still exists."""
         try:
             container_id = Path(cid_path).read_text(encoding="utf-8").strip()
         except OSError:
