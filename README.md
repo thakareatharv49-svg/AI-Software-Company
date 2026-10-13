@@ -6,6 +6,10 @@ The AI Software Developer venture runs an autonomous software factory with a bro
 
 Nexora HQ is the parent-company dashboard for tracking ventures, company-level activity, and integration health. AI Software Developer owns software mission execution, generated applications, previews, and its internal factory workflows. The optional `/api/hq/status` endpoint exposes aggregate mission counts to Nexora HQ using a dedicated bearer token; it does not expose mission details or any execution controls.
 
+## Security operations
+
+Review the [security policy](docs/security.md), [secure execution policy](docs/security/SECURE_EXECUTION_POLICY.md), and [incident response runbook](docs/security/SECURITY_OPERATIONS_RUNBOOK.md) before enabling customer access or GitHub publishing.
+
 ## Web app
 
 The control center is served by the same FastAPI application:
