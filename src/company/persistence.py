@@ -62,6 +62,20 @@ def _safe_plan(plan: MissionPlan) -> MissionPlan:
     return safe
 
 
+def _safe_factory_snapshot(project: FactoryProject) -> dict[str, Any]:
+    """Normalize project snapshot content before it is written to durable storage."""
+    mission = _safe_mission(project.mission)
+    plan = _safe_plan(project.plan)
+    status = redact_sensitive_text(str(project.status))[:32]
+    return {
+        "mission": mission.model_dump(mode="json"),
+        "plan": plan.model_dump(mode="json"),
+        "status": status,
+        "stages_executed": max(0, int(project.stages_executed)),
+        "attempts": max(0, int(project.attempts)),
+    }
+
+
 def _safe_job(job: MissionJob) -> MissionJob:
     return job.model_copy(update={"mission": _safe_mission(job.mission), "plan": _safe_plan(job.plan)})
 
@@ -424,11 +438,7 @@ class ProjectStore:
         with Session(self._engine) as session:
             row = session.get(FactoryProjectRow, project.mission.id)
             values = {
-                "mission": project.mission.model_dump(mode="json"),
-                "plan": project.plan.model_dump(mode="json"),
-                "status": project.status,
-                "stages_executed": project.stages_executed,
-                "attempts": project.attempts,
+                **_safe_factory_snapshot(project),
                 "updated_at": now,
             }
             if row is None:
