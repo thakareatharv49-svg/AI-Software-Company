@@ -159,8 +159,26 @@ class ProjectFactory:
             restored += 1
         return restored
 
+    @staticmethod
+    def _safe_mission(mission: CompanyMission) -> CompanyMission:
+        """Redact credential-like text from mission fields before persistence or planning."""
+        return mission.model_copy(
+            update={
+                "name": redact_sensitive_text(mission.name),
+                "objective": redact_sensitive_text(mission.objective),
+                "constraints": [
+                    redact_sensitive_text(constraint)
+                    for constraint in mission.constraints
+                ],
+            }
+        )
+
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
         job = self._load_job(mission.id)
+        if job is None:
+            # Treat the initial submission as a trust boundary: mission text is
+            # copied into durable jobs, plans, audit events, and model prompts.
+            mission = self._safe_mission(mission)
         # If the durable job is already queued but its in-memory/project snapshot
         # is missing, treat that job as the source of truth. Rebuilding a fresh
         # plan here would silently erase recovered stage progress and attempts.
@@ -386,7 +404,8 @@ class ProjectFactory:
             "OWNER-REQUESTED REVISION FEEDBACK:\n"
             f"{feedback}"
         )
-        revised_mission = job.mission.model_copy(
+        safe_original = self._safe_mission(job.mission)
+        revised_mission = safe_original.model_copy(
             update={"objective": revised_objective}
         )
         plan = build_mission_plan(revised_mission)
