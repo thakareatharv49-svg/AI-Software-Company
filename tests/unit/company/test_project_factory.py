@@ -1113,3 +1113,56 @@ def test_factory_recovers_interrupted_running_projects_as_queued() -> None:
     assert recovered.plan.steps[1].status == "planned"
     assert recovered.plan.steps[1].detail is None
     assert saved and saved[-1][0] == "queued"
+
+
+def test_safe_plan_redacts_and_bounds_all_restored_free_text_fields() -> None:
+    mission = CompanyMission(name="Restore", objective="Restore safely")
+    plan = build_mission_plan(mission)
+    plan.name = "name " + "N" * 1000
+    plan.objective = "api_key=objectiveSecret123456 " + "O" * 9000
+    plan.qa_status = "Q" * 300
+    plan.qa_evidence = "token=qaSecret123456 " + "Q" * 6000
+    plan.security_summary = "password=summarySecret123456"
+    plan.security_evidence = "S" * 3000
+    plan.constraints = ["C" * 3000]
+    plan.acceptance_criteria = ["A" * 5000]
+    plan.qa_command = ["cmd " * 300]
+    step = plan.steps[0]
+    step.objective = "access_token=stepSecret123456 " + "X" * 3000
+    step.agent_role = "R" * 300
+    step.detail = "password=detailSecret123456 " + "D" * 5000
+    task = plan.engineering_tasks[0]
+    task.title = "T" * 700
+    task.requirement = "secret=taskSecret123456 " + "R" * 5000
+    task.workstream = "W" * 300
+    task.agent_role = "G" * 300
+    task.acceptance_check = "A" * 3000
+
+    safe = ProjectFactory._safe_plan(plan)
+
+    for value in safe.model_dump_json().split():
+        assert "objectiveSecret123456" not in value
+    serialized = safe.model_dump_json()
+    for secret in (
+        "objectiveSecret123456",
+        "qaSecret123456",
+        "summarySecret123456",
+        "stepSecret123456",
+        "detailSecret123456",
+        "taskSecret123456",
+    ):
+        assert secret not in serialized
+    assert len(safe.name) == 500
+    assert len(safe.objective) == 8000
+    assert len(safe.qa_evidence) == 5200
+    assert len(safe.security_evidence) == 2000
+    assert len(safe.constraints[0]) == 2000
+    assert len(safe.acceptance_criteria[0]) == 4000
+    assert len(safe.qa_command[0]) == 500
+    assert len(safe.steps[0].objective) == 2000
+    assert len(safe.steps[0].detail) == 4000
+    assert len(safe.engineering_tasks[0].title) == 500
+    assert len(safe.engineering_tasks[0].requirement) == 4000
+    assert len(safe.engineering_tasks[0].workstream) == 200
+    assert len(safe.engineering_tasks[0].acceptance_check) == 2000
+    assert safe.steps[0].status == plan.steps[0].status
