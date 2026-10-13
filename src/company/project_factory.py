@@ -79,9 +79,21 @@ class ProjectFactory:
     def restore(self) -> int:
         if self.store is None:
             return 0
+        # Materialize the pending snapshots inside a recovery boundary. A
+        # temporary store outage must not crash startup or partially mutate
+        # the in-memory queue.
+        try:
+            pending = list(self.store.load_pending())
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).error(
+                "Unable to load pending factory snapshots; restore deferred"
+            )
+            return 0
         restored = 0
         known_ids = {item.mission.id for item in self.queue}
-        for item in self.store.load_pending():
+        for item in pending:
             # Treat each snapshot as an independent recovery unit. A malformed
             # entry from a custom/legacy store must not prevent later valid
             # missions from being restored after restart.
