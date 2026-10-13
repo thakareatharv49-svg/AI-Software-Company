@@ -63,7 +63,10 @@ async def test_invalid_stage_budget_does_not_dequeue_mission(max_stages) -> None
     )
     factory = ProjectFactory(orchestrator, controller, pipeline)
     project = factory.enqueue(
-        CompanyMission(name="Stage budget validation", objective="Preserve queue on invalid stage budget")
+        CompanyMission(
+            name="Stage budget validation",
+            objective="Preserve queue on invalid stage budget",
+        )
     )
 
     with pytest.raises(
