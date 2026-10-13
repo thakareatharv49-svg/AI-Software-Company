@@ -1,6 +1,3 @@
-import pytest
-from pydantic import ValidationError
-
 from src.company.mission_controller.planner import build_mission_plan
 from src.company.mission_jobs import MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission
@@ -18,14 +15,17 @@ def _job_data(attempts: int) -> dict:
     }
 
 
-def test_mission_job_accepts_zero_attempts():
+def test_mission_job_preserves_zero_attempts():
     assert MissionJob(**_job_data(0)).attempts == 0
 
 
-def test_mission_job_accepts_positive_attempts():
+def test_mission_job_preserves_positive_attempts():
     assert MissionJob(**_job_data(3)).attempts == 3
 
 
-def test_mission_job_rejects_negative_attempts():
-    with pytest.raises(ValidationError, match="attempts"):
-        MissionJob(**_job_data(-1))
+def test_mission_job_normalizes_negative_legacy_attempts():
+    assert MissionJob(**_job_data(-1)).attempts == 0
+
+
+def test_mission_job_normalizes_malformed_attempts():
+    assert MissionJob(**_job_data("not-an-integer")).attempts == 0
