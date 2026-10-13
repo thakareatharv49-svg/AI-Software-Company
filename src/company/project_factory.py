@@ -79,9 +79,21 @@ class ProjectFactory:
     def restore(self) -> int:
         if self.store is None:
             return 0
+        # A transient persistence outage must not crash application startup or
+        # partially mutate the queue. Materialize the snapshot list first so
+        # iteration-time storage errors are handled by the same boundary.
+        try:
+            pending = list(self.store.load_pending())
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).error(
+                "Unable to load pending factory snapshots; restore deferred"
+            )
+            return 0
         restored = 0
         known_ids = {item.mission.id for item in self.queue}
-        for item in self.store.load_pending():
+        for item in pending:
             # Treat each snapshot as an independent recovery unit. A malformed
             # entry from a custom/legacy store must not prevent later valid
             # missions from being restored after restart.
@@ -197,8 +209,7 @@ class ProjectFactory:
                         step.detail.strip()
                         for step in project.plan.steps
                         if step.detail and step.detail.strip()
-                        and step.status == "failed"
-                    ),
+                        and step.status == "failed"                    ),
                     None,
                 )
                 # Retry feedback is fed back into the model on the next
@@ -397,8 +408,7 @@ class ProjectFactory:
             item.mission.id in mission_ids and item.status == "running"
             for item in self.queue
         ):
-            raise ValueError("Cannot delete a mission that is currently running")
-        removed = [
+            raise ValueError("Cannot delete a mission that is currently running")        removed = [
             item for item in self.queue if item.mission.id in mission_ids
         ]
         self.queue = [
@@ -597,8 +607,7 @@ class ProjectFactory:
                     MissionJobStatus.RUNNING,
                     f"Factory attempt {project.attempts} started: {project.mission.name}",
                 )
-            )
-            self._audit(
+            )            self._audit(
                 project.mission.id,
                 "MISSION_RUNNING",
                 f"Factory attempt {project.attempts} started: {project.mission.name}",
@@ -797,8 +806,7 @@ class ProjectFactory:
                 None,
             )
             if failed_step is None:
-                active_step = next(
-                    (
+                active_step = next(                    (
                         step
                         for step in project.plan.steps
                         if step.status == "running"
@@ -997,8 +1005,7 @@ class ProjectFactory:
             "orchestrator_status": self.orchestrator.state.status.value,
             "execution_mode": (
                 "autonomous" if self.autonomous_runner is not None else "agent_pipeline"
-            ),
-        }
+            ),        }
         if project.last_error:
             audit_metadata["error"] = project.last_error
         self._audit(
@@ -1197,8 +1204,7 @@ class ProjectFactory:
             self._safe_error_detail(project.retry_feedback)
             if project.retry_feedback
             else None
-        )
-        if self.store is not None:
+        )        if self.store is not None:
             self.store.save(project)
 
     def _load_job(self, mission_id: str) -> MissionJob | None:
