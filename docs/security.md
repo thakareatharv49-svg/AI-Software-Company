@@ -25,13 +25,13 @@ configuration validation requires `SANDBOX_MODE=container`; startup refuses unsa
 image with `docker build -t ai-software-company-sandbox:latest docker/sandbox`.
 
 The container backend runs with no network, a read-only root filesystem, dropped Linux
-capabilities, no-new-privileges, process/memory/CPU/file-descriptor limits, a temporary
-filesystem, bounded output, and a single workspace bind mount. It does not mount host
-secrets or the Docker socket. Docker must be available and the image must already exist;
-the runner does not pull arbitrary images. If Docker is unavailable, isolated execution
-fails closed. The writable workspace is intentionally shared with the factory, so only
-the project workspace—not a home directory or repository containing credentials—should
-be passed as the sandbox root.
+capabilities, no-new-privileges, process/memory/CPU/file-descriptor limits, bounded output,
+and a 512 MiB ephemeral workspace. The project workspace is copied into that temporary
+filesystem; it is not mounted into the container, so generated code cannot read sibling host
+files, mutate the approved host artifact during QA, or fill the host workspace. The container
+does not inherit host environment variables or mount the Docker socket. Docker must be
+available and the image must already exist; the runner does not pull arbitrary images. If
+Docker is unavailable or staging fails, isolated execution fails closed.
 
 The sandbox image provides Python, pytest, and Node for basic generated-app checks. Projects
 that need extra dependencies require a separate controlled dependency/build stage; do not
