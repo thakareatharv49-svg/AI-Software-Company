@@ -143,4 +143,4 @@ def test_revision_feedback_is_redacted_before_persistence_and_audit():
     assert "supersecret123456" not in revised_job.mission.objective
     assert "api_key=[REDACTED]" in revised_job.mission.objective
     assert "supersecret123456" not in audit_entries[-1].metadata["feedback"]
-    assert "api_key=[REDACTED]" in audit_entries[-1].details["feedback"]
+    assert "api_key=[REDACTED]" in audit_entries[-1].metadata["feedback"]
