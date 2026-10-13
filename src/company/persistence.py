@@ -17,7 +17,7 @@ from src.company.mission_jobs import (
 from src.company.models.contracts import CompanyMission
 from src.company.project_outputs import ProjectOutputManifest
 from src.config.settings import settings
-from src.security.redaction import redact_sensitive_text
+from src.security.redaction import redact_sensitive_text, redact_sensitive_value
 from src.db.base import Base
 
 
@@ -64,6 +64,34 @@ def _safe_plan(plan: MissionPlan) -> MissionPlan:
 
 def _safe_job(job: MissionJob) -> MissionJob:
     return job.model_copy(update={"mission": _safe_mission(job.mission), "plan": _safe_plan(job.plan)})
+
+
+def _bounded_audit_value(value: Any, *, depth: int = 0) -> Any:
+    """Bound nested audit metadata so legacy records cannot grow without limit."""
+    if depth >= 6:
+        return "[TRUNCATED]" if value is not None else None
+    if isinstance(value, str):
+        return redact_sensitive_text(value)[:2000]
+    if isinstance(value, dict):
+        return {str(key)[:120]: _bounded_audit_value(item, depth=depth + 1) for key, item in list(value.items())[:100]}
+    if isinstance(value, (list, tuple)):
+        return [_bounded_audit_value(item, depth=depth + 1) for item in value[:100]]
+    if isinstance(value, (int, float, bool)) or value is None:
+        return value
+    return redact_sensitive_text(str(value))[:500]
+
+
+def _safe_audit_entry(entry: MissionAuditEntry) -> MissionAuditEntry:
+    """Redact and bound audit entries before durable writes and after legacy reads."""
+    metadata = redact_sensitive_value(entry.metadata)
+    return entry.model_copy(update={
+        "id": redact_sensitive_text(entry.id)[:100],
+        "mission_id": redact_sensitive_text(entry.mission_id)[:100],
+        "event_type": redact_sensitive_text(entry.event_type)[:100],
+        "message": redact_sensitive_text(entry.message)[:4000],
+        "status": redact_sensitive_text(entry.status)[:80] if entry.status is not None else None,
+        "metadata": _bounded_audit_value(metadata),
+    })
 
 
 def _safe_output_manifest(manifest: ProjectOutputManifest) -> ProjectOutputManifest:
@@ -326,6 +354,7 @@ class MissionAuditStore:
         self._engine = create_engine(url, pool_pre_ping=True)
 
     def append(self, entry: MissionAuditEntry) -> None:
+        entry = _safe_audit_entry(entry)
         with Session(self._engine) as session:
             session.add(
                 MissionAuditRow(
@@ -354,7 +383,7 @@ class MissionAuditStore:
                 query = query.where(MissionAuditRow.status == status)
             rows = session.scalars(query.order_by(MissionAuditRow.timestamp.asc())).all()
             return [
-                MissionAuditEntry(
+                _safe_audit_entry(MissionAuditEntry(
                     id=row.id,
                     mission_id=row.mission_id,
                     event_type=row.event_type,
@@ -362,7 +391,7 @@ class MissionAuditStore:
                     status=row.status,
                     timestamp=row.timestamp,
                     metadata=row.metadata,
-                )
+                ))
                 for row in rows
             ]
 
