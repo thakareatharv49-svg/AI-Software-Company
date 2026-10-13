@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     ollama_timeout: float = 600.0
 
     # Untrusted generated code must use the isolated backend outside development.
-    sandbox_mode: str = "host"
+    sandbox_mode: str = "container"
     sandbox_container_image: str = "ai-software-company-sandbox:latest"
     factory_start_paused: bool = False
 
