@@ -943,7 +943,7 @@ Acceptance: snapshot-backed and orphaned durable-job recovery enforce a consiste
 
 
 ## M70 — Persist Normalized Durable Recovery State
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Persist normalized attempt counters back to durable queued jobs during recovery instead of only correcting in-memory copies.
 - Apply the same persistence rule to snapshot-backed and orphaned queued jobs.
@@ -951,3 +951,14 @@ Status: IN PROGRESS
 - Add regression tests proving corrupt durable counters are repaired in storage.
 
 Acceptance: once recovery accepts a queued durable job, its persisted attempt counter is finite, non-negative, bounded, and consistent with the normalized recovery state.
+
+
+
+## M71 — Persist Sanitized Orphan Recovery State
+Status: IN PROGRESS
+
+- Persist sanitized mission and plan content for queued orphan jobs, even when their attempt counters were already valid.
+- Keep recovery fail-closed when changed durable state cannot be saved.
+- Add regression tests for credential redaction persistence and failed durable writes.
+
+Acceptance: a recovered queued orphan cannot retain unsafe legacy mission or plan text in durable storage, and is not scheduled if required normalization cannot be persisted.
