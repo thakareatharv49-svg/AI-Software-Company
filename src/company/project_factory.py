@@ -465,6 +465,36 @@ class ProjectFactory:
                     "Unable to list durable mission jobs during factory restore"
                 )
                 durable_jobs = []
+            # Orphan recovery must validate the entire enumerated identity
+            # index before enqueueing any record. Otherwise a duplicate can be
+            # skipped by snapshot reconciliation but resurrected here as an orphan.
+            durable_ids: set[str] = set()
+            embedded_ids: set[str] = set()
+            identity_index_valid = True
+            for candidate in durable_jobs:
+                try:
+                    durable_id = str(candidate.id).strip()
+                    embedded_id = str(candidate.mission.id).strip()
+                except (AttributeError, TypeError, ValueError):
+                    identity_index_valid = False
+                    break
+                if (
+                    not durable_id
+                    or not embedded_id
+                    or durable_id in durable_ids
+                    or embedded_id in embedded_ids
+                ):
+                    identity_index_valid = False
+                    break
+                durable_ids.add(durable_id)
+                embedded_ids.add(embedded_id)
+            if not identity_index_valid:
+                import logging
+
+                logging.getLogger(__name__).error(
+                    "Skipping orphaned durable mission recovery because identity index is ambiguous"
+                )
+                return restored
             for job in durable_jobs:
                 try:
                     # Durable job identity is the queue's idempotency key. A
