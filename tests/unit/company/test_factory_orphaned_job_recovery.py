@@ -669,13 +669,24 @@ def test_restore_rejects_non_string_durable_identity_values():
 
 def test_restore_rejects_non_string_identity_in_direct_job_lookup():
     job = make_job("Strict direct lookup identity")
+    job = job.model_copy(
+        update={
+            "id": "123",
+            "mission": job.mission.model_copy(update={"id": "123"}),
+            "status": MissionJobStatus.BLOCKED,
+        }
+    )
     snapshot = {
         "mission": job.mission,
         "plan": job.plan,
         "status": "queued",
         "attempts": 0,
     }
-    corrupt_lookup = job.model_copy(update={"id": 123})
+    # A stale/corrupt lookup claims a queued job with a numeric key, while the
+    # enumerable durable index correctly records this mission as blocked.
+    corrupt_lookup = job.model_copy(
+        update={"id": 123, "status": MissionJobStatus.QUEUED}
+    )
 
     class SnapshotStore:
         def load_pending(self):
@@ -685,12 +696,12 @@ def test_restore_rejects_non_string_identity_in_direct_job_lookup():
             pass
 
     class DivergentJobStore(JobStore):
-        # The enumerated index is valid, but a corrupted direct lookup result
-        # must independently fail closed instead of coercing an integer ID.
         def get(self, _job_id):
             return corrupt_lookup
 
     factory = make_factory(DivergentJobStore([job]), SnapshotStore())
 
+    # Reject the malformed lookup and trust the terminal indexed lifecycle;
+    # the stale queued snapshot must not resurrect the blocked mission.
     assert factory.restore() == 0
     assert factory.queue == []
