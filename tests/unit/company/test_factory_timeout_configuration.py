@@ -49,3 +49,32 @@ async def test_invalid_execution_timeout_does_not_dequeue_mission(timeout: float
     assert factory.queue == [project]
     assert project.status == "queued"
     assert project.attempts == 0
+
+
+@pytest.mark.parametrize("max_stages", [-1, 1.5, "2", True, False])
+@pytest.mark.asyncio
+async def test_invalid_stage_budget_does_not_dequeue_mission(max_stages) -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    project = factory.enqueue(
+        CompanyMission(
+            name="Stage budget validation",
+            objective="Preserve queue on invalid stage budget",
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="max_stages must be a non-negative integer or None",
+    ):
+        await factory.run_next(max_stages=max_stages)
+
+    assert factory.queue == [project]
+    assert project.status == "queued"
+    assert project.attempts == 0
