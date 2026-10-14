@@ -899,7 +899,7 @@ Acceptance: invalid snapshot entries cannot suppress recoverable valid work, whi
 
 
 ## M68 — Bounded Snapshot Recovery Counters
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Clamp restored attempt and stage counters to a documented defensive ceiling.
 - Normalize non-finite or invalid counter values to zero.
@@ -929,3 +929,14 @@ After completing a milestone:
 Never rely on chat history alone for the roadmap.
 
 GitHub repository + this file are the persistent roadmap source of truth.
+
+
+## M69 — Bounded Durable Job Attempt Counters
+Status: IN PROGRESS
+
+- Apply the same defensive attempt ceiling to durable mission jobs as to project snapshots.
+- Normalize invalid, negative, non-finite, and oversized attempts before durable recovery can schedule work.
+- Re-check counters during recovery so legacy objects that bypass model validation cannot restore unbounded attempts.
+- Add regression coverage for oversized and non-finite durable attempt counters.
+
+Acceptance: snapshot-backed and orphaned durable-job recovery enforce a consistent finite, non-negative, bounded attempt count.
