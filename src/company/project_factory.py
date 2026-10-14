@@ -106,9 +106,19 @@ class ProjectFactory:
                 project = FactoryProject(**item)
                 # Legacy snapshots predate strict counter validation. Normalize
                 # counters before comparisons or queue scheduling can consume them.
+                # Legacy/corrupt snapshots must not restore unbounded counters.
+                # In particular, a huge attempts value can bypass retry budgets
+                # and a huge stage count can poison dashboard/economics metrics.
+                max_recovered_counter = 1_000_000
                 for counter_name in ("attempts", "stages_executed"):
                     try:
-                        counter = max(0, int(getattr(project, counter_name)))
+                        counter = max(
+                            0,
+                            min(
+                                max_recovered_counter,
+                                int(getattr(project, counter_name)),
+                            ),
+                        )
                     except (TypeError, ValueError, OverflowError):
                         counter = 0
                     setattr(project, counter_name, counter)
