@@ -246,3 +246,14 @@ The user explicitly requires the assistant to do all PR checks, failure fixes, a
 ### Working agreement
 
 The user expects autonomous milestone execution, including code review, CI repair, required security checks, merging, and persistent roadmap updates. Never ask the user to merge. Work on one implementation milestone at a time and verify every merge.
+
+
+---
+
+## 16. Verified handoff update — 2026-10-14 (M75 merged; M76 active)
+
+- **M75 — COMPLETE**, PR #360, merge commit `54e08597241cafa4acac4ed4a4b5306ef6c8ceb0`. All required checks passed on exact head `364be1b56a2430d37daf97303aac6f2d1653dca4`: CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL Python plus JavaScript/TypeScript.
+- M75 fails closed when durable identity enumeration contains unreadable or empty identity records, rather than silently treating the index as conflict-free.
+- **M76 — IN PROGRESS**, branch `milestone-76-bidirectional-durable-identity-reconciliation`: enforce both sides of the durable key/embedded mission identity mapping. A row whose durable key equals the snapshot ID but embeds another mission must block recovery even if direct lookup returns no row.
+- Regression test simulates a corrupt indexed row hidden by direct lookup and verifies the snapshot is not queued.
+- Next: validate the exact PR head through CI, secret scan, dependency audit, and both CodeQL language jobs; fix failures, merge only after all checks pass, verify the merge, and keep roadmap/handoff aligned. Product milestones M47–M49 remain open pending true end-to-end acceptance.
