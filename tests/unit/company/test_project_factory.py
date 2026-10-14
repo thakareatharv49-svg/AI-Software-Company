@@ -1507,3 +1507,50 @@ async def test_enqueue_snapshot_failure_leaves_queue_unchanged_and_can_retry() -
     assert project.mission.id == mission.id
     assert jobs.jobs[mission.id].status == MissionJobStatus.QUEUED
     assert snapshots.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_run_next_snapshot_failure_keeps_mission_queued_without_attempt() -> None:
+    class FlakySnapshotStore:
+        def __init__(self):
+            self.calls = 0
+
+        def save(self, project):
+            self.calls += 1
+            if self.calls == 2:
+                raise OSError("temporary startup snapshot outage")
+
+        def load_pending(self):
+            return []
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    snapshots = FlakySnapshotStore()
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        store=snapshots,
+    )
+    project = factory.enqueue(
+        CompanyMission(
+            name="Startup persistence",
+            objective="Remain queued if starting persistence fails",
+        )
+    )
+    original_queue = list(factory.queue)
+
+    with pytest.raises(OSError, match="temporary startup snapshot outage"):
+        await factory.run_next()
+
+    assert factory.queue == original_queue
+    assert factory.queue[0] is project
+    assert project.status == "queued"
+    assert project.attempts == 0
+    assert factory._active_project is None
+    assert factory._running is False
