@@ -971,11 +971,22 @@ async def test_factory_contains_unexpected_worker_error_and_continues_queue() ->
         failed_mission_id = None
         should_fail = False
 
+        def __init__(self):
+            self.saves_by_mission = {}
+
         def load_pending(self):
             return []
 
         def save(self, project):
-            if self.should_fail and project.mission.id == self.failed_mission_id:
+            mission_id = project.mission.id
+            self.saves_by_mission[mission_id] = self.saves_by_mission.get(mission_id, 0) + 1
+            # Enqueue and startup each persist once. Fail on a later write so
+            # this regression continues to cover worker-error containment.
+            if (
+                self.should_fail
+                and mission_id == self.failed_mission_id
+                and self.saves_by_mission[mission_id] >= 3
+            ):
                 self.should_fail = False
                 raise RuntimeError("simulated persistence failure")
 
