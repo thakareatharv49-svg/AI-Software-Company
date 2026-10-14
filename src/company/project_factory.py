@@ -1150,6 +1150,10 @@ class ProjectFactory:
             or max_retries < 0
         ):
             raise ValueError("max_retries must be a non-negative integer")
+        # A zero-project budget is an intentional no-op: do not acquire the
+        # worker lock or emit a run-completed event when no work was requested.
+        if max_projects == 0:
+            return []
         if self._running:
             raise RuntimeError("Factory is already running")
         self._running = True

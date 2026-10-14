@@ -137,3 +137,30 @@ async def test_zero_stage_budget_is_a_noop(entrypoint: str) -> None:
     assert project.status == "queued"
     assert project.attempts == 0
     assert factory._running is False
+
+
+@pytest.mark.asyncio
+async def test_zero_project_budget_is_a_noop() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    project = factory.enqueue(
+        CompanyMission(
+            name="Zero project budget",
+            objective="Keep queued without acquiring the worker",
+        )
+    )
+
+    result = await factory.run(max_projects=0)
+
+    assert result == []
+    assert factory.queue == [project]
+    assert project.status == "queued"
+    assert project.attempts == 0
+    assert factory._running is False
+    assert factory._active_project is None
