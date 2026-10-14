@@ -207,7 +207,14 @@ class ProjectFactory:
                     try:
                         conflicting_jobs = list(list_all_jobs())
                     except Exception:
-                        conflicting_jobs = []
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Unable to verify durable mission identity; skipping pending factory snapshot"
+                        )
+                        # The snapshot cannot be trusted as standalone state when
+                        # durable identity reconciliation is unavailable.
+                        continue
                     for candidate in conflicting_jobs:
                         try:
                             embedded_id = str(candidate.mission.id).strip()

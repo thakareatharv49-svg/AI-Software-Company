@@ -210,3 +210,14 @@ The user explicitly requires the assistant to do all PR checks, failure fixes, a
 - **M72 — IN PROGRESS**, branch `milestone-72-fail-closed-snapshot-sanitization`: fail-closed sanitization for legacy project snapshots. It tracks whether recovery had to change sensitive mission/plan/diagnostic text or normalize counters, and will refuse to queue that snapshot if its repair cannot be persisted. Mission IDs are reserved only after the item is terminally handled or safely restored.
 - M72 regression test covers a credential-bearing legacy snapshot with an oversized counter when the snapshot store refuses writes.
 - Next: inspect current PR head; require all four workflows on that exact SHA, fix any failure on the same branch, merge only after all checks pass, and verify the merged result. Keep permanent product milestones M47–M49 distinct and open until end-to-end acceptance passes.
+
+
+---
+
+## 13. Verified handoff update — 2026-10-14 (M72 merged; M73 active)
+
+- **M72 — COMPLETE**, PR #357, merge commit `d73582eaf1952a15ca7f026b4bc9be767fcb3833`. Exact head `a8231838ede0eff08b176ab34139eaba350c9d61` passed CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL Security Analysis before merge.
+- M72 makes restored snapshots fail closed when security/counter repairs cannot be persisted; roadmap/context status must stay aligned with the merged implementation.
+- **M73 — IN PROGRESS**, branch `milestone-73-fail-closed-durable-identity-scan`: durable identity reconciliation must fail closed when the durable store's full identity scan errors. A failed scan is not an empty index; otherwise a stale project snapshot could be resurrected without proving there is no conflicting durable row.
+- Regression test covers a durable identity index outage and verifies the snapshot is not queued.
+- Next: verify all four required workflows on the exact M73 PR head, repair failures on the same branch, merge only after all pass, then verify merge status. Continue one implementation milestone at a time; never ask the user to merge.
