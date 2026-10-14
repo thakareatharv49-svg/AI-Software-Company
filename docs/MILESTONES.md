@@ -1038,10 +1038,20 @@ Status: COMPLETE
 Acceptance: no snapshot is restored based on a direct lookup until the configured enumerable durable identity index has passed a complete, consistent, one-to-one preflight.
 
 ## M79 — Require Explicit String Durable Identities
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Accept durable job IDs and embedded mission IDs only when they are explicit, non-empty strings.
 - Reject null, numeric, blank, or otherwise non-string identity values during index preflight and snapshot reconciliation.
 - Add regression coverage proving malformed identity types cannot make a pending snapshot recoverable.
 
 Acceptance: durable recovery fails closed for non-string or empty identity fields rather than coercing arbitrary values into apparently valid identifiers.
+
+
+## M80 — Enforce Strict Identities on Direct Job Lookup
+Status: IN PROGRESS
+
+- Apply the same explicit non-empty string identity validation to snapshot-backed direct job lookup results as to the preflight identity index.
+- Do not coerce numeric or other malformed IDs into valid-looking strings during lifecycle reconciliation.
+- Add a regression where the enumerated index is valid but direct lookup returns a corrupted job record.
+
+Acceptance: every durable recovery path validates identity types consistently and refuses a malformed direct-lookup record.
