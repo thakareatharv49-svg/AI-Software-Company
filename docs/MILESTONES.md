@@ -987,7 +987,7 @@ Acceptance: when a durable job store exists but identity reconciliation fails, s
 
 
 ## M74 — Fail Closed Without Durable Identity Enumeration
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Require a durable job store to support full identity enumeration before treating a missing direct lookup as proof that a snapshot is orphaned.
 - Skip snapshot recovery when identity enumeration is unsupported, just as when enumeration fails.
@@ -995,3 +995,14 @@ Status: IN PROGRESS
 - Keep independent recovery items isolated so one unverifiable snapshot does not stop unrelated work.
 
 Acceptance: a legacy snapshot is never scheduled when the configured durable job store cannot prove that no conflicting durable identity exists.
+
+
+## M75 — Fail Closed on Malformed Durable Identity Index
+Status: IN PROGRESS
+
+- Treat unreadable durable rows as an unverifiable identity index rather than silently ignoring them.
+- Reject empty durable or embedded mission identities during snapshot reconciliation.
+- Skip the affected snapshot when the full identity index contains a malformed row, because absence of a conflict cannot be established safely.
+- Add regression coverage for an enumerated durable row with no readable mission identity.
+
+Acceptance: snapshot recovery proceeds only when every enumerated durable row has a readable, non-empty durable ID and embedded mission ID; malformed identity data cannot be mistaken for proof that a snapshot is orphaned.
