@@ -106,3 +106,34 @@ async def test_invalid_retry_budget_does_not_dequeue_mission(max_retries) -> Non
     assert factory.queue == [project]
     assert project.status == "queued"
     assert project.attempts == 0
+
+
+@pytest.mark.parametrize("entrypoint", ["run_next", "run"])
+@pytest.mark.asyncio
+async def test_zero_stage_budget_is_a_noop(entrypoint: str) -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    project = factory.enqueue(
+        CompanyMission(
+            name="Zero stage budget",
+            objective="Keep queued without consuming an attempt",
+        )
+    )
+
+    if entrypoint == "run_next":
+        result = await factory.run_next(max_stages=0)
+        assert result is None
+    else:
+        result = await factory.run(max_projects=1, max_stages=0)
+        assert result == []
+
+    assert factory.queue == [project]
+    assert project.status == "queued"
+    assert project.attempts == 0
+    assert factory._running is False
