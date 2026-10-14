@@ -544,3 +544,31 @@ def test_restore_fails_closed_when_durable_key_embeds_different_mission():
     assert factory.restore() == 0
     assert factory.queue == []
 
+
+
+
+def test_restore_fails_closed_when_durable_identity_index_has_duplicate_keys():
+    job = make_job("Snapshot with duplicate durable key")
+    duplicate = job.model_copy(update={"mission": make_job("Different embedded identity").mission})
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class DuplicateIdentityJobStore(JobStore):
+        def list_all(self):
+            return [job, duplicate]
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(DuplicateIdentityJobStore([job, duplicate]), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
