@@ -589,8 +589,12 @@ class ProjectFactory:
         max_stages: int | None = None,
         max_retries: int = 2,
     ) -> FactoryProject | None:
-        if max_retries < 0:
-            raise ValueError("max_retries must be non-negative")
+        if (
+            isinstance(max_retries, bool)
+            or not isinstance(max_retries, int)
+            or max_retries < 0
+        ):
+            raise ValueError("max_retries must be a non-negative integer")
         if max_stages is not None and (
             isinstance(max_stages, bool)
             or not isinstance(max_stages, int)

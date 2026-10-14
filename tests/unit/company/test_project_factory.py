@@ -1338,7 +1338,7 @@ async def test_run_next_rejects_negative_retry_budget_without_mutating_queue() -
         CompanyMission(name="Retry budget", objective="Keep queue unchanged")
     )
 
-    with pytest.raises(ValueError, match="max_retries must be non-negative"):
+    with pytest.raises(ValueError, match="max_retries must be a non-negative integer"):
         await factory.run_next(max_retries=-1)
 
     assert factory.queue == [project]
