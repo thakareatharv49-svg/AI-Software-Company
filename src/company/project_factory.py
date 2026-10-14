@@ -352,10 +352,13 @@ class ProjectFactory:
             plan=plan,
             attempts=job.attempts if job is not None and job.status == MissionJobStatus.QUEUED else 0,
         )
+        # Persist the project snapshot before exposing it to the worker queue.
+        # If persistence fails, callers can retry enqueue without a ghost in-memory
+        # entry or a duplicate-lifecycle error caused by partially published work.
+        self._save(project)
         # Preserve FIFO ordering: the first submitted mission must execute first.
         # A terminal failure is recorded per mission; it must not discard unrelated work.
         self.queue.append(project)
-        self._save(project)
         self._audit(
             mission.id,
             "MISSION_QUEUED",
