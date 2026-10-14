@@ -11,6 +11,7 @@ Last updated: 2026-10-14
 - Do not overwrite or discard generated product artifacts such as `generated-products/` during local work.
 
 ## Recently completed milestones
+- M59, PR #344: identify autonomous-runner output manifests as `autonomous_project`, preserving `factory_project` for fallback pipeline outputs. Added regression assertions for both paths and documented that M36 runner activation remains opt-in with explicit dependencies. All four required workflows passed on exact head `a4e5101d28caf1ff8a6bc4a1dbb85933ce12e2f6`; squash merge commit `e0420b6af132bbae075698e9456f329849aee71d`.
 - M57, PR #341: completed and merged; regression-fix PR #342 also merged. Verify live PR history for exact scope if needed.
 - M58, PR #343: expose project output manifests in the Nexora dashboard — merged after CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL all passed on exact head `093827d4fd8193cf9d0499b630719ef0e9ebf165`. Merge commit: `ab0aadeb0bbbffc1e6b61a18038e4a62f2ceddde`. Adds a Project outputs panel for the selected mission, showing output name/status/type/repository, loading/empty/error states, validated GitHub repository links, and a regression test. Observability only; it does not imply every factory mission creates an external repository or deployment.
 - M45, PR #329: normalize restored factory counters — merged.
@@ -39,6 +40,7 @@ Last updated: 2026-10-14
 - PR #336 head `37280772ef9a132e5f337bf7d2f1e6336e1b12a5`: CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL passed; merged.
 - PR #313 head `d4c4095872c955a1f77c4442029b9985056cb8d1` and PR #314 head `b09ae478f2708db8a8bdac7583b4e72d1ad3c14e` remain older open factory-recovery PRs; CI test jobs have been unusually long-running, so re-query live GitHub state and logs before acting.
 - PR #343 head `093827d4fd8193cf9d0499b630719ef0e9ebf165`: all four required workflows passed; merged as M58.
+- PR #344 head `a4e5101d28caf1ff8a6bc4a1dbb85933ce12e2f6`: CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL all passed; merged as M59. Merge commit `e0420b6af132bbae075698e9456f329849aee71d`.
 
 ## Working rules
 1. Start each resumed session by checking live GitHub PR state, exact head SHA, workflow runs, and dependency/base-branch relationships.
