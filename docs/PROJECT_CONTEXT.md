@@ -199,3 +199,14 @@ This section is the newest verified state. If older sections above conflict with
 ### Working agreement reaffirmed
 
 The user explicitly requires the assistant to do all PR checks, failure fixes, and merges. Never ask the user to merge. Be fast by batching status checks, but never report a merge or test success that GitHub has not verified.
+
+
+---
+
+## 12. Verified handoff update — 2026-10-14 (M71 merged; M72 active)
+
+- **M71 — COMPLETE**, PR #356, merge commit `eaeb2030e08e424a15e7b322c62e0788b766f8ed`. The exact PR head `d34132be1a2e92c641bbabd72f31f7a9b07dca12` passed CI, Secret and Credential Scan, Dependency Vulnerability Audit, and both CodeQL language jobs before squash merge.
+- M71 persists sanitized mission/plan content for queued orphan durable jobs and skips queueing when required durable normalization cannot be saved.
+- **M72 — IN PROGRESS**, branch `milestone-72-fail-closed-snapshot-sanitization`: fail-closed sanitization for legacy project snapshots. It tracks whether recovery had to change sensitive mission/plan/diagnostic text or normalize counters, and will refuse to queue that snapshot if its repair cannot be persisted. Mission IDs are reserved only after the item is terminally handled or safely restored.
+- M72 regression test covers a credential-bearing legacy snapshot with an oversized counter when the snapshot store refuses writes.
+- Next: inspect current PR head; require all four workflows on that exact SHA, fix any failure on the same branch, merge only after all checks pass, and verify the merged result. Keep permanent product milestones M47–M49 distinct and open until end-to-end acceptance passes.
