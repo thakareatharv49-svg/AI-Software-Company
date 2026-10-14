@@ -980,12 +980,13 @@ async def test_factory_contains_unexpected_worker_error_and_continues_queue() ->
         def save(self, project):
             mission_id = project.mission.id
             self.saves_by_mission[mission_id] = self.saves_by_mission.get(mission_id, 0) + 1
-            # Fail during the post-startup execution write. This keeps the
-            # failure outside startup rollback and exercises worker containment.
+            # Fail only after execution has visibly started, not during
+            # the new startup-persistence rollback boundary.
             if (
                 self.should_fail
                 and mission_id == self.failed_mission_id
-                and self.saves_by_mission[mission_id] >= 3
+                and project.status == "running"
+                and any(step.status == "running" for step in project.plan.steps)
             ):
                 self.should_fail = False
                 raise RuntimeError("simulated persistence failure")
