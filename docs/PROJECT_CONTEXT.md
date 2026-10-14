@@ -221,3 +221,14 @@ The user explicitly requires the assistant to do all PR checks, failure fixes, a
 - **M73 — IN PROGRESS**, branch `milestone-73-fail-closed-durable-identity-scan`: durable identity reconciliation must fail closed when the durable store's full identity scan errors. A failed scan is not an empty index; otherwise a stale project snapshot could be resurrected without proving there is no conflicting durable row.
 - Regression test covers a durable identity index outage and verifies the snapshot is not queued.
 - Next: verify all four required workflows on the exact M73 PR head, repair failures on the same branch, merge only after all pass, then verify merge status. Continue one implementation milestone at a time; never ask the user to merge.
+
+
+---
+
+## 14. Verified handoff update — 2026-10-14 (M73 merged; M74 active)
+
+- **M73 — COMPLETE**, PR #358, merge commit `e5dfbee11d2ff5e41a730270dcf4976107cdc650`. The exact head `57635da4803ff739115945f1412ea4d044c72c17` passed CI, Secret and Credential Scan, Dependency Vulnerability Audit, and both CodeQL language checks before squash merge.
+- M73 fails closed when durable identity enumeration throws; a failed scan is not treated as an empty index.
+- **M74 — IN PROGRESS**, branch `milestone-74-fail-closed-without-identity-enumeration`: the same invariant must hold when a durable store has no `list_all()` capability. A direct lookup returning no row cannot establish absence of conflicting embedded mission IDs without enumeration.
+- Regression test uses a lookup-only durable store and asserts the stale snapshot is not queued.
+- Next: validate M74 on its exact latest PR head, repair any failed workflow, merge only after all required checks pass, verify the merge, and keep the roadmap/handoff synchronized. Do not conflate this reliability-hardening sequence with permanent product milestones M47–M49.
