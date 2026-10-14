@@ -111,6 +111,10 @@ class ProjectFactory:
                     except (TypeError, ValueError, OverflowError):
                         counter = 0
                     setattr(project, counter_name, counter)
+                # Claim the mission ID before any recovery writes. If a later
+                # write fails, a duplicate legacy snapshot must not enqueue it
+                # a second time during this same restore pass.
+                known_ids.add(project.mission.id)
             except (AttributeError, KeyError, TypeError, ValueError):
                 import logging
 
@@ -167,7 +171,15 @@ class ProjectFactory:
                     job = job.model_copy(
                         update={"mission": safe_job_mission, "plan": safe_job_plan}
                     )
-                    self._save_job(job)
+                    try:
+                        self._save_job(job)
+                    except Exception:
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Unable to persist sanitized mission job during restore"
+                        )
+                        continue
             # The project store can contain a stale snapshot if shutdown or
             # cancellation happened between persistence operations. Durable
             # terminal job state wins: never resurrect completed, failed,
@@ -180,7 +192,14 @@ class ProjectFactory:
             }:
                 delete_many = getattr(self.store, "delete_many", None)
                 if callable(delete_many):
-                    delete_many({project.mission.id})
+                    try:
+                        delete_many({project.mission.id})
+                    except Exception:
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Unable to delete terminal mission snapshot during restore"
+                        )
                 continue
             # A queued durable job can also be newer than its project snapshot
             # (for example, after a bounded pause or a crash during persistence).
@@ -194,7 +213,14 @@ class ProjectFactory:
                 project.plan = durable_plan
                 project.attempts = max(project.attempts, job.attempts)
                 if project_changed:
-                    self._save(project)
+                    try:
+                        self._save(project)
+                    except Exception:
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Unable to refresh queued mission snapshot during restore"
+                        )
 
             # The project snapshot and durable job are written separately, so
             # a crash can leave either one behind. If the durable job says RUNNING,
@@ -208,7 +234,15 @@ class ProjectFactory:
                 recovered_job = recover_running_job(
                     job.model_copy(update={"plan": project.plan})
                 )
-                self._save_job(recovered_job)
+                try:
+                    self._save_job(recovered_job)
+                except Exception:
+                    import logging
+
+                    logging.getLogger(__name__).error(
+                        "Unable to persist recovered running mission; skipping snapshot"
+                    )
+                    continue
 
             # Never restore an interrupted project as actively running. Reclaim
             # it as queued and reset only in-flight stages, preserving completed
@@ -235,10 +269,23 @@ class ProjectFactory:
                     if interrupted_detail
                     else None
                 )
+                try:
+                    self._save(project)
+                except Exception:
+                    import logging
+
+                    logging.getLogger(__name__).error(
+                        "Unable to persist re-queued interrupted mission during restore"
+                    )
+            try:
                 self._save(project)
-            self._save(project)
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).error(
+                    "Unable to persist restored mission snapshot; keeping it in memory"
+                )
             self.queue.append(project)
-            known_ids.add(project.mission.id)
             restored += 1
         return restored
 
