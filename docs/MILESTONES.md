@@ -831,6 +831,33 @@ The company performs the work.
 
 ---
 
+# Operational Recovery Follow-on Milestones
+
+These reliability milestones extend the operational factory beyond the original M50+ continuous-evolution outline.
+
+## M62 — Recovery Persistence Reliability
+Status: COMPLETE
+
+- Isolate project-snapshot and durable-job persistence failures per recovery item.
+- Keep terminal durable jobs out of the active queue even when stale-snapshot cleanup fails.
+- Prevent duplicate queue entries from duplicate legacy snapshots.
+- Add regression coverage for recovery write failures and terminal-job cleanup failures.
+
+Acceptance: one snapshot's persistence failure does not stop unrelated recoveries, and terminal durable lifecycle state is never resurrected into active work.
+
+## M63 — Durable Job Reconciliation
+Status: IN PROGRESS
+
+- Recover queued durable jobs whose project snapshot was not written before a crash.
+- Recover interrupted running jobs from the durable job store and reset in-flight stages before re-queueing.
+- Continue recovery from durable jobs when the project snapshot store is unavailable.
+- Never re-enqueue terminal jobs; make repeated restore calls idempotent.
+- Add regression tests for orphaned queued/running jobs, terminal states, store outages, and repeated restore.
+
+Acceptance: the durable job store can recover eligible missions even when project snapshots are missing, without duplicating queue entries or resurrecting terminal work.
+
+---
+
 # Milestone Execution Rule
 
 Work on exactly one active implementation milestone at a time.
