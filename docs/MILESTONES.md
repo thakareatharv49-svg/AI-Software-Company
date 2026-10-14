@@ -867,7 +867,7 @@ Status: COMPLETE
 Acceptance: malformed durable records cannot create duplicate or incorrectly eligible queue entries, and valid queued/running recovery continues unchanged.
 
 ## M65 — Snapshot & Durable Lifecycle Consistency
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Apply durable identity and lifecycle validation to snapshot-backed recovery as well as orphan recovery.
 - Reject snapshots when the corresponding durable job has a mismatched identity or invalid lifecycle status.
@@ -875,6 +875,16 @@ Status: IN PROGRESS
 - Add regression coverage for snapshot/job identity and status mismatches.
 
 Acceptance: both recovery paths enforce the same durable identity and lifecycle invariants; malformed durable state cannot be resurrected by an older project snapshot.
+
+## M66 — Snapshot Lifecycle Eligibility & Durable Precedence
+Status: IN PROGRESS
+
+- Restore a project snapshot without a durable job only when its status is explicitly queued or interrupted-running.
+- Reject terminal and unknown snapshot lifecycle values instead of adding them to the active queue.
+- Treat a validated durable queued status as authoritative over stale snapshot status.
+- Add regression tests for terminal/unknown snapshots and durable-versus-snapshot status conflicts.
+
+Acceptance: restored queue entries always have an eligible lifecycle state, and valid durable lifecycle state wins over stale project snapshot metadata.
 
 ---
 
