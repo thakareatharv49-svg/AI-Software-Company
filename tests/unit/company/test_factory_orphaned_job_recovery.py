@@ -659,8 +659,8 @@ def test_restore_rejects_non_string_durable_identity_values():
             def get(self, _job_id):
                 return job
 
-            def list_all(self):
-                return [corrupt_job]
+            def list_all(self, item=corrupt_job):
+                return [item]
 
         factory = make_factory(MalformedIdentityStore(), SnapshotStore())
         assert factory.restore() == 0
