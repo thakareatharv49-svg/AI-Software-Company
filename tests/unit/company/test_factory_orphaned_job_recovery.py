@@ -396,3 +396,29 @@ def test_restore_skips_queued_orphan_when_sanitized_state_cannot_be_saved():
 
     assert factory.restore() == 0
     assert factory.queue == []
+
+
+def test_restore_fails_closed_when_sanitized_snapshot_cannot_be_persisted():
+    job = make_job("Unsafe legacy snapshot")
+    unsafe_mission = job.mission.model_copy(
+        update={"objective": "Build safely with token=sk-proj-123456789012"}
+    )
+    snapshot = {
+        "mission": unsafe_mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 10**100,
+        "stages_executed": 0,
+    }
+
+    class BrokenSnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            raise OSError("snapshot store is read-only")
+
+    factory = make_factory(None, BrokenSnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
