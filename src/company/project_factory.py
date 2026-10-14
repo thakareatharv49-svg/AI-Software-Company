@@ -150,7 +150,15 @@ class ProjectFactory:
             # entry from a custom/legacy store must not prevent later valid
             # missions from being restored after restart.
             try:
-                mission_id = item["mission"].id
+                raw_mission_id = item["mission"].id
+                mission_id = _durable_identity_text(raw_mission_id)
+                if not mission_id or mission_id != raw_mission_id:
+                    import logging
+
+                    logging.getLogger(__name__).error(
+                        "Skipping pending factory snapshot with invalid mission identity"
+                    )
+                    continue
                 if mission_id in known_ids:
                     continue
                 project = FactoryProject(**item)
