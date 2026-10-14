@@ -1,0 +1,113 @@
+"""Recovery tests for durable jobs whose project snapshots are missing."""
+
+from runtime.models.messages import ModelResponse
+from src.agents.execution.executor import AgentExecutor
+from src.agents.registry.registry import AgentRegistry
+from src.company.mission_controller.controller import MissionController
+from src.company.mission_controller.execution import MissionExecutionPipeline
+from src.company.mission_controller.planner import build_mission_plan
+from src.company.mission_jobs import MissionJob, MissionJobStatus
+from src.company.models.contracts import CompanyMission
+from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.company.project_factory import ProjectFactory
+
+
+class FakeRuntime:
+    async def generate(self, request):
+        return ModelResponse(content="ok", model="fake", provider="fake")
+
+
+class JobStore:
+    def __init__(self, jobs):
+        self.jobs = {job.id: job for job in jobs}
+
+    def get(self, job_id):
+        return self.jobs.get(job_id)
+
+    def save(self, job):
+        self.jobs[job.id] = job
+
+    def list_all(self):
+        return list(self.jobs.values())
+
+
+class BrokenProjectStore:
+    def load_pending(self):
+        raise OSError("project snapshot store unavailable")
+
+    def save(self, _project):
+        raise OSError("project snapshot store unavailable")
+
+
+def make_job(name, status=MissionJobStatus.QUEUED):
+    mission = CompanyMission(name=name, objective=f"Recover {name}")
+    plan = build_mission_plan(mission)
+    return MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=plan,
+        status=status,
+        message="persisted",
+        attempts=3,
+    )
+
+
+def make_factory(job_store, store=None):
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    return ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        store=store,
+        job_store=job_store,
+    )
+
+
+def test_restore_recovers_queued_durable_job_without_project_snapshot():
+    job = make_job("Orphan queued job")
+    factory = make_factory(JobStore([job]))
+
+    assert factory.restore() == 1
+    assert len(factory.queue) == 1
+    project = factory.queue[0]
+    assert project.mission.id == job.id
+    assert project.status == "queued"
+    assert project.attempts == 3
+
+
+def test_restore_recovers_running_orphan_and_persists_queued_lifecycle():
+    job = make_job("Orphan running job", MissionJobStatus.RUNNING)
+    job.plan.steps[0].status = "running"
+    store = JobStore([job])
+    factory = make_factory(store)
+
+    assert factory.restore() == 1
+    assert len(factory.queue) == 1
+    assert factory.queue[0].plan.steps[0].status == "planned"
+    assert store.jobs[job.id].status == MissionJobStatus.QUEUED
+    assert store.jobs[job.id].plan.steps[0].status == "planned"
+
+
+def test_restore_skips_terminal_orphans_and_uses_jobs_when_project_store_is_down():
+    completed = make_job("Completed orphan", MissionJobStatus.COMPLETED)
+    queued = make_job("Queued orphan")
+    store = JobStore([completed, queued])
+    factory = make_factory(store, BrokenProjectStore())
+
+    assert factory.restore() == 1
+    assert [project.mission.id for project in factory.queue] == [queued.id]
+
+
+def test_restore_is_idempotent_for_durable_orphans():
+    job = make_job("Idempotent orphan")
+    factory = make_factory(JobStore([job]))
+
+    assert factory.restore() == 1
+    assert factory.restore() == 0
+    assert len(factory.queue) == 1
