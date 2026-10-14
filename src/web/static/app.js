@@ -39,6 +39,19 @@ function ensureUiElements() {
       form.insertAdjacentElement("afterend", node);
     }
   }
+  if (!$("project-outputs-card")) {
+    const section = document.createElement("section");
+    section.id = "project-outputs-card";
+    section.className = "card";
+    section.innerHTML = '<div class="section-heading"><div><h2>Project outputs</h2><p id="project-output-context" class="muted">Select a mission to inspect its persisted output manifests.</p></div><small id="project-output-count" class="section-count"></small></div><div id="project-outputs"><div class="empty">Select a mission to view its outputs.</div></div>';
+    const products = document.querySelector(".products-card");
+    if (products) products.insertAdjacentElement("afterend", section);
+    else {
+      const stats = document.querySelector(".stats");
+      if (stats) stats.insertAdjacentElement("afterend", section);
+      else if (main) main.prepend(section);
+    }
+  }
 }
 
 function message(text, error=false) {
@@ -131,6 +144,79 @@ function renderProducts(items) {
     open.textContent = "Open Product ↗";
     card.append(info, open);
     box.append(card);
+  }
+}
+
+async function renderProjectOutputsPanel(id) {
+  const box = $("project-outputs");
+  const context = $("project-output-context");
+  const count = $("project-output-count");
+  if (!box || !context || !count) return;
+  if (!id) {
+    context.textContent = "Select a mission to inspect its persisted output manifests.";
+    count.textContent = "";
+    box.innerHTML = '<div class="empty">Select a mission to view its outputs.</div>';
+    return;
+  }
+
+  context.textContent = "Loading persisted outputs for the selected mission…";
+  count.textContent = "";
+  box.innerHTML = '<div class="empty">Loading project outputs…</div>';
+  try {
+    const outputs = await api("/api/missions/" + encodeURIComponent(id) + "/outputs");
+    if (selectedMissionId !== id) return;
+    const safeOutputs = Array.isArray(outputs) ? outputs : [];
+    context.textContent = "Mission: " + id;
+    count.textContent = safeOutputs.length ? safeOutputs.length + (safeOutputs.length === 1 ? " output" : " outputs") : "0 outputs";
+    box.replaceChildren();
+    if (!safeOutputs.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "No output manifests have been recorded for this mission yet.";
+      box.append(empty);
+      return;
+    }
+
+    for (const output of safeOutputs) {
+      const row = document.createElement("div");
+      row.className = "event project-output";
+      const name = document.createElement("b");
+      name.textContent = output.name || "Unnamed project";
+      const status = document.createElement("div");
+      status.className = "muted";
+      status.textContent = "Status: " + (output.status || "unknown");
+      const type = document.createElement("div");
+      type.className = "muted";
+      type.textContent = "Output type: " + (output.output_type || "factory_project");
+      row.append(name, status, type);
+
+      if (output.repository) {
+        const repository = String(output.repository);
+        const repoText = document.createElement("div");
+        repoText.className = "muted";
+        repoText.textContent = "Repository: " + repository;
+        row.append(repoText);
+        if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+          const link = document.createElement("a");
+          link.className = "repo";
+          link.href = "https://github.com/" + repository;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = "Open repository ↗";
+          row.append(link);
+        }
+      }
+      box.append(row);
+    }
+  } catch (error) {
+    if (selectedMissionId !== id) return;
+    context.textContent = "Mission: " + id;
+    count.textContent = "Unavailable";
+    box.replaceChildren();
+    const failure = document.createElement("div");
+    failure.className = "empty";
+    failure.textContent = "Project outputs could not be loaded: " + error.message;
+    box.append(failure);
   }
 }
 
@@ -438,6 +524,8 @@ function renderStallDiagnostics(root, diagnostics) {
 
 async function showMission(id) {
   selectedMissionId = id;
+  ensureUiElements();
+  void renderProjectOutputsPanel(id);
   const details = $("details");
   const title = $("detail-title");
   details.textContent = "Loading mission…";
