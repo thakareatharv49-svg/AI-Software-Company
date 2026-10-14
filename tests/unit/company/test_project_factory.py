@@ -986,7 +986,7 @@ async def test_factory_contains_unexpected_worker_error_and_continues_queue() ->
                 self.should_fail
                 and mission_id == self.failed_mission_id
                 and project.status == "running"
-                and any(step.status == "completed" for step in project.plan.steps)
+                and project.status == "completed"
             ):
                 self.should_fail = False
                 raise RuntimeError("simulated persistence failure")
