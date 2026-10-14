@@ -422,3 +422,32 @@ def test_restore_fails_closed_when_sanitized_snapshot_cannot_be_persisted():
 
     assert factory.restore() == 0
     assert factory.queue == []
+
+
+def test_restore_fails_closed_when_durable_identity_scan_is_unavailable():
+    job = make_job("Identity scan unavailable")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class UnavailableIdentityStore:
+        def get(self, _job_id):
+            return None
+
+        def list_all(self):
+            raise OSError("durable index temporarily unavailable")
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(UnavailableIdentityStore(), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
