@@ -1129,10 +1129,27 @@ class ProjectFactory:
         max_stages: int | None = None,
         max_retries: int = 2,
     ) -> list[FactoryProject]:
+        # Validate every run budget before changing worker state or touching the queue.
+        if max_projects is not None and (
+            isinstance(max_projects, bool)
+            or not isinstance(max_projects, int)
+            or max_projects < 0
+        ):
+            raise ValueError("max_projects must be a non-negative integer or None")
+        if max_stages is not None and (
+            isinstance(max_stages, bool)
+            or not isinstance(max_stages, int)
+            or max_stages < 0
+        ):
+            raise ValueError("max_stages must be a non-negative integer or None")
+        if (
+            isinstance(max_retries, bool)
+            or not isinstance(max_retries, int)
+            or max_retries < 0
+        ):
+            raise ValueError("max_retries must be a non-negative integer")
         if self._running:
             raise RuntimeError("Factory is already running")
-        if max_retries < 0:
-            raise ValueError("max_retries must be non-negative")
         self._running = True
         completed: list[FactoryProject] = []
         completed_ids: set[str] = set()

@@ -1344,3 +1344,50 @@ async def test_run_next_rejects_negative_retry_budget_without_mutating_queue() -
     assert factory.queue == [project]
     assert project.status == "queued"
     assert project.attempts == 0
+
+
+
+@pytest.mark.parametrize(
+    ("budget", "value", "message"),
+    [
+        ("max_projects", -1, "max_projects must be a non-negative integer or None"),
+        ("max_projects", 1.5, "max_projects must be a non-negative integer or None"),
+        ("max_projects", "2", "max_projects must be a non-negative integer or None"),
+        ("max_projects", True, "max_projects must be a non-negative integer or None"),
+        ("max_projects", False, "max_projects must be a non-negative integer or None"),
+        ("max_stages", -1, "max_stages must be a non-negative integer or None"),
+        ("max_stages", 1.5, "max_stages must be a non-negative integer or None"),
+        ("max_stages", "2", "max_stages must be a non-negative integer or None"),
+        ("max_stages", True, "max_stages must be a non-negative integer or None"),
+        ("max_stages", False, "max_stages must be a non-negative integer or None"),
+        ("max_retries", -1, "max_retries must be a non-negative integer"),
+        ("max_retries", 1.5, "max_retries must be a non-negative integer"),
+        ("max_retries", "2", "max_retries must be a non-negative integer"),
+        ("max_retries", None, "max_retries must be a non-negative integer"),
+        ("max_retries", True, "max_retries must be a non-negative integer"),
+        ("max_retries", False, "max_retries must be a non-negative integer"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_run_rejects_invalid_budgets_before_mutating_factory(
+    budget, value, message
+) -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    project = factory.enqueue(
+        CompanyMission(name="Run budget validation", objective="Preserve factory state")
+    )
+
+    with pytest.raises(ValueError, match=message):
+        await factory.run(**{budget: value})
+
+    assert factory.queue == [project]
+    assert project.status == "queued"
+    assert project.attempts == 0
+    assert factory._running is False
