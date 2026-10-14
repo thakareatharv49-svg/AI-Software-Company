@@ -1048,10 +1048,20 @@ Acceptance: durable recovery fails closed for non-string or empty identity field
 
 
 ## M80 — Enforce Strict Identities on Direct Job Lookup
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Apply the same explicit non-empty string identity validation to snapshot-backed direct job lookup results as to the preflight identity index.
 - Do not coerce numeric or other malformed IDs into valid-looking strings during lifecycle reconciliation.
 - Add a regression where the enumerated index is valid but direct lookup returns a corrupted job record.
 
 Acceptance: every durable recovery path validates identity types consistently and refuses a malformed direct-lookup record.
+
+
+## M81 — Validate Snapshot Mission Identity Before Recovery
+Status: IN PROGRESS
+
+- Validate the snapshot's mission ID as a canonical, non-empty string before checking duplicates or performing durable job lookup.
+- Reject null, numeric, blank, or whitespace-padded IDs instead of allowing malformed legacy model instances to bypass normal validation.
+- Add regression coverage for malformed snapshot mission IDs with no matching durable job.
+
+Acceptance: no snapshot enters reconciliation, durable lookup, or queue restoration unless its mission identity is an explicit canonical non-empty string.
