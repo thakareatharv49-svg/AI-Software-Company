@@ -289,3 +289,11 @@ The user expects autonomous milestone execution, including code review, CI repai
 - M79 adds strict non-empty string identity parsing for the enumerable durable identity index and reconciliation scans, preventing null/numeric IDs from being coerced into trusted identifiers.
 - **M80 — IN PROGRESS**, branch `milestone-80-strict-snapshot-job-identities`: apply that same strict identity parsing to the direct durable-job lookup used during snapshot recovery. Regression coverage makes the enumerated index valid while the direct lookup returns a corrupted numeric ID.
 - Next: validate every required workflow on the exact M80 PR head, repair any failures, merge only after all required checks pass, verify main, and keep the roadmap and handoff current. Permanent product milestones M47–M49 remain open pending end-to-end acceptance.
+
+
+## Latest engineering handoff — 2026-10-15 UTC (M80 merged; M81 active)
+
+- **M80 — COMPLETE**, PR #365, merge commit `938a8068e3a25e76b7d89043fae36711f479c654`. All required checks passed on exact head `dac948e062c83925acce0a1756063842d5caa241`: quality CI, secret-history scan, dependency audit, and Python plus JavaScript/TypeScript CodeQL.
+- M80 applies strict non-empty string validation to snapshot-backed direct job lookup results; the corrected regression proves a malformed numeric key cannot override a blocked durable lifecycle and resurrect a stale snapshot.
+- **M81 — IN PROGRESS**, branch `milestone-81-strict-snapshot-mission-identities`: validate the snapshot mission ID itself before duplicate detection or durable lookup. Null, numeric, blank, and non-canonical whitespace-padded IDs must fail closed.
+- Next: validate all required workflows on the exact latest M81 PR head, fix failures, merge only after success, verify main, and update this handoff. Permanent product milestones M47–M49 remain open pending end-to-end acceptance.
