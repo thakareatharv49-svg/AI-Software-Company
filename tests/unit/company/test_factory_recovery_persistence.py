@@ -96,6 +96,17 @@ def test_restore_does_not_resurrect_terminal_job_when_snapshot_delete_fails():
                 message="completed",
             )
 
+        def list_all(self):
+            return [
+                MissionJob(
+                    id=terminal.id,
+                    mission=terminal,
+                    plan=build_mission_plan(terminal),
+                    status=MissionJobStatus.COMPLETED,
+                    message="completed",
+                )
+            ]
+
         def save(self, _job):
             pass
 
