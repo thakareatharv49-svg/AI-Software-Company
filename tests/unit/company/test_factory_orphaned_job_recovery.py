@@ -327,3 +327,39 @@ def test_mission_job_validation_caps_attempts_and_normalizes_non_finite_values()
 
     assert oversized.attempts == MAX_MISSION_ATTEMPTS
     assert non_finite.attempts == 0
+
+
+def test_restore_persists_normalized_attempts_for_queued_orphan_job():
+    job = make_job("Persist normalized orphan attempts")
+    corrupt_job = job.model_copy(update={"attempts": 10**100})
+    store = JobStore([corrupt_job])
+    factory = make_factory(store)
+
+    assert factory.restore() == 1
+    assert factory.queue[0].attempts == MAX_MISSION_ATTEMPTS
+    assert store.jobs[job.id].attempts == MAX_MISSION_ATTEMPTS
+
+
+def test_restore_persists_normalized_attempts_for_snapshot_backed_job():
+    job = make_job("Persist normalized snapshot-backed attempts")
+    corrupt_job = job.model_copy(update={"attempts": float("inf")})
+    store = JobStore([corrupt_job])
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 2,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(store, SnapshotStore())
+
+    assert factory.restore() == 1
+    assert factory.queue[0].attempts == 2
+    assert store.jobs[job.id].attempts == 0
