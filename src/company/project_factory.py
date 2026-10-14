@@ -326,8 +326,8 @@ class ProjectFactory:
                 # snapshot resurrect work under an invalid identity or status.
                 try:
                     job_status = MissionJobStatus(job.status)
-                    job_id = str(job.id).strip()
-                    embedded_mission_id = str(job.mission.id).strip()
+                    job_id = _durable_identity_text(job.id)
+                    embedded_mission_id = _durable_identity_text(job.mission.id)
                 except (AttributeError, TypeError, ValueError):
                     import logging
 
