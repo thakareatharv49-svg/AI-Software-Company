@@ -224,20 +224,37 @@ class ProjectFactory:
                     # The snapshot cannot be trusted as standalone state when
                     # durable identity reconciliation is unavailable.
                     continue
+                identity_index_valid = True
                 for candidate in conflicting_jobs:
-                        try:
-                            embedded_id = str(candidate.mission.id).strip()
-                            durable_id = str(candidate.id).strip()
-                        except (AttributeError, TypeError, ValueError):
-                            continue
-                        if embedded_id == project.mission.id and durable_id != project.mission.id:
-                            import logging
+                    try:
+                        embedded_id = str(candidate.mission.id).strip()
+                        durable_id = str(candidate.id).strip()
+                    except (AttributeError, TypeError, ValueError):
+                        import logging
 
-                            logging.getLogger(__name__).error(
-                                "Skipping pending snapshot with mismatched durable mission identity"
-                            )
-                            job = candidate
-                            break
+                        logging.getLogger(__name__).error(
+                            "Durable mission identity index contains an unreadable record; skipping pending snapshot"
+                        )
+                        identity_index_valid = False
+                        break
+                    if not embedded_id or not durable_id:
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Durable mission identity index contains an empty identity; skipping pending snapshot"
+                        )
+                        identity_index_valid = False
+                        break
+                    if embedded_id == project.mission.id and durable_id != project.mission.id:
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Skipping pending snapshot with mismatched durable mission identity"
+                        )
+                        job = candidate
+                        break
+                if not identity_index_valid:
+                    continue
             if job is not None:
                 # Validate the durable record for snapshot-backed recovery too.
                 # The orphaned-job path already checks these invariants; without

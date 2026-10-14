@@ -477,3 +477,37 @@ def test_restore_fails_closed_when_durable_store_cannot_enumerate_identities():
 
     assert factory.restore() == 0
     assert factory.queue == []
+
+
+def test_restore_fails_closed_when_identity_index_contains_unreadable_record():
+    job = make_job("Identity index contains unreadable record")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class UnreadableJob:
+        id = "other-job"
+        # Missing mission means recovery cannot prove this row is unrelated.
+
+    class JobStore:
+        def get(self, _job_id):
+            return None
+
+        def list_all(self):
+            return [UnreadableJob()]
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(JobStore(), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
