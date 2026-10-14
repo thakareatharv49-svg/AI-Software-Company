@@ -1109,7 +1109,7 @@ class ProjectFactory:
         self, project: FactoryProject, exc: Exception
     ) -> None:
         """Best-effort terminalize a mission if an error escapes run_next cleanup."""
-        if project.status not in {"completed", "blocked", "cancelled"}:
+        if project.status not in {"blocked", "cancelled"}:
             project.status = "blocked"
             project.last_error = self._safe_error_detail(
                 f"Factory worker error: {type(exc).__name__}: {exc}"
