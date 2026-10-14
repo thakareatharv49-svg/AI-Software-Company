@@ -511,3 +511,36 @@ def test_restore_fails_closed_when_identity_index_contains_unreadable_record():
     assert factory.restore() == 0
     assert factory.queue == []
 
+
+def test_restore_fails_closed_when_durable_key_embeds_different_mission():
+    snapshot_job = make_job("Snapshot mission identity")
+    conflicting_job = make_job("Different embedded mission").model_copy(
+        update={"id": snapshot_job.id}
+    )
+    snapshot = {
+        "mission": snapshot_job.mission,
+        "plan": snapshot_job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class CorruptIdentityJobStore:
+        def get(self, _job_id):
+            # Simulate a lookup that cannot surface a corrupt indexed row.
+            return None
+
+        def list_all(self):
+            return [conflicting_job]
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(CorruptIdentityJobStore(), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
