@@ -268,3 +268,11 @@ The user expects autonomous milestone execution, including code review, CI repai
 - M76 validates durable key and embedded mission ID symmetrically, preventing a corrupt key-to-mission mapping from allowing stale snapshot resurrection when direct lookup misses it.
 - **M77 — IN PROGRESS**, branch `milestone-77-reject-duplicate-durable-identities`: reject ambiguous durable identity indexes containing duplicate durable keys or duplicate embedded mission IDs.
 - Regression test covers duplicate durable keys in the enumerated index. Continue to run all required workflows on the exact PR head and merge only when all pass; verify merge status and keep permanent product milestones M47–M49 open until true end-to-end acceptance.
+
+
+## 18. Verified handoff update — 2026-10-14 (M77 merged; M78 active)
+
+- **M77 — COMPLETE**, PR #362, merge commit `14af781ce99276ac347e9ce4675ffe9270a31936`. CI, secret scan, dependency audit, and both CodeQL language checks passed on exact head `85d2a86c88881279f15a36ae3c9dbc35bfcd4729`.
+- M77 rejects duplicate durable keys or embedded mission IDs in the enumerated index during snapshot reconciliation and orphan recovery.
+- **M78 — IN PROGRESS**, branch `milestone-78-preflight-durable-identity-index`: validate the entire enumerable durable identity index before any snapshot is restored, including when direct lookup appears to succeed. Fail closed if the index cannot be fully enumerated or is inconsistent.
+- New regression tests cover a duplicate identity hidden behind a successful direct lookup and an unavailable identity index. Validate the exact latest PR head through CI, secret scan, dependency audit, and both CodeQL checks before merging. Verify main after merge; keep M47–M49 open pending real end-to-end acceptance.

@@ -576,3 +576,61 @@ def test_restore_fails_closed_when_durable_identity_index_has_duplicate_keys():
 
     assert factory.restore() == 0
     assert factory.queue == []
+
+def test_restore_preflights_identity_index_even_when_direct_lookup_succeeds():
+    job = make_job("Snapshot with direct lookup hit")
+    duplicate_key = job.model_copy(
+        update={"mission": make_job("Different embedded mission").mission}
+    )
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class DuplicateIdentityJobStore(JobStore):
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def list_all(self):
+            return [job, duplicate_key]
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(DuplicateIdentityJobStore([job, duplicate_key]), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
+
+def test_restore_fails_closed_when_identity_preflight_cannot_enumerate():
+    job = make_job("Snapshot when identity enumeration fails")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class UnavailableIdentityIndexStore(JobStore):
+        def list_all(self):
+            raise OSError("identity index unavailable")
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(UnavailableIdentityIndexStore([job]), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
