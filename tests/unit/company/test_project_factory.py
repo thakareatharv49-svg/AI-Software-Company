@@ -1446,3 +1446,64 @@ def test_retry_persistence_failure_does_not_mutate_in_memory_queue() -> None:
     assert factory.queue == original_queue
     assert factory.queue[0] is stale_project
     assert factory.queue[1] is other_project
+
+
+@pytest.mark.asyncio
+async def test_enqueue_snapshot_failure_leaves_queue_unchanged_and_can_retry() -> None:
+    from src.company.mission_jobs import MissionJobStatus
+
+    class FlakySnapshotStore:
+        def __init__(self):
+            self.calls = 0
+
+        def save(self, project):
+            self.calls += 1
+            if self.calls == 1:
+                raise OSError("temporary snapshot store outage")
+
+        def load_pending(self):
+            return []
+
+    class JobStore:
+        def __init__(self):
+            self.jobs = {}
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, job):
+            self.jobs[job.id] = job
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    snapshots = FlakySnapshotStore()
+    jobs = JobStore()
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        store=snapshots,
+        job_store=jobs,
+    )
+    mission = CompanyMission(
+        name="Retry enqueue",
+        objective="Do not publish a mission until its snapshot is durable",
+    )
+
+    with pytest.raises(OSError, match="temporary snapshot store outage"):
+        factory.enqueue(mission)
+
+    assert factory.queue == []
+    assert jobs.jobs[mission.id].status == MissionJobStatus.QUEUED
+
+    project = factory.enqueue(mission)
+
+    assert factory.queue == [project]
+    assert project.mission.id == mission.id
+    assert jobs.jobs[mission.id].status == MissionJobStatus.QUEUED
+    assert snapshots.calls == 2
