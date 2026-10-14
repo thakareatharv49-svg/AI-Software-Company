@@ -1020,10 +1020,19 @@ Acceptance: snapshot recovery only proceeds when the durable key and embedded mi
 
 
 ## M77 — Reject Duplicate Durable Identity Mappings
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Require the enumerated durable mission index to have a one-to-one mapping between durable job IDs and embedded mission IDs.
 - Fail closed when duplicate durable keys or duplicate embedded mission IDs make recovery ambiguous.
 - Add regression coverage proving duplicate identity rows cannot make a stale snapshot eligible for recovery.
 
 Acceptance: snapshot recovery only proceeds when the enumerated durable identity index is readable, non-empty, consistent, and unambiguous.
+
+## M78 — Preflight Durable Identity Index Before Snapshot Recovery
+Status: IN PROGRESS
+
+- Validate the full durable identity index before recovering any pending project snapshot, even when direct lookup returns a plausible matching job.
+- Fail closed when enumeration fails, identities are unreadable/empty, mappings mismatch, or duplicate durable/embedded IDs exist.
+- Add regressions for duplicate identity rows hidden by a successful direct lookup and for index enumeration failure.
+
+Acceptance: no snapshot is restored based on a direct lookup until the configured enumerable durable identity index has passed a complete, consistent, one-to-one preflight.
