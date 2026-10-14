@@ -133,6 +133,17 @@ def test_restore_skips_running_snapshot_if_recovery_job_write_fails_but_continue
                 message="running",
             )
 
+        def list_all(self):
+            return [
+                MissionJob(
+                    id=interrupted.id,
+                    mission=interrupted,
+                    plan=build_mission_plan(interrupted),
+                    status=MissionJobStatus.RUNNING,
+                    message="running",
+                )
+            ]
+
         def save(self, _job):
             raise OSError("durable job store unavailable")
 
