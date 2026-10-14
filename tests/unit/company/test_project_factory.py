@@ -1567,3 +1567,48 @@ async def test_run_next_snapshot_failure_keeps_mission_queued_without_attempt() 
     assert project.attempts == 0
     assert factory._active_project is None
     assert factory._running is False
+
+
+def test_factory_restore_skips_job_store_failure_and_restores_later_missions() -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    bad = CompanyMission(name="Unreadable job", objective="Must not be resurrected")
+    good = CompanyMission(name="Readable job", objective="Restore independently")
+    bad_plan = build_mission_plan(bad)
+    good_plan = build_mission_plan(good)
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [
+                {"mission": bad, "plan": bad_plan, "status": "queued"},
+                {"mission": good, "plan": good_plan, "status": "queued"},
+            ]
+
+        def save(self, project):
+            pass
+
+    class JobStore:
+        def get(self, job_id):
+            if job_id == bad.id:
+                raise RuntimeError("temporary durable-store read failure")
+            return None
+
+        def save(self, job):
+            pass
+
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        store=SnapshotStore(),
+        job_store=JobStore(),
+    )
+
+    assert factory.restore() == 1
+    assert [project.mission.id for project in factory.queue] == [good.id]
+
