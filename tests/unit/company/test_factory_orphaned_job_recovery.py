@@ -558,6 +558,10 @@ def test_restore_fails_closed_when_durable_identity_index_has_duplicate_keys():
     }
 
     class DuplicateIdentityJobStore(JobStore):
+        def get(self, _job_id):
+            # Simulate an indexed lookup that misses duplicate/corrupt rows.
+            return None
+
         def list_all(self):
             return [job, duplicate]
 
