@@ -113,7 +113,6 @@ def test_restore_is_idempotent_for_durable_orphans():
     assert len(factory.queue) == 1
 
 
-
 def test_restore_skips_orphaned_job_with_mismatched_identity():
     job = make_job("Mismatched identity")
     corrupt_job = job.model_copy(update={"id": "different-mission-id"})
