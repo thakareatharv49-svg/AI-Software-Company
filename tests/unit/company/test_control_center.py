@@ -277,7 +277,7 @@ def test_dashboard_exposes_project_output_observability_panel() -> None:
     html = (static_dir / "index.html").read_text(encoding="utf-8")
 
     assert 'id = "project-outputs-card"' in dashboard
-    assert 'id = "project-outputs"' in dashboard
+    assert 'id="project-outputs"' in dashboard
     assert 'renderProjectOutputsPanel(id)' in dashboard
     assert '"/api/missions/" + encodeURIComponent(id) + "/outputs"' in dashboard
     assert 'output.output_type' in dashboard
