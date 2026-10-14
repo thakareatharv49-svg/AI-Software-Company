@@ -10,6 +10,9 @@ from src.company.models.contracts import CompanyMission
 from src.security.redaction import redact_sensitive_text
 
 
+MAX_MISSION_ATTEMPTS = 1_000_000
+
+
 class MissionJobStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
@@ -52,7 +55,7 @@ class MissionJob(BaseModel):
     @classmethod
     def normalize_attempts(cls, value: object) -> int:
         try:
-            return max(0, int(value))
+            return min(MAX_MISSION_ATTEMPTS, max(0, int(value)))
         except (TypeError, ValueError, OverflowError):
             return 0
 

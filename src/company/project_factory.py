@@ -15,6 +15,7 @@ from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
 from src.company.mission_controller.planner import build_mission_plan
 from src.company.mission_jobs import (
+    MAX_MISSION_ATTEMPTS,
     MissionJob,
     MissionJobStatus,
     recover_running_job,
@@ -28,6 +29,14 @@ from src.security.redaction import redact_sensitive_text, redact_sensitive_value
 
 if TYPE_CHECKING:
     from src.company.autonomous_factory_runner import FactoryAutonomousRunner
+
+
+def _bounded_job_attempts(value: object) -> int:
+    """Bound attempts even when a legacy object bypassed Pydantic validation."""
+    try:
+        return min(MAX_MISSION_ATTEMPTS, max(0, int(value)))
+    except (TypeError, ValueError, OverflowError):
+        return 0
 
 
 class FactoryStore(Protocol):
@@ -220,7 +229,7 @@ class ProjectFactory:
                         "Skipping pending snapshot with mismatched durable mission identity"
                     )
                     continue
-                job = job.model_copy(update={"status": job_status})
+                job = job.model_copy(update={"status": job_status, "attempts": _bounded_job_attempts(job.attempts)})
                 safe_job_mission = self._safe_mission(job.mission)
                 safe_job_plan = self._safe_plan(job.plan)
                 if (
@@ -402,7 +411,7 @@ class ProjectFactory:
                         MissionJobStatus.RUNNING,
                     }:
                         continue
-                    job = job.model_copy(update={"status": status})
+                    job = job.model_copy(update={"status": status, "attempts": _bounded_job_attempts(job.attempts)})
                     safe_mission = self._safe_mission(job.mission)
                     safe_plan = self._safe_plan(job.plan)
                     job = job.model_copy(
