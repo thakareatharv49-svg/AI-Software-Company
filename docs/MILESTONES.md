@@ -998,7 +998,7 @@ Acceptance: a legacy snapshot is never scheduled when the configured durable job
 
 
 ## M75 — Fail Closed on Malformed Durable Identity Index
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Treat unreadable durable rows as an unverifiable identity index rather than silently ignoring them.
 - Reject empty durable or embedded mission identities during snapshot reconciliation.
@@ -1006,3 +1006,14 @@ Status: IN PROGRESS
 - Add regression coverage for an enumerated durable row with no readable mission identity.
 
 Acceptance: snapshot recovery proceeds only when every enumerated durable row has a readable, non-empty durable ID and embedded mission ID; malformed identity data cannot be mistaken for proof that a snapshot is orphaned.
+
+
+## M76 — Bidirectional Durable Identity Reconciliation
+Status: IN PROGRESS
+
+- Detect mismatches in both directions when reconciling a snapshot against enumerated durable jobs.
+- Reject a durable row that embeds the snapshot mission under a different durable key.
+- Also reject a durable row occupying the snapshot's key while embedding a different mission, even if direct lookup incorrectly returns no row.
+- Add regression coverage for a corrupt key-to-mission mapping that would otherwise allow stale snapshot resurrection.
+
+Acceptance: snapshot recovery only proceeds when the durable key and embedded mission identity agree in both directions across the enumerated index; either mismatch blocks recovery of the affected snapshot.
