@@ -39,6 +39,14 @@ def _bounded_job_attempts(value: object) -> int:
         return 0
 
 
+def _durable_identity_text(value: object) -> str | None:
+    """Accept only explicit non-empty string IDs from durable storage."""
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
 class FactoryStore(Protocol):
     def save(self, project: FactoryProject) -> None: ...
     def load_pending(self) -> list[dict]: ...
@@ -117,8 +125,8 @@ class ProjectFactory:
                     seen_durable_ids: set[str] = set()
                     seen_embedded_ids: set[str] = set()
                     for candidate in indexed_jobs:
-                        durable_id = str(candidate.id).strip()
-                        embedded_id = str(candidate.mission.id).strip()
+                        durable_id = _durable_identity_text(candidate.id)
+                        embedded_id = _durable_identity_text(candidate.mission.id)
                         if (
                             not durable_id
                             or not embedded_id
@@ -262,8 +270,8 @@ class ProjectFactory:
                 seen_embedded_ids: set[str] = set()
                 for candidate in conflicting_jobs:
                     try:
-                        embedded_id = str(candidate.mission.id).strip()
-                        durable_id = str(candidate.id).strip()
+                        embedded_id = _durable_identity_text(candidate.mission.id)
+                        durable_id = _durable_identity_text(candidate.id)
                     except (AttributeError, TypeError, ValueError):
                         import logging
 

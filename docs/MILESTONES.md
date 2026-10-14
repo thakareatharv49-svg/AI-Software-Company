@@ -1029,10 +1029,19 @@ Status: COMPLETE
 Acceptance: snapshot recovery only proceeds when the enumerated durable identity index is readable, non-empty, consistent, and unambiguous.
 
 ## M78 — Preflight Durable Identity Index Before Snapshot Recovery
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Validate the full durable identity index before recovering any pending project snapshot, even when direct lookup returns a plausible matching job.
 - Fail closed when enumeration fails, identities are unreadable/empty, mappings mismatch, or duplicate durable/embedded IDs exist.
 - Add regressions for duplicate identity rows hidden by a successful direct lookup and for index enumeration failure.
 
 Acceptance: no snapshot is restored based on a direct lookup until the configured enumerable durable identity index has passed a complete, consistent, one-to-one preflight.
+
+## M79 — Require Explicit String Durable Identities
+Status: IN PROGRESS
+
+- Accept durable job IDs and embedded mission IDs only when they are explicit, non-empty strings.
+- Reject null, numeric, blank, or otherwise non-string identity values during index preflight and snapshot reconciliation.
+- Add regression coverage proving malformed identity types cannot make a pending snapshot recoverable.
+
+Acceptance: durable recovery fails closed for non-string or empty identity fields rather than coercing arbitrary values into apparently valid identifiers.

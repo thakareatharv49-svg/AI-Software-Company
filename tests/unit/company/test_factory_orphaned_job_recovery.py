@@ -634,3 +634,34 @@ def test_restore_fails_closed_when_identity_preflight_cannot_enumerate():
     assert factory.restore() == 0
     assert factory.queue == []
 
+def test_restore_rejects_non_string_durable_identity_values():
+    job = make_job("Non-string durable identity")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    for corrupt_job in (
+        job.model_copy(update={"id": None}),
+        job.model_copy(update={"mission": job.mission.model_copy(update={"id": None})}),
+        job.model_copy(update={"id": 123}),
+    ):
+        class MalformedIdentityStore:
+            def get(self, _job_id):
+                return job
+
+            def list_all(self, item=corrupt_job):
+                return [item]
+
+        factory = make_factory(MalformedIdentityStore(), SnapshotStore())
+        assert factory.restore() == 0
+        assert factory.queue == []
