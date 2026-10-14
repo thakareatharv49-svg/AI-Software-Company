@@ -111,3 +111,22 @@ def test_restore_is_idempotent_for_durable_orphans():
     assert factory.restore() == 1
     assert factory.restore() == 0
     assert len(factory.queue) == 1
+
+
+
+def test_restore_skips_orphaned_job_with_mismatched_identity():
+    job = make_job("Mismatched identity")
+    corrupt_job = job.model_copy(update={"id": "different-mission-id"})
+    factory = make_factory(JobStore([corrupt_job]))
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
+
+def test_restore_skips_orphaned_job_with_unknown_lifecycle_status():
+    job = make_job("Unknown lifecycle")
+    corrupt_job = job.model_copy(update={"status": "waiting_for_magic"})
+    factory = make_factory(JobStore([corrupt_job]))
+
+    assert factory.restore() == 0
+    assert factory.queue == []
