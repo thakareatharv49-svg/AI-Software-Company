@@ -665,3 +665,32 @@ def test_restore_rejects_non_string_durable_identity_values():
         factory = make_factory(MalformedIdentityStore(), SnapshotStore())
         assert factory.restore() == 0
         assert factory.queue == []
+
+
+def test_restore_rejects_non_string_identity_in_direct_job_lookup():
+    job = make_job("Strict direct lookup identity")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+    corrupt_lookup = job.model_copy(update={"id": 123})
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    class DivergentJobStore(JobStore):
+        # The enumerated index is valid, but a corrupted direct lookup result
+        # must independently fail closed instead of coercing an integer ID.
+        def get(self, _job_id):
+            return corrupt_lookup
+
+    factory = make_factory(DivergentJobStore([job]), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
