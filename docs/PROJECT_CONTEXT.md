@@ -281,3 +281,11 @@ The user expects autonomous milestone execution, including code review, CI repai
 
 - M78 merged and verified on `main`: merge commit `259cc80a99a25a6f1ad583361faabaa4fbb89a24`. All six checks on the exact PR head passed: quality CI, secret-history scan, dependency audit, Python CodeQL, and JavaScript/TypeScript CodeQL (the six check runs include the separate security/code scanning entries).
 - M79 is in progress on branch `milestone-79-strict-durable-identity-types`. It introduces strict normalization for durable identity values and regression tests for null/numeric identity corruption. Do not mark M79 complete or merge until all required checks pass on its exact latest head.
+
+
+## Latest engineering handoff — 2026-10-14 UTC (M79 merged; M80 active)
+
+- **M79 — COMPLETE**, PR #364, merge commit `3f15a39b9cfae71caed83d6933c9965284fceb3a`. CI, secret scan, dependency audit, and Python plus JavaScript/TypeScript CodeQL passed on exact head `bc88e43c99b8b5a98cf3b7eff4b9ea97b5514f87` before merge.
+- M79 adds strict non-empty string identity parsing for the enumerable durable identity index and reconciliation scans, preventing null/numeric IDs from being coerced into trusted identifiers.
+- **M80 — IN PROGRESS**, branch `milestone-80-strict-snapshot-job-identities`: apply that same strict identity parsing to the direct durable-job lookup used during snapshot recovery. Regression coverage makes the enumerated index valid while the direct lookup returns a corrupted numeric ID.
+- Next: validate every required workflow on the exact M80 PR head, repair any failures, merge only after all required checks pass, verify main, and keep the roadmap and handoff current. Permanent product milestones M47–M49 remain open pending end-to-end acceptance.
