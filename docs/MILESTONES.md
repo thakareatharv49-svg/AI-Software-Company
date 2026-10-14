@@ -955,10 +955,21 @@ Acceptance: once recovery accepts a queued durable job, its persisted attempt co
 
 
 ## M71 — Persist Sanitized Orphan Recovery State
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Persist sanitized mission and plan content for queued orphan jobs, even when their attempt counters were already valid.
 - Keep recovery fail-closed when changed durable state cannot be saved.
 - Add regression tests for credential redaction persistence and failed durable writes.
 
 Acceptance: a recovered queued orphan cannot retain unsafe legacy mission or plan text in durable storage, and is not scheduled if required normalization cannot be persisted.
+
+
+## M72 — Fail-Closed Sanitization of Restored Snapshots
+Status: IN PROGRESS
+
+- Track when legacy project snapshots require sensitive-text redaction or counter normalization.
+- Do not enqueue a repaired snapshot when its required durable write fails.
+- Reserve mission IDs only after recovery succeeds, so an unsaved unsafe duplicate cannot shadow a later valid snapshot.
+- Add regression coverage for credential-bearing snapshots and failed snapshot writes.
+
+Acceptance: recovery never schedules a snapshot whose required security/counter repair could not be persisted, while a failed unsafe duplicate does not suppress a later valid record.
