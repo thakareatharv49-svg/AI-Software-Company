@@ -1244,6 +1244,11 @@ class ProjectFactory:
                 project_id=getattr(pipeline_project, "id", f"project:{project.mission.id}"),
                 name=project.mission.name,
                 status=status,
+                output_type=(
+                    "autonomous_project"
+                    if pipeline_result is not None
+                    else "factory_project"
+                ),
                 repository=getattr(pipeline_project, "repository", None),
                 product_url=(
                     f"/product/{project.mission.id}"
