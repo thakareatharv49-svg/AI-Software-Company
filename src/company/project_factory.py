@@ -225,6 +225,8 @@ class ProjectFactory:
                     # durable identity reconciliation is unavailable.
                     continue
                 identity_index_valid = True
+                seen_durable_ids: set[str] = set()
+                seen_embedded_ids: set[str] = set()
                 for candidate in conflicting_jobs:
                     try:
                         embedded_id = str(candidate.mission.id).strip()
@@ -245,6 +247,22 @@ class ProjectFactory:
                         )
                         identity_index_valid = False
                         break
+                    # Recovery requires a one-to-one identity mapping. Duplicate
+                    # keys or embedded mission IDs make the durable index ambiguous,
+                    # even if one duplicate happens not to match this snapshot.
+                    if (
+                        durable_id in seen_durable_ids
+                        or embedded_id in seen_embedded_ids
+                    ):
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Durable mission identity index contains duplicate identities; skipping pending snapshot"
+                        )
+                        identity_index_valid = False
+                        break
+                    seen_durable_ids.add(durable_id)
+                    seen_embedded_ids.add(embedded_id)
                     # Either side of the identity pair can be corrupt:
                     # a row may claim this embedded mission under another key,
                     # or occupy this key while embedding a different mission.
