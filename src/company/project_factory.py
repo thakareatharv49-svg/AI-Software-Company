@@ -269,14 +269,6 @@ class ProjectFactory:
                     if interrupted_detail
                     else None
                 )
-                try:
-                    self._save(project)
-                except Exception:
-                    import logging
-
-                    logging.getLogger(__name__).error(
-                        "Unable to persist re-queued interrupted mission during restore"
-                    )
             try:
                 self._save(project)
             except Exception:
