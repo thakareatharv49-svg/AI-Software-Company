@@ -1009,7 +1009,7 @@ Acceptance: snapshot recovery proceeds only when every enumerated durable row ha
 
 
 ## M76 — Bidirectional Durable Identity Reconciliation
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Detect mismatches in both directions when reconciling a snapshot against enumerated durable jobs.
 - Reject a durable row that embeds the snapshot mission under a different durable key.
@@ -1017,3 +1017,13 @@ Status: IN PROGRESS
 - Add regression coverage for a corrupt key-to-mission mapping that would otherwise allow stale snapshot resurrection.
 
 Acceptance: snapshot recovery only proceeds when the durable key and embedded mission identity agree in both directions across the enumerated index; either mismatch blocks recovery of the affected snapshot.
+
+
+## M77 — Reject Duplicate Durable Identity Mappings
+Status: IN PROGRESS
+
+- Require the enumerated durable mission index to have a one-to-one mapping between durable job IDs and embedded mission IDs.
+- Fail closed when duplicate durable keys or duplicate embedded mission IDs make recovery ambiguous.
+- Add regression coverage proving duplicate identity rows cannot make a stale snapshot eligible for recovery.
+
+Acceptance: snapshot recovery only proceeds when the enumerated durable identity index is readable, non-empty, consistent, and unambiguous.
