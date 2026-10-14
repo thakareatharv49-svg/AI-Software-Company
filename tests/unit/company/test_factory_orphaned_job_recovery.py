@@ -719,8 +719,8 @@ def test_restore_rejects_non_string_snapshot_mission_identity():
         }
 
         class SnapshotStore:
-            def load_pending(self):
-                return [snapshot]
+            def load_pending(self, item=snapshot):
+                return [item]
 
             def save(self, _project):
                 pass
