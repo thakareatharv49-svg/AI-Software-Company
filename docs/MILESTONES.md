@@ -973,3 +973,14 @@ Status: IN PROGRESS
 - Add regression coverage for credential-bearing snapshots and failed snapshot writes.
 
 Acceptance: recovery never schedules a snapshot whose required security/counter repair could not be persisted, while a failed unsafe duplicate does not suppress a later valid record.
+
+
+## M73 — Fail-Closed Durable Identity Reconciliation
+Status: IN PROGRESS
+
+- Treat an unavailable durable-job identity scan as an inability to verify snapshot identity, not as an empty durable index.
+- Skip snapshot recovery when the durable store's full identity scan fails, avoiding unsafe resurrection from stale snapshots.
+- Add regression coverage for temporary durable-index failures.
+- Keep the recovery path resilient: unrelated valid recovery items continue to be processed independently.
+
+Acceptance: when a durable job store exists but identity reconciliation fails, snapshots are not treated as orphaned standalone truth; recovery fails closed for the affected snapshot and continues safely.
