@@ -78,20 +78,21 @@ class ProjectFactory:
     _last_autonomous_result: object | None = field(default=None, init=False, repr=False)
 
     def restore(self) -> int:
-        if self.store is None:
+        if self.store is None and self.job_store is None:
             return 0
-        # Materialize the pending snapshots inside a recovery boundary. A
-        # temporary store outage must not crash startup or partially mutate
-        # the in-memory queue.
-        try:
-            pending = list(self.store.load_pending())
-        except Exception:
-            import logging
+        # Materialize project snapshots inside a recovery boundary. Durable
+        # mission jobs are reconciled separately below, so a project-store
+        # outage does not hide recoverable jobs from the queue.
+        pending: list[dict] = []
+        if self.store is not None:
+            try:
+                pending = list(self.store.load_pending())
+            except Exception:
+                import logging
 
-            logging.getLogger(__name__).error(
-                "Unable to load pending factory snapshots; restore deferred"
-            )
-            return 0
+                logging.getLogger(__name__).error(
+                    "Unable to load pending factory snapshots; trying durable job recovery"
+                )
         restored = 0
         known_ids = {item.mission.id for item in self.queue}
         for item in pending:
@@ -279,6 +280,74 @@ class ProjectFactory:
                 )
             self.queue.append(project)
             restored += 1
+
+        # The durable job table is authoritative for lifecycle state, but a
+        # crash can occur after writing a job and before writing its project
+        # snapshot. Recover those orphaned jobs so they do not disappear on
+        # restart. This is optional for custom stores that only implement get.
+        list_all = getattr(self.job_store, "list_all", None)
+        if callable(list_all):
+            try:
+                durable_jobs = list(list_all())
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).error(
+                    "Unable to list durable mission jobs during factory restore"
+                )
+                durable_jobs = []
+            for job in durable_jobs:
+                try:
+                    mission_id = job.id
+                    if mission_id in known_ids:
+                        continue
+                    if job.status in {
+                        MissionJobStatus.COMPLETED,
+                        MissionJobStatus.FAILED,
+                        MissionJobStatus.BLOCKED,
+                        MissionJobStatus.CANCELLED,
+                    }:
+                        continue
+                    safe_mission = self._safe_mission(job.mission)
+                    safe_plan = self._safe_plan(job.plan)
+                    job = job.model_copy(
+                        update={"mission": safe_mission, "plan": safe_plan}
+                    )
+                    if job.status == MissionJobStatus.RUNNING:
+                        job = recover_running_job(job)
+                        try:
+                            self._save_job(job)
+                        except Exception:
+                            import logging
+
+                            logging.getLogger(__name__).error(
+                                "Unable to persist orphaned running mission recovery"
+                            )
+                            continue
+                    project = FactoryProject(
+                        mission=job.mission,
+                        plan=job.plan,
+                        status="queued",
+                        attempts=max(0, int(job.attempts)),
+                    )
+                    try:
+                        self._save(project)
+                    except Exception:
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Unable to persist orphaned durable mission snapshot; keeping it in memory"
+                        )
+                    self.queue.append(project)
+                    known_ids.add(mission_id)
+                    restored += 1
+                except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
+                    import logging
+
+                    logging.getLogger(__name__).error(
+                        "Skipping malformed orphaned durable mission job"
+                    )
+                    continue
         return restored
 
     @staticmethod
