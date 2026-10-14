@@ -877,7 +877,7 @@ Status: COMPLETE
 Acceptance: both recovery paths enforce the same durable identity and lifecycle invariants; malformed durable state cannot be resurrected by an older project snapshot.
 
 ## M66 — Snapshot Lifecycle Eligibility & Durable Precedence
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Restore a project snapshot without a durable job only when its status is explicitly queued or interrupted-running.
 - Reject terminal and unknown snapshot lifecycle values instead of adding them to the active queue.
@@ -885,6 +885,17 @@ Status: IN PROGRESS
 - Add regression tests for terminal/unknown snapshots and durable-versus-snapshot status conflicts.
 
 Acceptance: restored queue entries always have an eligible lifecycle state, and valid durable lifecycle state wins over stale project snapshot metadata.
+
+
+## M67 — Recovery Snapshot Deduplication Safety
+Status: IN PROGRESS
+
+- Reserve snapshot mission IDs only after snapshot data and durable lifecycle metadata pass validation.
+- Ensure a malformed earlier duplicate cannot shadow a later valid snapshot for the same mission.
+- Keep duplicate prevention in place once a snapshot has passed validation, including when persistence later fails.
+- Add a regression test for malformed-then-valid duplicate snapshots.
+
+Acceptance: invalid snapshot entries cannot suppress recoverable valid work, while each mission is restored at most once per recovery pass.
 
 ---
 

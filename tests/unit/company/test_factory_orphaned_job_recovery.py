@@ -231,3 +231,32 @@ def test_restore_uses_queued_durable_lifecycle_over_stale_snapshot_status():
     assert factory.restore() == 1
     assert len(factory.queue) == 1
     assert factory.queue[0].status == "queued"
+
+def test_restore_malformed_duplicate_snapshot_does_not_shadow_valid_snapshot():
+    job = make_job("Valid snapshot after malformed duplicate")
+    malformed_snapshot = {
+        "mission": job.mission,
+        "plan": None,
+        "status": "queued",
+        "attempts": 0,
+    }
+    valid_snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 2,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [malformed_snapshot, valid_snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(None, SnapshotStore())
+
+    assert factory.restore() == 1
+    assert len(factory.queue) == 1
+    assert factory.queue[0].mission.id == job.id
+    assert factory.queue[0].attempts == 2

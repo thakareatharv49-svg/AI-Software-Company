@@ -112,10 +112,6 @@ class ProjectFactory:
                     except (TypeError, ValueError, OverflowError):
                         counter = 0
                     setattr(project, counter_name, counter)
-                # Claim the mission ID before any recovery writes. If a later
-                # write fails, a duplicate legacy snapshot must not enqueue it
-                # a second time during this same restore pass.
-                known_ids.add(project.mission.id)
             except (AttributeError, KeyError, TypeError, ValueError):
                 import logging
 
@@ -249,6 +245,10 @@ class ProjectFactory:
                 continue
             if job is not None and job.status == MissionJobStatus.QUEUED:
                 project.status = "queued"
+            # Reserve an ID only after the snapshot and its durable lifecycle
+            # have passed validation. A malformed earlier duplicate must not
+            # shadow a later valid snapshot for the same mission.
+            known_ids.add(project.mission.id)
             if job is not None and job.status in {
                 MissionJobStatus.COMPLETED,
                 MissionJobStatus.FAILED,
