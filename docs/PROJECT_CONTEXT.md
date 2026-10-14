@@ -1,6 +1,6 @@
 # Persistent Project Context — AI Software Company
 
-> Last reviewed: 2026-10-13 (UTC). This document is the handoff record for future engineering sessions. Read it before planning or changing the project. Keep it updated when architecture, priorities, milestone status, or working agreements change.
+> Last reviewed: 2026-10-14 (UTC). This document is the handoff record for future engineering sessions. Read it before planning or changing the project. Keep it updated when architecture, priorities, milestone status, or working agreements change.
 
 ## 1. Source of truth and working agreement
 
@@ -166,3 +166,36 @@ These are user-reported symptoms and open investigation items, not claims that t
 4. State the current objective briefly, implement one milestone, add regression tests, and open a PR.
 5. Wait for the four required checks on the exact head SHA; inspect/fix any failure.
 6. Merge only after all four pass, verify merged status, and update this context/roadmap when the durable project state materially changes.
+
+
+---
+
+## 11. Verified handoff update — 2026-10-14 (supersedes older hardening status above)
+
+This section is the newest verified state. If older sections above conflict with this update or the live GitHub PR state, use the newest merged commits, live PR state, and current `docs/MILESTONES.md`.
+
+### Latest factory-recovery hardening milestones
+
+- **M67 — COMPLETE**, PR #352, merge commit `b1b3486c81ff7316a2b3c338bf1f086f794eb583`: malformed duplicate recovery snapshots cannot shadow later valid snapshots.
+- **M68 — COMPLETE**, PR #353, merge commit `67812bfd74b4669906f15dc248c8b942bc5f1429`: restored snapshot counters are bounded and non-finite values normalize safely.
+- **M69 — COMPLETE**, PR #354, merge commit `4cc42ebd1956a9b7ea1ba61db27ffc1397fba425`: durable mission-job attempt counters are bounded and normalized during validation/recovery.
+- **M70 — COMPLETE**, PR #355, merge commit `5adcffdb599044ddef27b22474a326d35970646d`: normalized attempt counters are persisted for snapshot-backed and orphaned queued jobs; recovery skips affected items if required writes fail. All four required workflows passed on PR head `e2a98adee9a37a8c35fafdb97e497451ef6b54ec`.
+- **M71 — IN PROGRESS**, PR #356: `Persist Sanitized Orphan Recovery State`. It persists sanitized mission/plan data for queued orphan jobs even when counters were already valid, and fails closed when required durable normalization cannot be saved. Current PR head before this context update was `7106e79c3b8fc439da3b0011b5585ace6df446b8`; all four required workflows passed on that exact head. Adding this context update changes the PR head, so re-check workflows on the new head before merging.
+
+### M71 implementation and tests
+
+- Code: `src/company/project_factory.py` — queued orphan recovery detects changes to sanitized mission/plan state as well as attempt counters, persists the normalized durable job, and skips queueing if that write fails.
+- Tests: `tests/unit/company/test_factory_orphaned_job_recovery.py` — verifies legacy credential-bearing mission text is redacted in durable storage and an unsaved sanitized job is not queued.
+- Roadmap: `docs/MILESTONES.md` — M70 marked COMPLETE and M71 marked IN PROGRESS in PR #356. Keep the main roadmap and this context aligned after merge.
+
+### Immediate next actions
+
+1. Verify PR #356's current head and all four required workflows after any new commit.
+2. Inspect failed steps and fix failures on the same PR; do not merge with pending/failed required checks.
+3. Merge PR #356 by squash only after CI, secret scan, dependency audit, and both CodeQL languages pass on its exact head; verify `merged: true`.
+4. Update this context and roadmap to reflect the verified merge, then continue with M72 when requested.
+5. Continue to treat this recovery-hardening sequence as distinct from permanent product milestones M47–M49. Those remain open until their actual end-to-end acceptance criteria pass.
+
+### Working agreement reaffirmed
+
+The user explicitly requires the assistant to do all PR checks, failure fixes, and merges. Never ask the user to merge. Be fast by batching status checks, but never report a merge or test success that GitHub has not verified.
