@@ -455,7 +455,6 @@ class ProjectFactory:
             raise ValueError(
                 f"Mission '{mission_id}' cannot be retried from '{job.status.value}'"
             )
-        self.queue = [item for item in self.queue if item.mission.id != mission_id]
         # Capture the concrete failed-stage diagnosis before resetting the plan.
         # Otherwise a manual retry silently loses the feedback used by automatic
         # retries and can repeat the same failed generation attempt.
@@ -491,8 +490,11 @@ class ProjectFactory:
             attempts=queued.attempts,
             retry_feedback=(self._safe_error_detail(retry_feedback)[:2000] if retry_feedback else None),
         )
-        self.queue.append(project)
         self._save(project)
+        # Mutate the in-memory queue only after durable job and project writes
+        # succeed. A transient store failure must not silently drop a queued copy.
+        self.queue = [item for item in self.queue if item.mission.id != mission_id]
+        self.queue.append(project)
         self._audit(mission_id, "MISSION_REQUEUED", queued.message, queued.status.value)
         return queued
 
