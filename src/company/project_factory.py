@@ -104,6 +104,39 @@ class ProjectFactory:
                 )
         restored = 0
         known_ids = {item.mission.id for item in self.queue}
+
+        # Validate the durable identity index before recovering *any* snapshot.
+        # Per-snapshot reconciliation alone is insufficient: a direct lookup can
+        # return a plausible row while enumeration reveals a duplicate/corrupt
+        # mapping elsewhere in the index.
+        if self.job_store is not None:
+            list_all_jobs = getattr(self.job_store, "list_all", None)
+            if callable(list_all_jobs):
+                try:
+                    indexed_jobs = list(list_all_jobs())
+                    seen_durable_ids: set[str] = set()
+                    seen_embedded_ids: set[str] = set()
+                    for candidate in indexed_jobs:
+                        durable_id = str(candidate.id).strip()
+                        embedded_id = str(candidate.mission.id).strip()
+                        if (
+                            not durable_id
+                            or not embedded_id
+                            or durable_id != embedded_id
+                            or durable_id in seen_durable_ids
+                            or embedded_id in seen_embedded_ids
+                        ):
+                            raise ValueError("ambiguous durable mission identity index")
+                        seen_durable_ids.add(durable_id)
+                        seen_embedded_ids.add(embedded_id)
+                except Exception:
+                    import logging
+
+                    logging.getLogger(__name__).error(
+                        "Durable mission identity preflight failed; skipping factory snapshot recovery"
+                    )
+                    return 0
+
         for item in pending:
             # Treat each snapshot as an independent recovery unit. A malformed
             # entry from a custom/legacy store must not prevent later valid
