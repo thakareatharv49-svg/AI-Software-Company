@@ -73,7 +73,7 @@ def test_readiness_api_is_exposed() -> None:
         ("database_url", "   ", "database_configured"),
         ("ollama_base_url", "", "ai_runtime_configured"),
         ("ollama_model", "", "ai_runtime_configured"),
-        ("github_allow_writes", True, "github_writes_explicit"),
+        ("github_token", "", "github_writes_explicit"),
         ("environment", "staging", "production_environment"),
         ("google_oauth_client_id", "partial-client", "oauth_provider_configured"),
         ("owner_email", "  ", "owner_email_configured"),
