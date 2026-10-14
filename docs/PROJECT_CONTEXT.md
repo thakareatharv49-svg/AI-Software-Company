@@ -232,3 +232,17 @@ The user explicitly requires the assistant to do all PR checks, failure fixes, a
 - **M74 — IN PROGRESS**, branch `milestone-74-fail-closed-without-identity-enumeration`: the same invariant must hold when a durable store has no `list_all()` capability. A direct lookup returning no row cannot establish absence of conflicting embedded mission IDs without enumeration.
 - Regression test uses a lookup-only durable store and asserts the stale snapshot is not queued.
 - Next: validate M74 on its exact latest PR head, repair any failed workflow, merge only after all required checks pass, verify the merge, and keep the roadmap/handoff synchronized. Do not conflate this reliability-hardening sequence with permanent product milestones M47–M49.
+
+
+---
+
+## 15. Verified handoff update — 2026-10-14 (M74 merged; M75 active)
+
+- **M74 — COMPLETE**, PR #359, merge commit `e38ee143d3a7b0fd919e2d526571fdd58bdc29ba`. User confirmed merge at 2026-10-14T20:32:44Z. M74 prevents stale snapshot recovery when a durable store does not implement full identity enumeration.
+- **M75 — IN PROGRESS**, branch `milestone-75-fail-closed-on-malformed-identity-index`: fail closed when an enumerated durable identity index contains unreadable or empty identities. Ignoring malformed rows could let an old snapshot be treated as orphaned without proving the durable index is conflict-free.
+- Regression coverage verifies a malformed durable row causes the affected snapshot to be skipped.
+- Next: run the full CI, secret scan, dependency audit, and both CodeQL language checks on the exact latest PR head; fix any failures, merge only when all required checks pass, verify merge, and synchronize this handoff. Keep permanent product milestones M47–M49 open until their real end-to-end acceptance criteria pass.
+
+### Working agreement
+
+The user expects autonomous milestone execution, including code review, CI repair, required security checks, merging, and persistent roadmap updates. Never ask the user to merge. Work on one implementation milestone at a time and verify every merge.
