@@ -143,7 +143,20 @@ class ProjectFactory:
                     "Skipping malformed pending factory snapshot"
                 )
                 continue
-            job = self._load_job(project.mission.id)
+            # Durable job stores are an independent recovery dependency. A
+            # single corrupt/unavailable record must not abort restoration of
+            # unrelated pending missions. Fail closed for this snapshot: if its
+            # lifecycle cannot be verified, do not resurrect it from the older
+            # project snapshot.
+            try:
+                job = self._load_job(project.mission.id)
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).error(
+                    "Unable to load durable mission job; skipping pending factory snapshot"
+                )
+                continue
             if job is not None:
                 safe_job_mission = self._safe_mission(job.mission)
                 safe_job_plan = self._safe_plan(job.plan)
