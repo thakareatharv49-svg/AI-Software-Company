@@ -985,7 +985,6 @@ async def test_factory_contains_unexpected_worker_error_and_continues_queue() ->
             if (
                 self.should_fail
                 and mission_id == self.failed_mission_id
-                and project.status == "running"
                 and project.status == "completed"
             ):
                 self.should_fail = False
