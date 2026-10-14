@@ -245,7 +245,12 @@ class ProjectFactory:
                         )
                         identity_index_valid = False
                         break
-                    if embedded_id == project.mission.id and durable_id != project.mission.id:
+                    # Either side of the identity pair can be corrupt:
+                    # a row may claim this embedded mission under another key,
+                    # or occupy this key while embedding a different mission.
+                    if (embedded_id == project.mission.id) != (
+                        durable_id == project.mission.id
+                    ):
                         import logging
 
                         logging.getLogger(__name__).error(
