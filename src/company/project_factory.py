@@ -203,19 +203,28 @@ class ProjectFactory:
             # legacy snapshot as a standalone source of truth.
             if job is None and self.job_store is not None:
                 list_all_jobs = getattr(self.job_store, "list_all", None)
-                if callable(list_all_jobs):
-                    try:
-                        conflicting_jobs = list(list_all_jobs())
-                    except Exception:
-                        import logging
+                if not callable(list_all_jobs):
+                    import logging
 
-                        logging.getLogger(__name__).error(
-                            "Unable to verify durable mission identity; skipping pending factory snapshot"
-                        )
-                        # The snapshot cannot be trusted as standalone state when
-                        # durable identity reconciliation is unavailable.
-                        continue
-                    for candidate in conflicting_jobs:
+                    logging.getLogger(__name__).error(
+                        "Durable job store cannot enumerate identities; skipping pending factory snapshot"
+                    )
+                    # A store that cannot enumerate identities is just as
+                    # unverifiable as a failed scan: do not trust stale snapshot
+                    # state as standalone truth.
+                    continue
+                try:
+                    conflicting_jobs = list(list_all_jobs())
+                except Exception:
+                    import logging
+
+                    logging.getLogger(__name__).error(
+                        "Unable to verify durable mission identity; skipping pending factory snapshot"
+                    )
+                    # The snapshot cannot be trusted as standalone state when
+                    # durable identity reconciliation is unavailable.
+                    continue
+                for candidate in conflicting_jobs:
                         try:
                             embedded_id = str(candidate.mission.id).strip()
                             durable_id = str(candidate.id).strip()

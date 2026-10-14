@@ -1598,6 +1598,9 @@ def test_factory_restore_skips_job_store_failure_and_restores_later_missions() -
                 raise RuntimeError("temporary durable-store read failure")
             return None
 
+        def list_all(self):
+            return []
+
         def save(self, job):
             pass
 
