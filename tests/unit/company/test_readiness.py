@@ -1,3 +1,5 @@
+import pytest
+
 from src.company.readiness import build_readiness_report
 from src.config.settings import settings
 
