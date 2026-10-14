@@ -423,17 +423,25 @@ class ProjectFactory:
                     )
                     safe_mission = self._safe_mission(job.mission)
                     safe_plan = self._safe_plan(job.plan)
+                    recovery_state_changed = (
+                        attempts_changed
+                        or safe_mission.model_dump() != job.mission.model_dump()
+                        or safe_plan.model_dump() != job.plan.model_dump()
+                    )
                     job = job.model_copy(
                         update={"mission": safe_mission, "plan": safe_plan}
                     )
-                    if job.status == MissionJobStatus.QUEUED and attempts_changed:
+                    if (
+                        job.status == MissionJobStatus.QUEUED
+                        and recovery_state_changed
+                    ):
                         try:
                             self._save_job(job)
                         except Exception:
                             import logging
 
                             logging.getLogger(__name__).error(
-                                "Unable to persist normalized queued mission attempts"
+                                "Unable to persist normalized queued mission recovery state"
                             )
                             continue
                     if job.status == MissionJobStatus.RUNNING:

@@ -363,3 +363,36 @@ def test_restore_persists_normalized_attempts_for_snapshot_backed_job():
     assert factory.restore() == 1
     assert factory.queue[0].attempts == 2
     assert store.jobs[job.id].attempts == 0
+
+
+
+def test_restore_persists_sanitized_mission_for_queued_orphan_job():
+    job = make_job("Persist sanitized orphan mission")
+    unsafe_mission = job.mission.model_copy(
+        update={"objective": "Build safely with token=sk-proj-123456789012"}
+    )
+    corrupt_job = job.model_copy(update={"mission": unsafe_mission})
+    store = JobStore([corrupt_job])
+    factory = make_factory(store)
+
+    assert factory.restore() == 1
+    persisted_objective = store.jobs[job.id].mission.objective
+    assert "sk-proj-123456789012" not in persisted_objective
+    assert "[REDACTED_TOKEN]" in persisted_objective
+
+
+def test_restore_skips_queued_orphan_when_sanitized_state_cannot_be_saved():
+    job = make_job("Do not queue unsaved sanitized orphan")
+    unsafe_mission = job.mission.model_copy(
+        update={"objective": "Build safely with token=sk-proj-123456789012"}
+    )
+    corrupt_job = job.model_copy(update={"mission": unsafe_mission})
+
+    class BrokenJobStore(JobStore):
+        def save(self, _job):
+            raise OSError("durable job store unavailable")
+
+    factory = make_factory(BrokenJobStore([corrupt_job]))
+
+    assert factory.restore() == 0
+    assert factory.queue == []
