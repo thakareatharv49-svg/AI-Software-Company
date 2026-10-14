@@ -129,3 +129,50 @@ def test_restore_skips_orphaned_job_with_unknown_lifecycle_status():
 
     assert factory.restore() == 0
     assert factory.queue == []
+
+
+
+def test_restore_does_not_resurrect_snapshot_when_durable_job_identity_mismatches():
+    job = make_job("Snapshot identity mismatch")
+    corrupt_job = job.model_copy(update={"id": "different-mission-id"})
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(JobStore([corrupt_job]), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
+
+def test_restore_does_not_resurrect_snapshot_with_unknown_durable_status():
+    job = make_job("Snapshot unknown status")
+    corrupt_job = job.model_copy(update={"status": "waiting_for_magic"})
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(JobStore([corrupt_job]), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []

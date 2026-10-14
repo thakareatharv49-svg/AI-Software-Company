@@ -162,7 +162,59 @@ class ProjectFactory:
                     "Unable to load durable mission job; skipping pending factory snapshot"
                 )
                 continue
+            # A corrupt durable row may be indexed under its own mismatched ID,
+            # so lookup by snapshot ID can return None even though a conflicting
+            # row embeds this mission. Detect that conflict before trusting the
+            # legacy snapshot as a standalone source of truth.
+            if job is None and self.job_store is not None:
+                list_all_jobs = getattr(self.job_store, "list_all", None)
+                if callable(list_all_jobs):
+                    try:
+                        conflicting_jobs = list(list_all_jobs())
+                    except Exception:
+                        conflicting_jobs = []
+                    for candidate in conflicting_jobs:
+                        try:
+                            embedded_id = str(candidate.mission.id).strip()
+                            durable_id = str(candidate.id).strip()
+                        except (AttributeError, TypeError, ValueError):
+                            continue
+                        if embedded_id == project.mission.id and durable_id != project.mission.id:
+                            import logging
+
+                            logging.getLogger(__name__).error(
+                                "Skipping pending snapshot with mismatched durable mission identity"
+                            )
+                            job = candidate
+                            break
             if job is not None:
+                # Validate the durable record for snapshot-backed recovery too.
+                # The orphaned-job path already checks these invariants; without
+                # the same gate here, a corrupt durable record could let an old
+                # snapshot resurrect work under an invalid identity or status.
+                try:
+                    job_status = MissionJobStatus(job.status)
+                    job_id = str(job.id).strip()
+                    embedded_mission_id = str(job.mission.id).strip()
+                except (AttributeError, TypeError, ValueError):
+                    import logging
+
+                    logging.getLogger(__name__).error(
+                        "Skipping pending snapshot with invalid durable mission job"
+                    )
+                    continue
+                if (
+                    not job_id
+                    or job_id != project.mission.id
+                    or embedded_mission_id != project.mission.id
+                ):
+                    import logging
+
+                    logging.getLogger(__name__).error(
+                        "Skipping pending snapshot with mismatched durable mission identity"
+                    )
+                    continue
+                job = job.model_copy(update={"status": job_status})
                 safe_job_mission = self._safe_mission(job.mission)
                 safe_job_plan = self._safe_plan(job.plan)
                 if (

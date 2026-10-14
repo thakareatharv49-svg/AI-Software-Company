@@ -857,7 +857,7 @@ Status: COMPLETE
 Acceptance: the durable job store can recover eligible missions even when project snapshots are missing, without duplicating queue entries or resurrecting terminal work.
 
 ## M64 — Durable Job Identity & Eligibility Validation
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Require durable job IDs to match their embedded mission IDs before recovery.
 - Admit only explicitly queued or interrupted-running jobs into the active queue.
@@ -865,6 +865,16 @@ Status: IN PROGRESS
 - Add regression tests for mismatched identities and unknown statuses.
 
 Acceptance: malformed durable records cannot create duplicate or incorrectly eligible queue entries, and valid queued/running recovery continues unchanged.
+
+## M65 — Snapshot & Durable Lifecycle Consistency
+Status: IN PROGRESS
+
+- Apply durable identity and lifecycle validation to snapshot-backed recovery as well as orphan recovery.
+- Reject snapshots when the corresponding durable job has a mismatched identity or invalid lifecycle status.
+- Ensure corrupt durable records cannot bypass fail-closed recovery checks through a legacy project snapshot.
+- Add regression coverage for snapshot/job identity and status mismatches.
+
+Acceptance: both recovery paths enforce the same durable identity and lifecycle invariants; malformed durable state cannot be resurrected by an older project snapshot.
 
 ---
 
