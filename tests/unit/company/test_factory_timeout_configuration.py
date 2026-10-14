@@ -78,3 +78,31 @@ async def test_invalid_stage_budget_does_not_dequeue_mission(max_stages) -> None
     assert factory.queue == [project]
     assert project.status == "queued"
     assert project.attempts == 0
+
+@pytest.mark.parametrize("max_retries", [-1, 1.5, "2", None, True, False])
+@pytest.mark.asyncio
+async def test_invalid_retry_budget_does_not_dequeue_mission(max_retries) -> None:
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    project = factory.enqueue(
+        CompanyMission(
+            name="Retry budget validation",
+            objective="Preserve queue on invalid retry budget",
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="max_retries must be a non-negative integer",
+    ):
+        await factory.run_next(max_retries=max_retries)
+
+    assert factory.queue == [project]
+    assert project.status == "queued"
+    assert project.attempts == 0
