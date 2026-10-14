@@ -611,7 +611,9 @@ class ProjectFactory:
             raise ValueError(
                 "execution_timeout_seconds must be a finite positive number"
             )
-        if not self.queue:
+        # A zero-stage budget is an intentional no-op, not an execution attempt.
+        # Leave the mission queued so a later run with a positive budget can resume it.
+        if max_stages == 0 or not self.queue:
             return None
 
         project = self.queue.pop(0)
