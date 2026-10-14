@@ -68,7 +68,6 @@ def make_factory(job_store, store=None):
         job_store=job_store,
     )
 
-
 def test_restore_recovers_queued_durable_job_without_project_snapshot():
     job = make_job("Orphan queued job")
     factory = make_factory(JobStore([job]))
@@ -79,7 +78,6 @@ def test_restore_recovers_queued_durable_job_without_project_snapshot():
     assert project.mission.id == job.id
     assert project.status == "queued"
     assert project.attempts == 3
-
 
 def test_restore_recovers_running_orphan_and_persists_queued_lifecycle():
     job = make_job("Orphan running job", MissionJobStatus.RUNNING)
@@ -93,7 +91,6 @@ def test_restore_recovers_running_orphan_and_persists_queued_lifecycle():
     assert store.jobs[job.id].status == MissionJobStatus.QUEUED
     assert store.jobs[job.id].plan.steps[0].status == "planned"
 
-
 def test_restore_skips_terminal_orphans_and_uses_jobs_when_project_store_is_down():
     completed = make_job("Completed orphan", MissionJobStatus.COMPLETED)
     queued = make_job("Queued orphan")
@@ -103,7 +100,6 @@ def test_restore_skips_terminal_orphans_and_uses_jobs_when_project_store_is_down
     assert factory.restore() == 1
     assert [project.mission.id for project in factory.queue] == [queued.id]
 
-
 def test_restore_is_idempotent_for_durable_orphans():
     job = make_job("Idempotent orphan")
     factory = make_factory(JobStore([job]))
@@ -111,7 +107,6 @@ def test_restore_is_idempotent_for_durable_orphans():
     assert factory.restore() == 1
     assert factory.restore() == 0
     assert len(factory.queue) == 1
-
 
 def test_restore_skips_orphaned_job_with_mismatched_identity():
     job = make_job("Mismatched identity")
@@ -121,7 +116,6 @@ def test_restore_skips_orphaned_job_with_mismatched_identity():
     assert factory.restore() == 0
     assert factory.queue == []
 
-
 def test_restore_skips_orphaned_job_with_unknown_lifecycle_status():
     job = make_job("Unknown lifecycle")
     corrupt_job = job.model_copy(update={"status": "waiting_for_magic"})
@@ -129,8 +123,6 @@ def test_restore_skips_orphaned_job_with_unknown_lifecycle_status():
 
     assert factory.restore() == 0
     assert factory.queue == []
-
-
 
 def test_restore_does_not_resurrect_snapshot_when_durable_job_identity_mismatches():
     job = make_job("Snapshot identity mismatch")
@@ -154,7 +146,6 @@ def test_restore_does_not_resurrect_snapshot_when_durable_job_identity_mismatche
     assert factory.restore() == 0
     assert factory.queue == []
 
-
 def test_restore_does_not_resurrect_snapshot_with_unknown_durable_status():
     job = make_job("Snapshot unknown status")
     corrupt_job = job.model_copy(update={"status": "waiting_for_magic"})
@@ -176,3 +167,67 @@ def test_restore_does_not_resurrect_snapshot_with_unknown_durable_status():
 
     assert factory.restore() == 0
     assert factory.queue == []
+
+def test_restore_skips_terminal_snapshot_without_durable_job():
+    job = make_job("Terminal snapshot without durable job")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "completed",
+        "attempts": 0,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(None, SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
+def test_restore_skips_snapshot_with_unknown_lifecycle_without_durable_job():
+    job = make_job("Unknown snapshot lifecycle")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "waiting_for_magic",
+        "attempts": 0,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(None, SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
+def test_restore_uses_queued_durable_lifecycle_over_stale_snapshot_status():
+    job = make_job("Durable queued lifecycle wins")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "completed",
+        "attempts": 0,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(JobStore([job]), SnapshotStore())
+
+    assert factory.restore() == 1
+    assert len(factory.queue) == 1
+    assert factory.queue[0].status == "queued"

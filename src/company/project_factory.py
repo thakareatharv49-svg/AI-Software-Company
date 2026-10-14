@@ -237,6 +237,18 @@ class ProjectFactory:
             # cancellation happened between persistence operations. Durable
             # terminal job state wins: never resurrect completed, failed,
             # blocked, or cancelled work into the active queue.
+            # When a durable row exists, its validated lifecycle is authoritative.
+            # Without one, only pending snapshots are eligible for recovery; terminal
+            # or unknown snapshot states must not be silently re-enqueued.
+            if job is None and project.status not in {"queued", "running"}:
+                import logging
+
+                logging.getLogger(__name__).error(
+                    "Skipping pending factory snapshot with ineligible lifecycle status"
+                )
+                continue
+            if job is not None and job.status == MissionJobStatus.QUEUED:
+                project.status = "queued"
             if job is not None and job.status in {
                 MissionJobStatus.COMPLETED,
                 MissionJobStatus.FAILED,
