@@ -260,3 +260,52 @@ def test_restore_malformed_duplicate_snapshot_does_not_shadow_valid_snapshot():
     assert len(factory.queue) == 1
     assert factory.queue[0].mission.id == job.id
     assert factory.queue[0].attempts == 2
+
+def test_restore_bounds_untrusted_snapshot_counters():
+    job = make_job("Snapshot with oversized counters")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 10**100,
+        "stages_executed": 10**100,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(None, SnapshotStore())
+
+    assert factory.restore() == 1
+    assert len(factory.queue) == 1
+    assert factory.queue[0].attempts == 1_000_000
+    assert factory.queue[0].stages_executed == 1_000_000
+
+
+def test_restore_normalizes_non_finite_snapshot_counters():
+    job = make_job("Snapshot with non-finite counters")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": float("inf"),
+        "stages_executed": float("nan"),
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(None, SnapshotStore())
+
+    assert factory.restore() == 1
+    assert len(factory.queue) == 1
+    assert factory.queue[0].attempts == 0
+    assert factory.queue[0].stages_executed == 0

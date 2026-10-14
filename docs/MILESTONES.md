@@ -888,7 +888,7 @@ Acceptance: restored queue entries always have an eligible lifecycle state, and 
 
 
 ## M67 — Recovery Snapshot Deduplication Safety
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Reserve snapshot mission IDs only after snapshot data and durable lifecycle metadata pass validation.
 - Ensure a malformed earlier duplicate cannot shadow a later valid snapshot for the same mission.
@@ -896,6 +896,17 @@ Status: IN PROGRESS
 - Add a regression test for malformed-then-valid duplicate snapshots.
 
 Acceptance: invalid snapshot entries cannot suppress recoverable valid work, while each mission is restored at most once per recovery pass.
+
+
+## M68 — Bounded Snapshot Recovery Counters
+Status: IN PROGRESS
+
+- Clamp restored attempt and stage counters to a documented defensive ceiling.
+- Normalize non-finite or invalid counter values to zero.
+- Prevent corrupted legacy snapshots from bypassing retry budgets or polluting progress metrics.
+- Add regression tests for oversized integers and non-finite values.
+
+Acceptance: restored snapshot counters are finite, non-negative, and bounded before scheduling or dashboard use.
 
 ---
 
