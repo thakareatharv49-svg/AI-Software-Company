@@ -113,6 +113,16 @@ class ProjectFactory:
                 if mission_id in known_ids:
                     continue
                 project = FactoryProject(**item)
+                # Track whether recovery changes persisted snapshot state. If
+                # sanitization or counter normalization is required, never queue
+                # the item unless the repaired snapshot can be durably written.
+                original_attempts = project.attempts
+                original_stages_executed = project.stages_executed
+                original_mission = project.mission.model_dump()
+                original_plan = project.plan.model_dump()
+                original_last_error = project.last_error
+                original_retry_feedback = project.retry_feedback
+                snapshot_needs_persist = False
                 # Legacy snapshots predate strict counter validation. Normalize
                 # counters before comparisons or queue scheduling can consume them.
                 # Legacy/corrupt snapshots must not restore unbounded counters.
@@ -131,6 +141,10 @@ class ProjectFactory:
                     except (TypeError, ValueError, OverflowError):
                         counter = 0
                     setattr(project, counter_name, counter)
+                snapshot_needs_persist = (
+                    project.attempts != original_attempts
+                    or project.stages_executed != original_stages_executed
+                )
             except (AttributeError, KeyError, TypeError, ValueError):
                 import logging
 
@@ -155,6 +169,12 @@ class ProjectFactory:
                     self._safe_error_detail(project.retry_feedback)
                     if project.retry_feedback
                     else None
+                )
+                snapshot_needs_persist = snapshot_needs_persist or (
+                    project.mission.model_dump() != original_mission
+                    or project.plan.model_dump() != original_plan
+                    or project.last_error != original_last_error
+                    or project.retry_feedback != original_retry_feedback
                 )
             except (AttributeError, KeyError, TypeError, ValueError):
                 import logging
@@ -272,13 +292,13 @@ class ProjectFactory:
             # Reserve an ID only after the snapshot and its durable lifecycle
             # have passed validation. A malformed earlier duplicate must not
             # shadow a later valid snapshot for the same mission.
-            known_ids.add(project.mission.id)
             if job is not None and job.status in {
                 MissionJobStatus.COMPLETED,
                 MissionJobStatus.FAILED,
                 MissionJobStatus.BLOCKED,
                 MissionJobStatus.CANCELLED,
             }:
+                known_ids.add(project.mission.id)
                 delete_many = getattr(self.store, "delete_many", None)
                 if callable(delete_many):
                     try:
@@ -364,8 +384,13 @@ class ProjectFactory:
                 import logging
 
                 logging.getLogger(__name__).error(
-                    "Unable to persist restored mission snapshot; keeping it in memory"
+                    "Unable to persist restored mission snapshot"
                 )
+                if snapshot_needs_persist:
+                    # Do not enqueue legacy state that still contains secrets
+                    # or unbounded counters because its repair could not be saved.
+                    continue
+            known_ids.add(project.mission.id)
             self.queue.append(project)
             restored += 1
 
