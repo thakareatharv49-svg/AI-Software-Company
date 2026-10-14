@@ -6,7 +6,7 @@ from src.agents.registry.registry import AgentRegistry
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.planner import build_mission_plan
-from src.company.mission_jobs import MissionJob, MissionJobStatus
+from src.company.mission_jobs import MAX_MISSION_ATTEMPTS, MissionJob, MissionJobStatus
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.project_factory import ProjectFactory
@@ -309,3 +309,22 @@ def test_restore_normalizes_non_finite_snapshot_counters():
     assert len(factory.queue) == 1
     assert factory.queue[0].attempts == 0
     assert factory.queue[0].stages_executed == 0
+
+
+def test_mission_job_model_bounds_untrusted_attempts():
+    job = make_job("Bounded durable attempts").model_copy(update={"attempts": 10**100})
+    # Recovery must defend against model_copy and legacy deserialization bypasses.
+    factory = make_factory(JobStore([job]))
+
+    assert factory.restore() == 1
+    assert factory.queue[0].attempts == MAX_MISSION_ATTEMPTS
+    assert factory.job_store.jobs[job.id].attempts == MAX_MISSION_ATTEMPTS
+
+
+def test_mission_job_validation_caps_attempts_and_normalizes_non_finite_values():
+    job = make_job("Validated durable attempts")
+    oversized = MissionJob.model_validate({**job.model_dump(), "attempts": 10**100})
+    non_finite = MissionJob.model_validate({**job.model_dump(), "attempts": float("inf")})
+
+    assert oversized.attempts == MAX_MISSION_ATTEMPTS
+    assert non_finite.attempts == 0
