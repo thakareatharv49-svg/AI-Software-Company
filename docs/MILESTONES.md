@@ -965,7 +965,7 @@ Acceptance: a recovered queued orphan cannot retain unsafe legacy mission or pla
 
 
 ## M72 — Fail-Closed Sanitization of Restored Snapshots
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Track when legacy project snapshots require sensitive-text redaction or counter normalization.
 - Do not enqueue a repaired snapshot when its required durable write fails.
@@ -976,7 +976,7 @@ Acceptance: recovery never schedules a snapshot whose required security/counter 
 
 
 ## M73 — Fail-Closed Durable Identity Reconciliation
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Treat an unavailable durable-job identity scan as an inability to verify snapshot identity, not as an empty durable index.
 - Skip snapshot recovery when the durable store's full identity scan fails, avoiding unsafe resurrection from stale snapshots.
@@ -984,3 +984,14 @@ Status: IN PROGRESS
 - Keep the recovery path resilient: unrelated valid recovery items continue to be processed independently.
 
 Acceptance: when a durable job store exists but identity reconciliation fails, snapshots are not treated as orphaned standalone truth; recovery fails closed for the affected snapshot and continues safely.
+
+
+## M74 — Fail Closed Without Durable Identity Enumeration
+Status: IN PROGRESS
+
+- Require a durable job store to support full identity enumeration before treating a missing direct lookup as proof that a snapshot is orphaned.
+- Skip snapshot recovery when identity enumeration is unsupported, just as when enumeration fails.
+- Add regression coverage for lookup-only durable stores.
+- Keep independent recovery items isolated so one unverifiable snapshot does not stop unrelated work.
+
+Acceptance: a legacy snapshot is never scheduled when the configured durable job store cannot prove that no conflicting durable identity exists.
