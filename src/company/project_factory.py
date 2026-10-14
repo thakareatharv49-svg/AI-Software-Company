@@ -298,16 +298,37 @@ class ProjectFactory:
                 durable_jobs = []
             for job in durable_jobs:
                 try:
-                    mission_id = job.id
+                    # Durable job identity is the queue's idempotency key. A
+                    # corrupt/mismatched record must not enqueue one mission
+                    # under a different ID and then duplicate it on every restore.
+                    mission_id = str(job.id).strip()
+                    mission = job.mission
+                    if not mission_id or mission_id != str(mission.id).strip():
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Skipping durable mission job with mismatched identity"
+                        )
+                        continue
                     if mission_id in known_ids:
                         continue
-                    if job.status in {
-                        MissionJobStatus.COMPLETED,
-                        MissionJobStatus.FAILED,
-                        MissionJobStatus.BLOCKED,
-                        MissionJobStatus.CANCELLED,
+                    # Only explicitly eligible lifecycle states may enter the
+                    # active queue. Unknown future/corrupt states fail closed.
+                    try:
+                        status = MissionJobStatus(job.status)
+                    except (TypeError, ValueError):
+                        import logging
+
+                        logging.getLogger(__name__).error(
+                            "Skipping durable mission job with invalid lifecycle status"
+                        )
+                        continue
+                    if status not in {
+                        MissionJobStatus.QUEUED,
+                        MissionJobStatus.RUNNING,
                     }:
                         continue
+                    job = job.model_copy(update={"status": status})
                     safe_mission = self._safe_mission(job.mission)
                     safe_plan = self._safe_plan(job.plan)
                     job = job.model_copy(
