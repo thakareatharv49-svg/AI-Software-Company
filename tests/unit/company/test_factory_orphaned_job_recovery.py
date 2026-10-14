@@ -176,3 +176,71 @@ def test_restore_does_not_resurrect_snapshot_with_unknown_durable_status():
 
     assert factory.restore() == 0
     assert factory.queue == []
+
+
+
+def test_restore_skips_terminal_snapshot_without_durable_job():
+    job = make_job("Terminal snapshot without durable job")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "completed",
+        "attempts": 0,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(None, SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
+
+def test_restore_skips_snapshot_with_unknown_lifecycle_without_durable_job():
+    job = make_job("Unknown snapshot lifecycle")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "waiting_for_magic",
+        "attempts": 0,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(None, SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
+
+
+def test_restore_uses_queued_durable_lifecycle_over_stale_snapshot_status():
+    job = make_job("Durable queued lifecycle wins")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "completed",
+        "attempts": 0,
+    }
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(JobStore([job]), SnapshotStore())
+
+    assert factory.restore() == 1
+    assert len(factory.queue) == 1
+    assert factory.queue[0].status == "queued"
