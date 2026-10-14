@@ -932,7 +932,7 @@ GitHub repository + this file are the persistent roadmap source of truth.
 
 
 ## M69 — Bounded Durable Job Attempt Counters
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Apply the same defensive attempt ceiling to durable mission jobs as to project snapshots.
 - Normalize invalid, negative, non-finite, and oversized attempts before durable recovery can schedule work.
@@ -940,3 +940,14 @@ Status: IN PROGRESS
 - Add regression coverage for oversized and non-finite durable attempt counters.
 
 Acceptance: snapshot-backed and orphaned durable-job recovery enforce a consistent finite, non-negative, bounded attempt count.
+
+
+## M70 — Persist Normalized Durable Recovery State
+Status: IN PROGRESS
+
+- Persist normalized attempt counters back to durable queued jobs during recovery instead of only correcting in-memory copies.
+- Apply the same persistence rule to snapshot-backed and orphaned queued jobs.
+- Fail closed for the affected recovery item if normalization cannot be durably saved.
+- Add regression tests proving corrupt durable counters are repaired in storage.
+
+Acceptance: once recovery accepts a queued durable job, its persisted attempt counter is finite, non-negative, bounded, and consistent with the normalized recovery state.
