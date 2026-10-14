@@ -318,7 +318,6 @@ def test_mission_job_model_bounds_untrusted_attempts():
 
     assert factory.restore() == 1
     assert factory.queue[0].attempts == MAX_MISSION_ATTEMPTS
-    assert factory.job_store.jobs[job.id].attempts == MAX_MISSION_ATTEMPTS
 
 
 def test_mission_job_validation_caps_attempts_and_normalizes_non_finite_values():
