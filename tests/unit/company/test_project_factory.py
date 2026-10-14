@@ -377,6 +377,7 @@ async def test_factory_records_project_output_manifest() -> None:
     assert output_store.manifests[0].mission_id == mission.id
     assert output_store.manifests[0].project_id == f"project:{mission.id}"
     assert output_store.manifests[0].status == "completed"
+    assert output_store.manifests[0].output_type == "factory_project"
 
 
 @pytest.mark.asyncio
@@ -473,6 +474,7 @@ async def test_factory_can_use_real_m36_runner_adapter() -> None:
     assert output_store.manifests[0].repository == "owner/real-project"
     assert output_store.manifests[0].github_message == "pull request created"
     assert output_store.manifests[0].memory_id == "memory-1"
+    assert output_store.manifests[0].output_type == "autonomous_project"
 
 
 @pytest.mark.asyncio
