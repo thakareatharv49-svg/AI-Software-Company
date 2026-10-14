@@ -1391,3 +1391,58 @@ async def test_run_rejects_invalid_budgets_before_mutating_factory(
     assert project.status == "queued"
     assert project.attempts == 0
     assert factory._running is False
+
+
+def test_retry_persistence_failure_does_not_mutate_in_memory_queue() -> None:
+    from src.company.mission_jobs import MissionJob, MissionJobStatus
+    from src.company.project_factory import FactoryProject
+
+    class FailingJobStore:
+        def __init__(self, job):
+            self.job = job
+
+        def get(self, job_id):
+            return self.job if self.job.id == job_id else None
+
+        def save(self, job):
+            raise RuntimeError("temporary job store outage")
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    mission = CompanyMission(name="Retry persistence", objective="Preserve queue on outage")
+    plan = build_mission_plan(mission)
+    blocked_job = MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=plan,
+        status=MissionJobStatus.BLOCKED,
+        message="Previous attempt blocked",
+        attempts=1,
+    )
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        job_store=FailingJobStore(blocked_job),
+    )
+    stale_project = FactoryProject(mission=mission, plan=plan, status="queued", attempts=1)
+    other_project = FactoryProject(
+        mission=CompanyMission(name="Other queued", objective="Do not lose this mission"),
+        plan=build_mission_plan(
+            CompanyMission(name="Other queued", objective="Do not lose this mission")
+        ),
+    )
+    factory.queue.extend([stale_project, other_project])
+    original_queue = list(factory.queue)
+
+    with pytest.raises(RuntimeError, match="temporary job store outage"):
+        factory.retry(mission.id)
+
+    assert factory.queue == original_queue
+    assert factory.queue[0] is stale_project
+    assert factory.queue[1] is other_project
