@@ -451,3 +451,29 @@ def test_restore_fails_closed_when_durable_identity_scan_is_unavailable():
 
     assert factory.restore() == 0
     assert factory.queue == []
+
+
+def test_restore_fails_closed_when_durable_store_cannot_enumerate_identities():
+    job = make_job("Identity enumeration unsupported")
+    snapshot = {
+        "mission": job.mission,
+        "plan": job.plan,
+        "status": "queued",
+        "attempts": 0,
+    }
+
+    class LookupOnlyJobStore:
+        def get(self, _job_id):
+            return None
+
+    class SnapshotStore:
+        def load_pending(self):
+            return [snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(LookupOnlyJobStore(), SnapshotStore())
+
+    assert factory.restore() == 0
+    assert factory.queue == []
