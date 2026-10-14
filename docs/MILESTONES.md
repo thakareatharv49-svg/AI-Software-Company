@@ -846,7 +846,7 @@ Status: COMPLETE
 Acceptance: one snapshot's persistence failure does not stop unrelated recoveries, and terminal durable lifecycle state is never resurrected into active work.
 
 ## M63 — Durable Job Reconciliation
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Recover queued durable jobs whose project snapshot was not written before a crash.
 - Recover interrupted running jobs from the durable job store and reset in-flight stages before re-queueing.
@@ -855,6 +855,16 @@ Status: IN PROGRESS
 - Add regression tests for orphaned queued/running jobs, terminal states, store outages, and repeated restore.
 
 Acceptance: the durable job store can recover eligible missions even when project snapshots are missing, without duplicating queue entries or resurrecting terminal work.
+
+## M64 — Durable Job Identity & Eligibility Validation
+Status: IN PROGRESS
+
+- Require durable job IDs to match their embedded mission IDs before recovery.
+- Admit only explicitly queued or interrupted-running jobs into the active queue.
+- Fail closed on unknown/corrupt lifecycle states instead of treating them as runnable.
+- Add regression tests for mismatched identities and unknown statuses.
+
+Acceptance: malformed durable records cannot create duplicate or incorrectly eligible queue entries, and valid queued/running recovery continues unchanged.
 
 ---
 
