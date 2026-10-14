@@ -971,11 +971,22 @@ async def test_factory_contains_unexpected_worker_error_and_continues_queue() ->
         failed_mission_id = None
         should_fail = False
 
+        def __init__(self):
+            self.saves_by_mission = {}
+
         def load_pending(self):
             return []
 
         def save(self, project):
-            if self.should_fail and project.mission.id == self.failed_mission_id:
+            mission_id = project.mission.id
+            self.saves_by_mission[mission_id] = self.saves_by_mission.get(mission_id, 0) + 1
+            # Fail only after execution has visibly started, not during
+            # the new startup-persistence rollback boundary.
+            if (
+                self.should_fail
+                and mission_id == self.failed_mission_id
+                and project.status == "completed"
+            ):
                 self.should_fail = False
                 raise RuntimeError("simulated persistence failure")
 
@@ -1507,3 +1518,50 @@ async def test_enqueue_snapshot_failure_leaves_queue_unchanged_and_can_retry() -
     assert project.mission.id == mission.id
     assert jobs.jobs[mission.id].status == MissionJobStatus.QUEUED
     assert snapshots.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_run_next_snapshot_failure_keeps_mission_queued_without_attempt() -> None:
+    class FlakySnapshotStore:
+        def __init__(self):
+            self.calls = 0
+
+        def save(self, project):
+            self.calls += 1
+            if self.calls == 2:
+                raise OSError("temporary startup snapshot outage")
+
+        def load_pending(self):
+            return []
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FakeRuntime()),
+        AgentRegistry(),
+    )
+    snapshots = FlakySnapshotStore()
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        store=snapshots,
+    )
+    project = factory.enqueue(
+        CompanyMission(
+            name="Startup persistence",
+            objective="Remain queued if starting persistence fails",
+        )
+    )
+    original_queue = list(factory.queue)
+
+    with pytest.raises(OSError, match="temporary startup snapshot outage"):
+        await factory.run_next()
+
+    assert factory.queue == original_queue
+    assert factory.queue[0] is project
+    assert project.status == "queued"
+    assert project.attempts == 0
+    assert factory._active_project is None
+    assert factory._running is False

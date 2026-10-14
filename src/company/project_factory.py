@@ -621,33 +621,68 @@ class ProjectFactory:
         if max_stages == 0 or not self.queue:
             return None
 
-        project = self.queue.pop(0)
-        # Retain ownership until run_next returns so run() can finalize the mission
-        # if an unexpected persistence, audit, or event error escapes the stage guard.
+        # Keep the project in the FIFO queue until its startup state is durable.
+        # A failed snapshot/job/audit write must not consume an attempt or strand
+        # the mission outside the queue before execution's recovery boundary begins.
+        project = self.queue[0]
+        previous_status = project.status
+        previous_attempts = project.attempts
+        previous_error = project.last_error
         self._active_project = project
-        # A prior mission's pipeline must never satisfy this mission's completion check.
         self._last_autonomous_result = None
         project.status = "running"
         project.attempts += 1
         project.last_error = None
-        self._save(project)
-        job = self._load_job(project.mission.id)
-        if job is not None:
-            self._save_job(
-                transition_job(
-                    job.model_copy(update={"attempts": project.attempts}),
-                    MissionJobStatus.RUNNING,
-                    f"Factory attempt {project.attempts} started: {project.mission.name}",
+        try:
+            self._save(project)
+            job = self._load_job(project.mission.id)
+            if job is not None:
+                self._save_job(
+                    transition_job(
+                        job.model_copy(update={"attempts": project.attempts}),
+                        MissionJobStatus.RUNNING,
+                        f"Factory attempt {project.attempts} started: {project.mission.name}",
+                    )
                 )
-            )
-            self._audit(
-                project.mission.id,
-                "MISSION_RUNNING",
-                f"Factory attempt {project.attempts} started: {project.mission.name}",
-                MissionJobStatus.RUNNING.value,
-                {"attempt": project.attempts},
-            )
+                self._audit(
+                    project.mission.id,
+                    "MISSION_RUNNING",
+                    f"Factory attempt {project.attempts} started: {project.mission.name}",
+                    MissionJobStatus.RUNNING.value,
+                    {"attempt": project.attempts},
+                )
+        except Exception:
+            # Roll back the in-memory transition and make a best-effort repair of
+            # any durable store that may have accepted only part of startup.
+            project.status = previous_status
+            project.attempts = previous_attempts
+            project.last_error = previous_error
+            self._active_project = None
+            self._last_autonomous_result = None
+            try:
+                self._save(project)
+            except Exception:
+                pass
+            try:
+                current_job = self._load_job(project.mission.id)
+                if current_job is not None and current_job.status == MissionJobStatus.RUNNING:
+                    self._save_job(
+                        current_job.model_copy(
+                            update={
+                                "status": MissionJobStatus.QUEUED,
+                                "attempts": previous_attempts,
+                                "plan": project.plan,
+                                "message": f"Factory startup interrupted; mission remains queued: {project.mission.name}",
+                                "updated_at": datetime.now(UTC),
+                            }
+                        )
+                    )
+            except Exception:
+                pass
+            raise
 
+        # Dequeue only after all startup persistence and audit operations succeed.
+        self.queue.pop(0)
         self._last_autonomous_result = None
         try:
             # Keep startup inside the guarded execution path. A controller/startup
@@ -1074,7 +1109,7 @@ class ProjectFactory:
         self, project: FactoryProject, exc: Exception
     ) -> None:
         """Best-effort terminalize a mission if an error escapes run_next cleanup."""
-        if project.status not in {"completed", "blocked", "cancelled"}:
+        if project.status not in {"blocked", "cancelled"}:
             project.status = "blocked"
             project.last_error = self._safe_error_detail(
                 f"Factory worker error: {type(exc).__name__}: {exc}"
