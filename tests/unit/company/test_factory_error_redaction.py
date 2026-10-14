@@ -235,6 +235,9 @@ def test_restore_redacts_legacy_mission_and_plan_without_losing_progress():
         def get(self, _mission_id):
             return None
 
+        def list_all(self):
+            return []
+
         def save(self, _job):
             pass
 
