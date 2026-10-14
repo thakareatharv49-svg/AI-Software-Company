@@ -229,11 +229,16 @@ class ProjectFactory:
                         "Skipping pending snapshot with mismatched durable mission identity"
                     )
                     continue
-                job = job.model_copy(update={"status": job_status, "attempts": _bounded_job_attempts(job.attempts)})
+                normalized_attempts = _bounded_job_attempts(job.attempts)
+                attempts_changed = normalized_attempts != job.attempts
+                job = job.model_copy(
+                    update={"status": job_status, "attempts": normalized_attempts}
+                )
                 safe_job_mission = self._safe_mission(job.mission)
                 safe_job_plan = self._safe_plan(job.plan)
                 if (
-                    safe_job_mission.model_dump() != job.mission.model_dump()
+                    attempts_changed
+                    or safe_job_mission.model_dump() != job.mission.model_dump()
                     or safe_job_plan.model_dump() != job.plan.model_dump()
                 ):
                     job = job.model_copy(
@@ -411,12 +416,26 @@ class ProjectFactory:
                         MissionJobStatus.RUNNING,
                     }:
                         continue
-                    job = job.model_copy(update={"status": status, "attempts": _bounded_job_attempts(job.attempts)})
+                    normalized_attempts = _bounded_job_attempts(job.attempts)
+                    attempts_changed = normalized_attempts != job.attempts
+                    job = job.model_copy(
+                        update={"status": status, "attempts": normalized_attempts}
+                    )
                     safe_mission = self._safe_mission(job.mission)
                     safe_plan = self._safe_plan(job.plan)
                     job = job.model_copy(
                         update={"mission": safe_mission, "plan": safe_plan}
                     )
+                    if job.status == MissionJobStatus.QUEUED and attempts_changed:
+                        try:
+                            self._save_job(job)
+                        except Exception:
+                            import logging
+
+                            logging.getLogger(__name__).error(
+                                "Unable to persist normalized queued mission attempts"
+                            )
+                            continue
                     if job.status == MissionJobStatus.RUNNING:
                         job = recover_running_job(job)
                         try:
