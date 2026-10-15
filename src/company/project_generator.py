@@ -1998,7 +1998,12 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
         raise RuntimeError("Ollama repair failed and no deterministic repair is available")
 
     async def _call(self, payload: dict) -> str:
-        request_timeout = settings.ollama_timeout
+        configured_provider = settings.factory_model_provider.strip().casefold()
+        request_timeout = (
+            settings.openai_compatible_timeout
+            if configured_provider in {"openai-compatible", "openai_compatible"}
+            else settings.ollama_timeout
+        )
         if self._generation_deadline is not None:
             remaining = self._generation_deadline - time.monotonic()
             if remaining <= 0:
