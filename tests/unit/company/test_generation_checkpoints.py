@@ -233,3 +233,55 @@ async def test_invalid_generated_python_is_retried_before_checkpointing(
     ).load()
     assert checkpoint is not None
     assert checkpoint["files"]["src/library.py"] == generated.files["src/library.py"]
+
+
+@pytest.mark.asyncio
+async def test_resume_regenerates_invalid_python_instead_of_reusing_checkpoint(
+    tmp_path, monkeypatch
+) -> None:
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    objective = "Create a Python library that exposes an add function and tests."
+    checkpoint = generator._checkpoint("Reusable Python Library", objective)
+    manifest = [
+        {
+            "path": "src/library.py",
+            "purpose": "Public add function",
+            "depends_on": [],
+        },
+        {
+            "path": "tests/test_library.py",
+            "purpose": "Behavioral tests",
+            "depends_on": ["src/library.py"],
+        },
+    ]
+    checkpoint.save(
+        manifest=manifest,
+        files={
+            "src/library.py": "def add(:\n    return 1",
+            "tests/test_library.py": "def test_add():\n    assert 2 + 3 == 5\n",
+        },
+    )
+    prompts: list[str] = []
+
+    async def fake_call(payload):
+        prompts.append(payload["prompt"])
+        return json.dumps({
+            "content": "def add(left, right):\n    return left + right\n"
+        })
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    generated = await generator._generate_large_mission(
+        "Reusable Python Library", objective
+    )
+
+    assert generated.files["src/library.py"] == (
+        "def add(left, right):\n    return left + right\n"
+    )
+    assert generated.files["tests/test_library.py"] == (
+        "def test_add():\n    assert 2 + 3 == 5\n"
+    )
+    assert len(prompts) == 1
+    assert "File to generate: src/library.py" in prompts[0]
+    saved = checkpoint.load()
+    assert saved is not None
+    assert saved["files"]["src/library.py"] == generated.files["src/library.py"]
