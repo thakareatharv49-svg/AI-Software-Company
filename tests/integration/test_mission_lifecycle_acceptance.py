@@ -1,5 +1,8 @@
 import json
 import sys
+
+import pytest
+from httpx import ASGITransport, AsyncClient
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -166,7 +169,8 @@ class _RealPipelineMissionRunner:
         )
 
 
-def test_m84_public_mission_path_reaches_real_qa_and_review_with_trace(tmp_path):
+@pytest.mark.asyncio
+async def test_m84_public_mission_path_reaches_real_qa_and_review_with_trace(tmp_path):
     """Submit via HTTP, execute through the factory, and verify QA/review evidence."""
     center = CompanyControlCenter(CompanyOrchestrator())
     runner = _RealPipelineMissionRunner(tmp_path)
@@ -174,54 +178,65 @@ def test_m84_public_mission_path_reaches_real_qa_and_review_with_trace(tmp_path)
     app.dependency_overrides[get_control_center] = lambda: center
     app.dependency_overrides[require_company_owner] = lambda: None
     try:
-        client = TestClient(app)
-        created = client.post(
-            "/api/missions",
-            json={
-                "name": "M84 lifecycle acceptance",
-                "objective": "Build a tiny accessible product and verify its files with executed tests.",
-                "constraints": ["Use deterministic local test adapters", "Do not publish to GitHub"],
-            },
-        )
-        assert created.status_code == 201, created.text
-        mission_id = created.json()["mission"]["id"]
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            created = await client.post(
+                "/api/missions",
+                json={
+                    "name": "M84 lifecycle acceptance",
+                    "objective": "Build a tiny accessible product and verify its files with executed tests.",
+                    "constraints": ["Use deterministic local test adapters", "Do not publish to GitHub"],
+                },
+            )
+            assert created.status_code == 201, created.text
+            mission_id = created.json()["mission"]["id"]
 
-        queued = client.get(f"/api/missions/{mission_id}/job")
-        assert queued.status_code == 200
-        assert queued.json()["status"] == "queued"
-        plan = client.get(f"/api/missions/{mission_id}/plan")
-        assert plan.status_code == 200
-        assert len(plan.json()["steps"]) == 12
+            queued = await client.get(f"/api/missions/{mission_id}/job")
+            assert queued.status_code == 200
+            assert queued.json()["status"] == "queued"
+            plan = await client.get(f"/api/missions/{mission_id}/plan")
+            assert plan.status_code == 200
+            assert len(plan.json()["steps"]) == 12
 
-        started = client.post(f"/api/missions/{mission_id}/factory-run?max_retries=0")
-        assert started.status_code == 200, started.text
-        final_job = client.get(f"/api/missions/{mission_id}/job")
-        outputs = client.get(f"/api/missions/{mission_id}/outputs")
-        audit = client.get(f"/api/missions/{mission_id}/audit")
-        result = runner.pipeline_result
-        trace = {
-            "mission_id": mission_id,
-            "factory_run_status": started.json().get("status"),
-            "job_status": final_job.json().get("status") if final_job.status_code == 200 else final_job.status_code,
-            "stage_statuses": [step["status"] for step in final_job.json()["plan"]["steps"]] if final_job.status_code == 200 else [],
-            "qa_status": result.qa_result.status.value if result else None,
-            "qa_exit_code": result.qa_result.exit_code if result else None,
-            "review_status": result.review_result.status.value if result else None,
-            "output_statuses": [item["status"] for item in outputs.json()] if outputs.status_code == 200 else [],
-            "audit_events": [item["event_type"] for item in audit.json()] if audit.status_code == 200 else [],
-        }
-        trace_text = json.dumps(trace, sort_keys=True)
-        assert final_job.status_code == 200, trace_text
-        assert final_job.json()["status"] == "completed", trace_text
-        assert all(status == "completed" for status in trace["stage_statuses"]), trace_text
-        assert result is not None, trace_text
-        assert result.qa_result.status.value == "passed", trace_text
-        assert result.qa_result.exit_code == 0, trace_text
-        assert result.qa_result.stdout.strip(), trace_text
-        assert result.review_result.status.value == "approved", trace_text
-        assert (tmp_path / "index.html").is_file(), trace_text
-        assert (tmp_path / "app.js").is_file(), trace_text
-        assert outputs.status_code == 200 and outputs.json(), trace_text
-        assert any(event in trace["audit_events"] for event in ("MISSION_RUNNING", "MISSION_COMPLETED")), trace_text
+            started = await client.post(
+                f"/api/missions/{mission_id}/factory-run?max_retries=0"
+            )
+            assert started.status_code == 200, started.text
+            # The public endpoint intentionally schedules the worker in the
+            # application loop and returns immediately; await that worker rather
+            # than allowing a test-client loop teardown to cancel it.
+            if center._factory_task is not None:
+                await center._factory_task
+
+            final_job = await client.get(f"/api/missions/{mission_id}/job")
+            outputs = await client.get(f"/api/missions/{mission_id}/outputs")
+            audit = await client.get(f"/api/missions/{mission_id}/audit")
+            result = runner.pipeline_result
+            trace = {
+                "mission_id": mission_id,
+                "factory_run_status": started.json().get("status"),
+                "job_status": final_job.json().get("status") if final_job.status_code == 200 else final_job.status_code,
+                "stage_statuses": [step["status"] for step in final_job.json()["plan"]["steps"]] if final_job.status_code == 200 else [],
+                "qa_status": result.qa_result.status.value if result else None,
+                "qa_exit_code": result.qa_result.exit_code if result else None,
+                "review_status": result.review_result.status.value if result else None,
+                "output_statuses": [item["status"] for item in outputs.json()] if outputs.status_code == 200 else [],
+                "audit_events": [item["event_type"] for item in audit.json()] if audit.status_code == 200 else [],
+            }
+            trace_text = json.dumps(trace, sort_keys=True)
+            assert final_job.status_code == 200, trace_text
+            assert final_job.json()["status"] == "completed", trace_text
+            assert all(status == "completed" for status in trace["stage_statuses"]), trace_text
+            assert result is not None, trace_text
+            assert result.qa_result.status.value == "passed", trace_text
+            assert result.qa_result.exit_code == 0, trace_text
+            assert result.qa_result.stdout.strip(), trace_text
+            assert result.review_result.status.value == "approved", trace_text
+            assert (tmp_path / "index.html").is_file(), trace_text
+            assert (tmp_path / "app.js").is_file(), trace_text
+            assert outputs.status_code == 200 and outputs.json(), trace_text
+            assert "FACTORY_PROJECT_COMPLETED" in trace["audit_events"], trace_text
     finally:
         app.dependency_overrides.clear()
