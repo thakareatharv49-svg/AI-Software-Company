@@ -374,3 +374,43 @@ The user expects autonomous milestone execution, including code review, CI repai
 - Mission diagnostics report heartbeat age/staleness, the effective execution timeout, and queue-wait threshold. Running-mission stale detection is bounded by the configured execution deadline, with a short noise floor and hard ceiling; malformed timeout configuration falls back to a safe default.
 - Diagnostics distinguish a suspected stall from a confirmed failure and advise inspecting worker/audit state before retrying, because long model calls and external processes can delay progress updates.
 - Focused tests cover stale/recent heartbeat behavior, configured deadlines, invalid timeout fallback, queued wait thresholds, and existing failure-state reporting. Exact-head CI/security checks and merge are required before treating this handoff as verified.
+
+
+---
+
+## Verified handoff — 2026-10-15 12:09 UTC
+
+This section was checked against live GitHub state on 2026-10-15. It supersedes any older milestone/status notes above where they conflict.
+
+### Repository identity and latest main
+- Confirmed project for this conversation: [AI-Software-Company](https://github.com/thakareatharv49-svg/AI-Software-Company), default branch `main`, description “Autonomous AI Software Company”.
+- Do not use the separate `AI-OpenSource-Engineer-` repository's milestones or context for this project.
+- Latest verified commit on `main`: `e2eb11973875d0e8664e0bf0f95944a4d0fce399`, “M85: expose bounded queue liveness diagnostics”, dated 2026-10-15 11:44:32 UTC.
+- Previous verified milestone record: M84 handoff commit `046a63ce402125841022ead054d19affb5dea55b`; M84 real-path lifecycle harness commit `0cc935e7d36409dbb2eb748c2a9d81938abf3fbc`.
+- The master roadmap is `docs/MILESTONES.md`; improvement priorities are in `docs/IMPROVEMENT_PLAN.md`. The repo uses `docs/PROJECT_CONTEXT.md` as the durable session handoff.
+
+### Open pull requests — not merged
+- [PR #313 — Milestone 40: recover orphaned continuous factory missions](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/313)
+  - Head branch: `fix/recover-orphaned-continuous-missions`
+  - Head SHA: `d4c4095872c955a1f77c4442029b9985056cb8d1`
+  - Base: `main`
+  - Current `quality` check was cancelled. CodeQL, Python analysis, JavaScript/TypeScript analysis, dependency audit, and secret-history scan showed success on the inspected SHA, but a cancelled required quality check means this PR is not merge-ready.
+- [PR #314 — Milestone 41: isolate factory queue from mission persistence failures](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/314)
+  - Head branch: `test/factory-continues-after-persistence-error`
+  - Head SHA: `b09ae478f2708db8a8bdac7583b4e72d1ad3c14e`
+  - Base: `fix/recover-orphaned-continuous-missions` (PR #313's branch), not `main`.
+  - Current `quality` check was cancelled. Do not merge before verifying/re-running the required checks and resolving the stacked-PR dependency. Prefer to land #313 first, then retarget/rebase #314 onto latest `main`, re-run checks, inspect exact-head results, and merge only if all required checks succeed.
+- At verification time, these were the two open PRs. Do not report either as merged.
+
+### Next actions
+1. Inspect PR #313 and #314 changed files and workflow logs to determine why `quality` was cancelled; do not infer a code failure from cancellation alone.
+2. Restore a valid CI run on the current exact PR head(s). Re-run or push a harmless workflow-triggering fix only when appropriate; avoid merging while required checks are cancelled/pending.
+3. Resolve the stacked PR dependency so each PR has a clear, reviewable base and changes are not accidentally duplicated.
+4. Merge only after required CI, CodeQL, secret scanning, and dependency audit checks are successful on the exact latest head SHA; verify the merge response and resulting `main` commit.
+5. After PR cleanup, resume the next sequential milestone from verified `main`, using the acceptance criteria in `docs/MILESTONES.md`. Prioritize real-path reliability of large/continuous missions over narrow test-only milestones.
+
+### Working agreements reconfirmed
+- The user asked to verify repository identity before continuing; this is the AI Software Company repository.
+- User expects the assistant to handle implementation, tests, CI troubleshooting, PR creation, and merging where connector permissions allow. Do not ask the user to merge.
+- Never claim a merge, successful CI, completed milestone, or saved file without checking GitHub's actual result.
+- Keep the company/factory branding **AI Software Company** and HQ branding **Nexora**.
