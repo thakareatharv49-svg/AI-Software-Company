@@ -1074,7 +1074,7 @@ See [docs/IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) for the research-backed prio
 
 These are PLANNED, not complete. Promote one milestone to IN PROGRESS only when its implementation branch starts; mark COMPLETE only after tests and required GitHub checks pass.
 
-- **M82 — Defensive Snapshot Record Decoding:** IN PROGRESS — validate record and nested-object shapes before dereferencing during restore.
+- **M82 — Defensive Snapshot Record Decoding:** COMPLETE — validate record and nested-object shapes before dereferencing during restore.
 - **M83 — Mixed-Record Restore Isolation:** corrupt records and persistence failures must not poison healthy recovery candidates.
 - **M84 — Real-Path Mission Lifecycle Harness:** exercise submission through queue, worker, QA, and review with structured evidence.
 - **M85 — Queue Liveness and Stuck-Stage Diagnostics:** deadlines, heartbeats, and actionable stuck/blocked state.
@@ -1089,7 +1089,7 @@ These are PLANNED, not complete. Promote one milestone to IN PROGRESS only when 
 
 
 ## M82 — Defensive Snapshot Record Decoding
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Validate that each pending snapshot is a mapping before reading fields.
 - Validate nested mission and plan objects are the expected model types before dereferencing their fields.
