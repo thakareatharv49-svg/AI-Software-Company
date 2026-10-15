@@ -350,3 +350,11 @@ The user expects autonomous milestone execution, including code review, CI repai
 - Arbitrary exceptions caused by malformed nested legacy job payloads are contained to the affected orphan record, so later independent healthy jobs can still recover. Added regressions for a malformed nested plan followed by a healthy job and non-string durable identity.
 - **Next planned milestone: M84 — Real-Path Mission Lifecycle Harness.** Exercise the actual public submission-to-queue/worker/QA/review path with deterministic providers and structured evidence. Do not treat unit recovery coverage as end-to-end product acceptance.
 - Remaining major acceptance gaps: large-mission execution/recovery, queue liveness/fairness, preview/revise/approve/publish, and fresh-database OAuth/workspace/tenant isolation.
+
+
+## Engineering handoff — 2026-10-15 UTC (M84 implementation in progress)
+
+- Main baseline: `aa36504c51c6950792609b2a82750796da0fb6c8` (M83 complete).
+- M84 adds a deterministic acceptance harness through the public mission submission and factory-run HTTP routes. It keeps the real factory, generated-product execution pipeline, pytest QA runner, reviewer, durable job/output manifest, and audit history in the path while replacing only model/agent nondeterminism.
+- The harness must retain a machine-readable failure trace and prove the mission reaches a completed durable state with all stages complete, QA exit code 0, review approved, generated files present, and output/audit evidence.
+- Do not mark complete until exact-head CI, secret scan, dependency audit, and both CodeQL checks pass and the PR is merged. The separate existing real-model large-product test may require Ollama; M84's default acceptance harness must not.
