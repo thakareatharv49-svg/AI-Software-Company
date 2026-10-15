@@ -672,7 +672,7 @@ async def test_large_generation_keeps_file_context_bounded_and_dependency_first(
             "    return {'text': text}",
             "",
             "def test_add_note_preserves_text():",
-            "    assert add_note('Plan')[''text'] == 'Plan'",
+            "    assert add_note('Plan')['text'] == 'Plan'",
         ])}),
     ]
     payloads = []
