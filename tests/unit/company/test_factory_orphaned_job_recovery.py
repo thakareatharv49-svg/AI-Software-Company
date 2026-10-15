@@ -795,3 +795,32 @@ def test_restore_isolates_snapshot_with_malformed_nested_plan_model():
     assert factory.restore() == 1
     assert [project.mission.id for project in factory.queue] == [healthy_snapshot["mission"].id]
 
+
+def test_restore_isolates_malformed_orphan_and_recovers_later_healthy_job():
+    malformed = make_job("Malformed orphan").model_copy(
+        update={"plan": make_job("Broken plan").plan.model_copy(update={"steps": None})}
+    )
+    healthy = make_job("Healthy orphan after malformed record")
+
+    class MixedJobStore(JobStore):
+        def list_all(self):
+            return [malformed, healthy]
+
+    factory = make_factory(MixedJobStore([malformed, healthy]))
+
+    assert factory.restore() == 1
+    assert [project.mission.id for project in factory.queue] == [healthy.id]
+
+
+def test_restore_fails_closed_when_orphan_identity_is_not_canonical_string():
+    healthy = make_job("Healthy but index identity is corrupt")
+    corrupt = healthy.model_copy(update={"id": 123})
+
+    class CorruptIdentityStore(JobStore):
+        def list_all(self):
+            return [corrupt]
+
+    factory = make_factory(CorruptIdentityStore([corrupt]))
+
+    assert factory.restore() == 0
+    assert factory.queue == []
