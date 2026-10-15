@@ -344,6 +344,16 @@ Rules:
             "help desk", "support portal", "subscription billing", "workflow automation",
             "human resources", "hr management", "supply chain", "knowledge base",
             "community platform",
+            # These deliverables have multiple coordinated files/tooling even when
+            # the mission brief is short. Keep them on the resumable manifest path
+            # instead of asking a small local model for a complete product at once.
+            "2d game", "3d game", "fighting game", "game engine",
+            "mobile app", "mobile application", "android app", "ios app",
+            "react native", "flutter app", "desktop app", "desktop application",
+            "windows app", "macos app", "electron app", "tauri app",
+            "rest api", "api-only", "api only", "microservice",
+            "python library", "javascript library", "npm package", "sdk",
+            "data pipeline", "etl pipeline", "automation pipeline",
         )
         requires_modular_plan = any(marker in text for marker in modular_product_markers)
         # Three explicit capabilities are already enough to make a mission
