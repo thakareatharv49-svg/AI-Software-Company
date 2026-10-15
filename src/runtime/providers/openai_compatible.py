@@ -5,9 +5,12 @@ import time
 import httpx
 
 from src.config.settings import settings
+from src.runtime.models.messages import ModelRequest, ModelResponse
+from src.runtime.providers.base import ModelProvider
 
 
-class OpenAICompatibleProvider:
+class OpenAICompatibleProvider(ModelProvider):
+    name = "openai-compatible"
     """Call OpenAI Chat Completions-compatible hosted or self-hosted endpoints.
 
     Works with OpenAI-compatible gateways and local servers (for example vLLM,
@@ -20,7 +23,22 @@ class OpenAICompatibleProvider:
         self.default_model = default_model or settings.openai_compatible_model
         self.timeout = timeout or settings.openai_compatible_timeout
 
-    async def generate(self, payload: dict) -> tuple[str, dict[str, int | None]]:
+    async def generate(self, request: ModelRequest) -> ModelResponse:
+        content, metrics = await self.generate_payload({
+            "model": request.model or self.default_model,
+            "prompt": request.prompt,
+            "system": request.system,
+            "options": {"temperature": request.temperature},
+        })
+        return ModelResponse(
+            content=content,
+            model=request.model or self.default_model,
+            provider=self.name,
+            duration_ms=metrics.get("duration_ms"),
+        )
+
+    async def generate_payload(self, payload: dict) -> tuple[str, dict[str, int | None]]:
+        """Generate from the factory's richer Ollama-shaped payload."""
         model = str(payload.get("model") or self.default_model)
         prompt = str(payload.get("prompt") or "")
         messages = []
