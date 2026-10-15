@@ -284,8 +284,12 @@ Rules:
         text = mission_text.casefold()
         non_browser_terms = (
             "command-line", "command line", " cli ", "cli tool", "terminal utility",
-            "api-only", "api only", "backend-only", "backend only", "python library",
-            "javascript library", "native mobile app", "desktop app",
+            "api-only", "api only", "rest api", "backend service", "backend-only", "backend only",
+            "python library", "javascript library", "npm package", "sdk",
+            "native mobile app", "mobile app", "mobile application", "android app", "ios app",
+            "react native", "flutter", "desktop app", "desktop application", "windows app",
+            "macos app", "electron app", "tauri app", "video game", "2d game", "3d game",
+            "automation script", "data pipeline", "etl job",
         )
         if any(term in f" {text} " for term in non_browser_terms):
             return False
