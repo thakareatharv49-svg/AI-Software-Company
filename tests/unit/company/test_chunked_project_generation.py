@@ -651,35 +651,39 @@ async def test_large_generation_keeps_file_context_bounded_and_dependency_first(
     monkeypatch, tmp_path
 ):
     generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
-    responses = [
-        json.dumps({
-            "files": [
-                {"path": "index.html", "purpose": "App entry point"},
-                {"path": "style.css", "purpose": "Visual styling"},
-                {
-                    "path": "app.js",
-                    "purpose": "Interactive behavior",
-                    "depends_on": ["index.html"],
-                },
-                {"path": "tests/test_project.py", "purpose": "Behavior tests"},
-            ]
-        }),
-        json.dumps({"content": "<!doctype html><title>Context</title>"}),
-        json.dumps({"content": "body { color: black; }"}),
-        json.dumps({"content": "function runApp() { return true; }"}),
-        json.dumps({"content": "\n".join([
+    manifest_response = json.dumps({
+        "files": [
+            {"path": "index.html", "purpose": "App entry point"},
+            {"path": "style.css", "purpose": "Visual styling"},
+            {
+                "path": "app.js",
+                "purpose": "Interactive behavior",
+                "depends_on": ["index.html"],
+            },
+            {"path": "tests/test_project.py", "purpose": "Behavior tests"},
+        ]
+    })
+    file_responses = {
+        "index.html": json.dumps({"content": "<!doctype html><title>Context</title>"}),
+        "style.css": json.dumps({"content": "body { color: black; }"}),
+        "app.js": json.dumps({"content": "function runApp() { return true; }"}),
+        "tests/test_project.py": json.dumps({"content": "\n".join([
             "def add_note(text):",
             "    return {'text': text}",
             "",
             "def test_add_note_preserves_text():",
             "    assert add_note('Plan')['text'] == 'Plan'",
         ])}),
-    ]
+    }
     payloads = []
 
     async def fake_call(payload):
         payloads.append(payload)
-        return responses.pop(0)
+        prompt = payload["prompt"]
+        if "File to generate: " not in prompt:
+            return manifest_response
+        path = prompt.split("File to generate: ", 1)[1].splitlines()[0].strip()
+        return file_responses[path]
 
     monkeypatch.setattr(generator, "_call", fake_call)
     await generator._generate_large_mission(
