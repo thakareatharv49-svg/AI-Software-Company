@@ -12,7 +12,7 @@ async def test_openai_compatible_provider_maps_json_generation_request() -> None
     response = httpx.Response(200, json={"choices": [{"message": {"content": '{"files": {}}'}}], "usage": {"prompt_tokens": 12, "completion_tokens": 4}}, request=httpx.Request("POST", "http://model.test/v1/chat/completions"))
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = response
-        content, metrics = await provider.generate({"prompt": "Build app", "model": "test-model", "format": {"type": "object"}, "options": {"temperature": 0.1, "num_predict": 2048}})
+        content, metrics = await provider.generate_payload({"prompt": "Build app", "model": "test-model", "format": {"type": "object"}, "options": {"temperature": 0.1, "num_predict": 2048}})
     assert content == '{"files": {}}'
     assert metrics["prompt_tokens"] == 12
     request = mock_post.await_args.kwargs
@@ -30,6 +30,19 @@ async def test_openai_compatible_provider_omits_auth_when_no_key_configured() ->
         content, _ = await provider.generate({"prompt": "hello"})
     assert content == "ok"
     assert "Authorization" not in mock_post.await_args.kwargs["headers"]
+
+
+@pytest.mark.asyncio
+async def test_openai_compatible_provider_implements_shared_runtime_contract() -> None:
+    from src.runtime.models.messages import ModelRequest
+    provider = OpenAICompatibleProvider(base_url="http://model.test/v1", api_key="", default_model="test-model")
+    response = httpx.Response(200, json={"choices": [{"message": {"content": "Hello"}}]}, request=httpx.Request("POST", "http://model.test/v1/chat/completions"))
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = response
+        result = await provider.generate(ModelRequest(prompt="Say hello"))
+    assert result.content == "Hello"
+    assert result.model == "test-model"
+    assert result.provider == "openai-compatible"
 
 
 def test_project_type_classifier_covers_requested_delivery_platforms() -> None:
