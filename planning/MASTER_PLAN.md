@@ -1006,3 +1006,12 @@ Build Again
 ```
 
 with meaningful engineering artifacts, reproducible execution, controlled permissions, transparent state, and persistent knowledge.
+
+
+---
+
+## 30. Revised execution priorities (2026-10-15)
+
+The master vision remains unchanged, but the engineering order is now evidence-driven: stabilize the mission lifecycle and durable recovery, prove real-path execution, add evidence-based product QA and approval, then expand security governance, customer onboarding, observability/economics, and release provenance. Do not increase agent autonomy before bounded execution, least-privilege tool policies, human approval boundaries, and reliable recovery are demonstrated.
+
+See [docs/IMPROVEMENT_PLAN.md](../docs/IMPROVEMENT_PLAN.md) for the research basis, detailed tracks, exit gates, and planned milestones M82–M93. See [docs/MILESTONES.md](../docs/MILESTONES.md) for implementation status. A planned milestone is not complete until its tests, real-path evidence where applicable, and exact-head CI/security checks pass.
