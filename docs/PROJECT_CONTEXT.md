@@ -322,3 +322,14 @@ The user expects autonomous milestone execution, including code review, CI repai
 - Regression coverage mixes null/scalar/list/empty records and wrong nested types with a valid snapshot, and covers a malformed nested plan model followed by an independent healthy record.
 - Next: inspect the exact PR head; require quality CI, secret scan, dependency audit, and both CodeQL language analyses to pass; repair any failures on the same branch; merge only after success; verify main and keep this handoff current.
 - End-to-end product gaps remain open until evidence-based acceptance: large-mission execution/recovery, queue liveness/fairness, preview/revise/approve/publish, and fresh-database OAuth/workspace/tenant isolation.
+
+
+---
+
+## Verified handoff — 2026-10-15 UTC (M82 merged)
+
+- **M82 — COMPLETE**, PR #368, merge commit `e1d637a5366e8136668858ee2109e2a71f645702`. The exact PR head `b6ad0a8b7e4ee141cc8dbb233a5388eb28015ce2` passed quality CI, secret-history scan, dependency audit, and both CodeQL language checks before merge.
+- Snapshot restoration now validates record mappings and explicit `CompanyMission`/`MissionPlan` nested model types before dereferencing. Parsing and sanitization errors are contained to the affected snapshot record.
+- Regression tests mix malformed null/scalar/list/empty entries and wrong nested types with healthy snapshots; a malformed nested plan does not prevent a later healthy snapshot from restoring.
+- **Next planned milestone M83 — Mixed-Record Restore Isolation:** extend the same failure-isolation guarantee to storage read/write failures and malformed durable records; preserve fail-closed recovery when durable identity cannot be verified. Do not mark M83 active until implementation begins.
+- The research-backed plan is in `docs/IMPROVEMENT_PLAN.md`; product-level end-to-end acceptance gaps remain open until exercised through the real application path.
