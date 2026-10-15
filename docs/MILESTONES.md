@@ -1077,7 +1077,7 @@ These are PLANNED, not complete. Promote one milestone to IN PROGRESS only when 
 - **M82 — Defensive Snapshot Record Decoding:** COMPLETE — validate record and nested-object shapes before dereferencing during restore.
 - **M83 — Mixed-Record Restore Isolation:** COMPLETE — isolate malformed durable orphan records from later healthy jobs, enforce canonical durable identities during orphan enumeration, and fail closed when the identity index itself is untrustworthy.
 - **M84 — Real-Path Mission Lifecycle Harness:** COMPLETE — deterministic public-path acceptance covers HTTP submission, factory worker execution, generated files, executed QA, review, durable output manifest, and audit history.
-- **M85 — Queue Liveness and Stuck-Stage Diagnostics:** deadlines, heartbeats, and actionable stuck/blocked state.
+- **M85 — Queue Liveness and Stuck-Stage Diagnostics:** COMPLETE — bounded progress-heartbeat detection tied to the configured execution deadline, queue-wait diagnostics, and actionable stalled/blocked guidance.
 - **M86 — Idempotent Lifecycle Operations:** duplicate submissions and concurrent retry/cancel/revise/restart safety.
 - **M87 — Generated Product QA Evidence:** build/startup smoke checks and browser critical-path checks for supported web products.
 - **M88 — Independent Review and Approval Binding:** review findings and approval tied to exact source/artifact identity.
@@ -1120,3 +1120,12 @@ Status: COMPLETE
 - Avoid real provider credentials and GitHub publication in the default test suite. Keep actual local-model/provider smoke tests separate and opt-in.
 
 Acceptance: one HTTP-submitted mission reaches completed through the factory worker with reproducible file, QA, review, persistence, and audit evidence; failure diagnostics include the structured trace.
+
+
+## M85 — Queue Liveness and Stuck-Stage Diagnostics
+Status: COMPLETE
+
+- Expose progress heartbeat age, stale status, queue wait threshold, and effective execution timeout through mission diagnostics.
+- Derive stale-running detection from the configured execution timeout with a 60-second noise floor and 2,100-second ceiling; invalid timeout settings fall back to the safe default.
+- Distinguish a suspected stalled worker from a confirmed failure and recommend inspecting worker/audit state before retrying.
+- Test recent/stale progress, configured and invalid deadlines, queued wait thresholds, and existing blocked/failed/cancelled outcomes.
