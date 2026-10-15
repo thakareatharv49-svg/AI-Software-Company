@@ -1,3 +1,5 @@
+import math
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.agents.models.contracts import AgentResult
@@ -104,17 +106,54 @@ def mission_audit(
     return center.audit(mission_id, event_type=event_type, status=status)
 
 
+_QUEUE_WAIT_WARNING_SECONDS = 300
+_DEFAULT_MISSION_EXECUTION_TIMEOUT_SECONDS = 1800
+_MAX_HEARTBEAT_STALE_SECONDS = 2100
+_MIN_HEARTBEAT_STALE_SECONDS = 60
+
+
+def _mission_liveness_thresholds(center: CompanyControlCenter) -> tuple[int, int]:
+    """Return bounded queue-wait and progress-heartbeat thresholds."""
+    factory = getattr(center, "_factory", None)
+    raw_timeout = getattr(
+        factory, "execution_timeout_seconds", _DEFAULT_MISSION_EXECUTION_TIMEOUT_SECONDS
+    )
+    try:
+        timeout = float(raw_timeout)
+    except (TypeError, ValueError, OverflowError):
+        timeout = float(_DEFAULT_MISSION_EXECUTION_TIMEOUT_SECONDS)
+    if not math.isfinite(timeout) or timeout <= 0:
+        timeout = float(_DEFAULT_MISSION_EXECUTION_TIMEOUT_SECONDS)
+    heartbeat_stale_after = min(
+        _MAX_HEARTBEAT_STALE_SECONDS,
+        max(_MIN_HEARTBEAT_STALE_SECONDS, int(timeout)),
+    )
+    return _QUEUE_WAIT_WARNING_SECONDS, heartbeat_stale_after
+
+
 @router.get("/missions/{mission_id}/diagnostics")
 def mission_diagnostics(
     mission_id: str,
     center: CompanyControlCenter = ControlCenter,
 ) -> dict[str, object]:
-    """Explain a mission's persisted progress and flag unusually long inactivity."""
+    """Explain persisted mission progress and expose bounded liveness signals."""
     from datetime import UTC, datetime
 
     job = center.mission_job(mission_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Mission job not found")
+
+    queue_wait_threshold, heartbeat_stale_after = _mission_liveness_thresholds(center)
+    factory = getattr(center, "_factory", None)
+    execution_timeout = getattr(
+        factory, "execution_timeout_seconds", _DEFAULT_MISSION_EXECUTION_TIMEOUT_SECONDS
+    )
+    try:
+        execution_timeout = float(execution_timeout)
+    except (TypeError, ValueError, OverflowError):
+        execution_timeout = float(_DEFAULT_MISSION_EXECUTION_TIMEOUT_SECONDS)
+    if not math.isfinite(execution_timeout) or execution_timeout <= 0:
+        execution_timeout = float(_DEFAULT_MISSION_EXECUTION_TIMEOUT_SECONDS)
 
     now = datetime.now(UTC)
     updated_at = job.updated_at
@@ -122,6 +161,14 @@ def mission_diagnostics(
         updated_at = updated_at.replace(tzinfo=UTC)
     idle_seconds = max(0, int((now - updated_at).total_seconds()))
     status_value = job.status.value
+    heartbeat_stale = (
+        status_value == MissionJobStatus.RUNNING.value
+        and idle_seconds >= heartbeat_stale_after
+    )
+    queue_wait_exceeded = (
+        status_value == MissionJobStatus.QUEUED.value
+        and idle_seconds >= queue_wait_threshold
+    )
     running_steps = [
         step for step in job.plan.steps
         if str(getattr(step.status, "value", step.status)).casefold() == "running"
@@ -135,24 +182,27 @@ def mission_diagnostics(
     message = "Mission has recent persisted activity."
     recommended_action = "continue_monitoring"
     if status_value == MissionJobStatus.QUEUED.value:
-        if idle_seconds >= 300:
+        if queue_wait_exceeded:
             diagnosis = "waiting_for_worker"
-            message = "Mission has been queued for at least five minutes without a status update."
+            message = (
+                f"Mission has been queued for at least {queue_wait_threshold} seconds "
+                "without a status update."
+            )
             recommended_action = "start_or_check_factory_worker"
         else:
             diagnosis = "queued"
             message = "Mission is waiting in the factory queue."
             recommended_action = "wait_or_start_factory"
-    elif status_value == MissionJobStatus.RUNNING.value and idle_seconds >= 2100:
+    elif status_value == MissionJobStatus.RUNNING.value and heartbeat_stale:
         diagnosis = "possibly_stalled"
         message = (
-            "No persisted mission update for over 35 minutes. This may be a stalled "
-            "worker; a long model call or external process can also delay updates."
+            f"No persisted progress heartbeat for at least {heartbeat_stale_after} seconds. "
+            "This may be a stalled worker; a long model call or external process can also delay updates."
         )
         recommended_action = "inspect_audit_and_worker_before_retrying"
     elif status_value == MissionJobStatus.RUNNING.value:
         diagnosis = "active"
-        message = "Mission is running within the expected progress window."
+        message = "Mission is running within the configured progress-heartbeat window."
         recommended_action = "continue_monitoring"
     elif status_value == MissionJobStatus.BLOCKED.value:
         diagnosis = "blocked"
@@ -180,6 +230,11 @@ def mission_diagnostics(
         "message": message,
         "recommended_action": recommended_action,
         "idle_seconds": idle_seconds,
+        "heartbeat_age_seconds": idle_seconds,
+        "heartbeat_stale": heartbeat_stale,
+        "heartbeat_stale_after_seconds": heartbeat_stale_after,
+        "queue_wait_threshold_seconds": queue_wait_threshold,
+        "execution_timeout_seconds": execution_timeout,
         "last_updated_at": job.updated_at.isoformat(),
         "current_stage": current_step.stage.value if current_step else None,
         "current_stage_detail": current_step.detail if current_step else None,
