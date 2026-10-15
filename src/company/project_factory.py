@@ -535,14 +535,17 @@ class ProjectFactory:
             identity_index_valid = True
             for candidate in durable_jobs:
                 try:
-                    durable_id = str(candidate.id).strip()
-                    embedded_id = str(candidate.mission.id).strip()
-                except (AttributeError, TypeError, ValueError):
+                    durable_id = _durable_identity_text(candidate.id)
+                    embedded_id = _durable_identity_text(candidate.mission.id)
+                except Exception:
+                    # The identity index is a single trust boundary: if even one
+                    # row cannot be read, uniqueness cannot be established safely.
                     identity_index_valid = False
                     break
                 if (
                     not durable_id
                     or not embedded_id
+                    or durable_id != embedded_id
                     or durable_id in durable_ids
                     or embedded_id in embedded_ids
                 ):
@@ -645,7 +648,11 @@ class ProjectFactory:
                     self.queue.append(project)
                     known_ids.add(mission_id)
                     restored += 1
-                except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
+                except Exception:
+                    # Custom stores and legacy model_copy payloads can raise
+                    # arbitrary exceptions while nested mission/plan fields are
+                    # inspected or sanitized. Contain them to this job so a
+                    # malformed row cannot abort recovery of later healthy jobs.
                     import logging
 
                     logging.getLogger(__name__).error(
