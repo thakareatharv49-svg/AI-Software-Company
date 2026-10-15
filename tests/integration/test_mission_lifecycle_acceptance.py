@@ -1,4 +1,20 @@
 from fastapi.testclient import TestClient
+import json
+import sys
+from types import SimpleNamespace
+
+from src.agents.models.contracts import AgentDefinition, AgentResult
+from src.agents.models.enums import AgentPermission
+from src.agents.registry.registry import AgentRegistry
+from src.company.execution.pipeline import CompanyExecutionPipeline
+from src.memory.service.service import MemoryService
+from src.manager.manager import MasterManager
+from src.manager.models.contracts import Mission as PipelineMission, TaskPlanItem
+from src.projects.engine.project_engine import ProjectEngine
+from src.projects.models.contracts import ProjectCreateRequest
+from src.qa.execution.runner import QARunner
+from src.qa.models.contracts import QATestRequest
+from src.security.review.reviewer import CodeReviewer
 
 from src.company.control_center.routes import get_control_center
 from src.company.control_center.service import CompanyControlCenter
@@ -58,23 +74,6 @@ def test_mission_lifecycle_acceptance_from_submission_to_safe_cancellation():
 
 
 # M84 deterministic public-path acceptance harness
-
-import json
-import sys
-from types import SimpleNamespace
-
-from src.agents.models.contracts import AgentDefinition, AgentResult
-from src.agents.models.enums import AgentPermission
-from src.agents.registry.registry import AgentRegistry
-from src.company.execution.pipeline import CompanyExecutionPipeline
-from src.memory.service.service import MemoryService
-from src.manager.manager import MasterManager
-from src.manager.models.contracts import Mission as PipelineMission, TaskPlanItem
-from src.projects.engine.project_engine import ProjectEngine
-from src.projects.models.contracts import ProjectCreateRequest
-from src.qa.execution.runner import QARunner
-from src.qa.models.contracts import QATestRequest
-from src.security.review.reviewer import CodeReviewer
 
 
 class _DeterministicEngineer:
