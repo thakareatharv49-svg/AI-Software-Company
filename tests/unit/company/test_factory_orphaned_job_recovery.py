@@ -705,3 +705,28 @@ def test_restore_rejects_non_string_identity_in_direct_job_lookup():
     # the stale queued snapshot must not resurrect the blocked mission.
     assert factory.restore() == 0
     assert factory.queue == []
+
+
+def test_restore_rejects_non_string_snapshot_mission_identity():
+    job = make_job("Malformed snapshot identity")
+    for malformed_id in (None, 123, " "):
+        mission = job.mission.model_copy(update={"id": malformed_id})
+        snapshot = {
+            "mission": mission,
+            "plan": job.plan,
+            "status": "queued",
+            "attempts": 0,
+        }
+
+        class SnapshotStore:
+            def load_pending(self, item=snapshot):
+                return [item]
+
+            def save(self, _project):
+                pass
+
+        # The durable store is empty, so the malformed snapshot must not be
+        # allowed to reach lookup/recovery and become an active mission.
+        factory = make_factory(JobStore([]), SnapshotStore())
+        assert factory.restore() == 0
+        assert factory.queue == []
