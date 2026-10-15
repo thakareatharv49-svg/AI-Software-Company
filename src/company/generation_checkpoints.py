@@ -52,13 +52,13 @@ class GenerationCheckpointStore:
                 or any(not isinstance(dep, str) or not dep.strip() for dep in dependencies)
             ):
                 return None
-            normalized_path = path.replace("\\\\", "/").strip()
+            normalized_path = path.replace(chr(92), "/").strip()
             path_parts = normalized_path.split("/")
             if (
                 normalized_path.startswith("/")
                 or ":" in normalized_path
                 or any(part in {"", ".", ".."} for part in path_parts)
-                or "\\n" in normalized_path
+                or chr(10) in normalized_path
             ):
                 return None
             path_key = normalized_path.casefold()
@@ -71,7 +71,7 @@ class GenerationCheckpointStore:
             not isinstance(path, str)
             or not path.strip()
             or not isinstance(content, str)
-            or path.replace("\\\\", "/").casefold() not in seen_paths
+            or path.replace(chr(92), "/").casefold() not in seen_paths
             for path, content in files.items()
         ):
             return None
