@@ -150,7 +150,15 @@ class ProjectFactory:
             # entry from a custom/legacy store must not prevent later valid
             # missions from being restored after restart.
             try:
-                raw_mission_id = item["mission"].id
+                if not isinstance(item, dict):
+                    raise TypeError("snapshot record must be a mapping")
+                raw_mission = item.get("mission")
+                raw_plan = item.get("plan")
+                if not isinstance(raw_mission, CompanyMission):
+                    raise TypeError("snapshot mission must be a CompanyMission")
+                if not isinstance(raw_plan, MissionPlan):
+                    raise TypeError("snapshot plan must be a MissionPlan")
+                raw_mission_id = raw_mission.id
                 mission_id = _durable_identity_text(raw_mission_id)
                 if not mission_id or mission_id != raw_mission_id:
                     import logging
@@ -194,7 +202,10 @@ class ProjectFactory:
                     project.attempts != original_attempts
                     or project.stages_executed != original_stages_executed
                 )
-            except (AttributeError, KeyError, TypeError, ValueError):
+            except Exception:
+                # Snapshot stores may return legacy objects that bypassed model
+                # validation or raise while exposing nested fields. Isolate each
+                # record so one malformed entry cannot abort healthy recovery.
                 import logging
 
                 logging.getLogger(__name__).error(
@@ -225,7 +236,9 @@ class ProjectFactory:
                     or project.last_error != original_last_error
                     or project.retry_feedback != original_retry_feedback
                 )
-            except (AttributeError, KeyError, TypeError, ValueError):
+            except Exception:
+                # Sanitization traverses nested legacy plan data; keep failures
+                # scoped to this record rather than aborting the restore pass.
                 import logging
 
                 logging.getLogger(__name__).error(
