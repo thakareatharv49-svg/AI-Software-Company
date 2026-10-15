@@ -29,6 +29,17 @@ def test_corrupt_checkpoint_is_ignored(tmp_path) -> None:
     assert store.load() is None
 
 
+def test_resumed_checkpoint_files_reject_broken_python_and_json(tmp_path) -> None:
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+
+    assert not generator._checkpoint_file_is_reusable("src/broken.py", "def broken(:\\n    pass")
+    assert not generator._checkpoint_file_is_reusable("config.json", '{"enabled":')
+    assert not generator._checkpoint_file_is_reusable("src/empty.py", "  \\n")
+    assert generator._checkpoint_file_is_reusable("src/valid.py", "def ready():\\n    return True\\n")
+    assert generator._checkpoint_file_is_reusable("config.json", '{"enabled": true}')
+
+
+
 def test_clear_removes_checkpoint(tmp_path) -> None:
     store = GenerationCheckpointStore(tmp_path, key="mission")
     store.save(manifest=[], files={})
