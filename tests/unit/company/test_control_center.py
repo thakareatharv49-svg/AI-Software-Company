@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
@@ -360,7 +362,10 @@ async def test_continuous_factory_processes_projects_one_at_a_time_and_can_stop(
     center._factory.run = fake_run
     await center.start_continuous_factory(max_retries=1)
     assert center._factory_task is not None
-    await center._factory_task
+    # The Stop action now cancels the active factory task, so awaiting it
+    # must observe cancellation rather than treating it as graceful completion.
+    with pytest.raises(asyncio.CancelledError):
+        await center._factory_task
 
     assert processed == [first.mission.id]
     assert center.continuous_factory_enabled() is False

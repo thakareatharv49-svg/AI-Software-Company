@@ -405,7 +405,7 @@ def stop_continuous_factory(
         "status": "stopping" if was_enabled else "stopped",
         "continuous": False,
         "message": (
-            "The current project will finish before the factory stops."
+            "The active project is being stopped; its interrupted work will be safely re-queued."
             if was_enabled else "Continuous mode is already stopped."
         ),
     }

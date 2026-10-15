@@ -325,7 +325,7 @@ class CompanyControlCenter:
 
                         if self._factory.queue:
                             await self._factory.run(max_projects=1, max_retries=max_retries)
-                            # Check the stop flag between projects; never cancel active generation.
+                            # Re-check the stop flag before starting another project.
                             await asyncio.sleep(0)
                         else:
                             await asyncio.sleep(1)
@@ -348,9 +348,12 @@ class CompanyControlCenter:
         self._factory_task = asyncio.create_task(continuous_runner())
 
     def stop_continuous_factory(self) -> bool:
-        """Stop after the current project finishes without cancelling generation."""
+        """Stop continuous mode and request cancellation of the active factory run."""
         was_enabled = self._continuous_mode
         self._continuous_mode = False
+        task = self._factory_task
+        if task is not None and not task.done():
+            task.cancel()
         return was_enabled
 
     def pause_factory(self) -> dict[str, object]:
@@ -584,6 +587,11 @@ class CompanyControlCenter:
         return results
 
     def stop(self) -> CompanyState:
+        """Stop company execution and request cancellation of the active factory run."""
+        self._continuous_mode = False
+        task = self._factory_task
+        if task is not None and not task.done():
+            task.cancel()
         self._orchestrator.stop()
         self._sync_latest()
         return self.state
