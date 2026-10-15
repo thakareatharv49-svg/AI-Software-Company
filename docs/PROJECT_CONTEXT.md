@@ -297,3 +297,16 @@ The user expects autonomous milestone execution, including code review, CI repai
 - M80 applies strict non-empty string validation to snapshot-backed direct job lookup results; the corrected regression proves a malformed numeric key cannot override a blocked durable lifecycle and resurrect a stale snapshot.
 - **M81 — IN PROGRESS**, branch `milestone-81-strict-snapshot-mission-identities`: validate the snapshot mission ID itself before duplicate detection or durable lookup. Null, numeric, blank, and non-canonical whitespace-padded IDs must fail closed.
 - Next: validate all required workflows on the exact latest M81 PR head, fix failures, merge only after success, verify main, and update this handoff. Permanent product milestones M47–M49 remain open pending end-to-end acceptance.
+
+
+---
+
+## Latest engineering handoff — 2026-10-15 UTC (M81 merged; improvement plan revised)
+
+- **M81 — COMPLETE**, PR #366, merge commit `aaf6f5456cec9b0f80763709d6540c2ece1941df`. The exact PR head `f38a3e65b1dcd9174daf3c966f5e02b5bf6d1bc1` passed CI/quality, secret scan, dependency audit, and CodeQL checks for Python and JavaScript/TypeScript before squash merge.
+- M81 validates a snapshot's mission identity as a canonical non-empty string before duplicate checks, durable lookup, or restoration; regressions cover null, numeric, blank, and noncanonical values.
+- **Research-backed plan added:** `docs/IMPROVEMENT_PLAN.md` is the strategic source for prioritized reliability, QA, security, customer onboarding, observability/economics, and release-integrity work. It is informed by OWASP GenAI security guidance, NIST AI RMF/Generative AI Profile, and GitHub Actions supply-chain guidance.
+- `docs/MILESTONES.md` now marks M81 complete and lists planned M82–M93. Planned does not mean implemented or verified.
+- **Next implementation:** M82, defensive snapshot record decoding. Inspect actual restore boundaries, validate nested record shape before dereferencing, and prove malformed records do not abort healthy recovery. Keep the current strict durable identity preflight and fail-closed invariants.
+- **Important product acceptance gaps remain open:** end-to-end large-mission execution and recovery, queue liveness/fairness, preview → revise → approve → publish, and clean-database OAuth/workspace/tenant isolation. Do not claim production readiness until their real-path acceptance criteria pass.
+- Continue the working agreement: inspect live GitHub state, use one implementation PR at a time, add regressions, require all required checks on the exact latest PR head, fix failures, merge only after success, verify main, and keep this handoff current. Never ask the user to merge.
