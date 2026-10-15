@@ -2013,7 +2013,10 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
         if provider_name in {"openai-compatible", "openai_compatible"}:
             from src.runtime.providers.openai_compatible import OpenAICompatibleProvider
 
-            model = str(payload.get("model") or settings.openai_compatible_model)
+            compatible_payload = dict(payload)
+            if not compatible_payload.get("model") or compatible_payload.get("model") == settings.ollama_model:
+                compatible_payload["model"] = settings.openai_compatible_model
+            model = str(compatible_payload["model"])
             provider = OpenAICompatibleProvider(timeout=request_timeout)
             started_at = time.perf_counter()
             prompt = payload.get("prompt", "")
@@ -2024,7 +2027,7 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
                 "prompt_tokens": None, "generated_tokens": None, "duration_ms": None,
             }
             try:
-                result, provider_metrics = await provider.generate(payload)
+                result, provider_metrics = await provider.generate(compatible_payload)
                 metrics.update(provider_metrics)
                 if self._generation_deadline is not None:
                     self._generation_prompt_tokens += int(metrics["prompt_tokens"] or 0)
