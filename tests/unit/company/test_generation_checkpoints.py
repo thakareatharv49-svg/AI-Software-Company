@@ -29,6 +29,50 @@ def test_corrupt_checkpoint_is_ignored(tmp_path) -> None:
     assert store.load() is None
 
 
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        [None],
+        [{"path": "src/app.py"}],
+        [{"path": "src/app.py", "purpose": "App", "depends_on": "src/core.py"}],
+        [{"path": "../escape.py", "purpose": "Unsafe path"}],
+        [
+            {"path": "src/app.py", "purpose": "First"},
+            {"path": "SRC/app.py", "purpose": "Duplicate path"},
+        ],
+    ],
+)
+def test_checkpoint_with_invalid_manifest_is_ignored(tmp_path, manifest) -> None:
+    store = GenerationCheckpointStore(tmp_path, key="mission")
+    store.path.parent.mkdir(parents=True, exist_ok=True)
+    store.path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "key_hash": store.key_hash,
+            "manifest": manifest,
+            "files": {},
+        }),
+        encoding="utf-8",
+    )
+
+    assert store.load() is None
+
+
+def test_checkpoint_with_file_not_in_manifest_is_ignored(tmp_path) -> None:
+    store = GenerationCheckpointStore(tmp_path, key="mission")
+    store.path.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "key_hash": store.key_hash,
+            "manifest": [{"path": "src/app.py", "purpose": "App"}],
+            "files": {"src/other.py": "stale content"},
+        }),
+        encoding="utf-8",
+    )
+
+    assert store.load() is None
+
+
 def test_resumed_checkpoint_files_reject_broken_python_and_json(tmp_path) -> None:
     generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
 
