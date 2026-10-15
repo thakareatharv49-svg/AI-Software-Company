@@ -48,6 +48,9 @@ def test_diagnostics_flags_old_running_mission_without_claiming_certainty():
     assert result["current_stage"] == job.plan.steps[0].stage.value
     assert result["failure_detail"] is None
     assert "can also delay updates" in result["message"]
+    assert result["heartbeat_stale"] is True
+    assert result["heartbeat_age_seconds"] >= result["heartbeat_stale_after_seconds"]
+    assert result["execution_timeout_seconds"] == 1800.0
 
 
 def test_diagnostics_marks_recent_running_mission_active():
@@ -57,6 +60,9 @@ def test_diagnostics_marks_recent_running_mission_active():
 
     assert result["diagnosis"] == "active"
     assert result["recommended_action"] == "continue_monitoring"
+    assert result["heartbeat_stale"] is False
+    assert result["heartbeat_stale_after_seconds"] == 1800
+    assert result["queue_wait_threshold_seconds"] == 300
 
 
 def test_diagnostics_explains_queued_mission_waiting_for_worker():
@@ -91,3 +97,45 @@ def test_diagnostics_returns_404_for_unknown_mission():
         assert exc.status_code == 404
     else:
         raise AssertionError("Expected missing mission to return 404")
+
+
+
+def test_diagnostics_uses_configured_execution_deadline_for_heartbeat_threshold():
+    from types import SimpleNamespace
+
+    job = make_job(MissionJobStatus.RUNNING, age_seconds=150)
+
+    class ConfiguredCenter(Center):
+        _factory = SimpleNamespace(execution_timeout_seconds=120)
+
+    result = mission_diagnostics(job.id, ConfiguredCenter(job))
+
+    assert result["execution_timeout_seconds"] == 120.0
+    assert result["heartbeat_stale_after_seconds"] == 120
+    assert result["heartbeat_stale"] is True
+    assert result["diagnosis"] == "possibly_stalled"
+
+
+def test_diagnostics_bounds_invalid_execution_deadline_to_safe_default():
+    from types import SimpleNamespace
+
+    job = make_job(MissionJobStatus.RUNNING, age_seconds=60)
+
+    class InvalidTimeoutCenter(Center):
+        _factory = SimpleNamespace(execution_timeout_seconds=float("nan"))
+
+    result = mission_diagnostics(job.id, InvalidTimeoutCenter(job))
+
+    assert result["execution_timeout_seconds"] == 1800.0
+    assert result["heartbeat_stale_after_seconds"] == 1800
+    assert result["heartbeat_stale"] is False
+
+
+def test_diagnostics_reports_queued_wait_threshold_without_false_heartbeat_alert():
+    job = make_job(MissionJobStatus.QUEUED, age_seconds=600)
+
+    result = mission_diagnostics(job.id, Center(job))
+
+    assert result["diagnosis"] == "waiting_for_worker"
+    assert result["queue_wait_threshold_seconds"] == 300
+    assert result["heartbeat_stale"] is False
