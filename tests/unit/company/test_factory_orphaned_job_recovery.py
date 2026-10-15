@@ -730,3 +730,68 @@ def test_restore_rejects_non_string_snapshot_mission_identity():
         factory = make_factory(JobStore([]), SnapshotStore())
         assert factory.restore() == 0
         assert factory.queue == []
+
+def test_restore_skips_malformed_snapshot_shapes_and_restores_healthy_record():
+    healthy = make_job("Healthy snapshot after malformed records")
+    malformed_records = [
+        None,
+        [],
+        "not-a-record",
+        {},
+        {"mission": None, "plan": healthy.plan, "status": "queued"},
+        {"mission": {"id": healthy.id}, "plan": healthy.plan, "status": "queued"},
+        {"mission": healthy.mission, "plan": None, "status": "queued"},
+        {"mission": healthy.mission, "plan": {"steps": []}, "status": "queued"},
+    ]
+    healthy_snapshot = {
+        "mission": healthy.mission,
+        "plan": healthy.plan,
+        "status": "queued",
+        "attempts": 0,
+        "stages_executed": 0,
+    }
+
+    class MixedSnapshotStore:
+        def load_pending(self):
+            return [*malformed_records, healthy_snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(JobStore([]), MixedSnapshotStore())
+
+    assert factory.restore() == 1
+    assert len(factory.queue) == 1
+    assert factory.queue[0].mission.id == healthy.id
+
+
+def test_restore_isolates_snapshot_with_malformed_nested_plan_model():
+    healthy = make_job("Healthy after nested model failure")
+    malformed_plan = healthy.plan.model_copy(update={"steps": None})
+    malformed_snapshot = {
+        "mission": healthy.mission,
+        "plan": malformed_plan,
+        "status": "queued",
+        "attempts": 0,
+        "stages_executed": 0,
+    }
+    healthy_snapshot = {
+        "mission": healthy.mission.model_copy(update={"id": f"{healthy.id}-healthy"}),
+        "plan": healthy.plan,
+        "status": "queued",
+        "attempts": 0,
+        "stages_executed": 0,
+    }
+
+    class MixedSnapshotStore:
+        def load_pending(self):
+            return [malformed_snapshot, healthy_snapshot]
+
+        def save(self, _project):
+            pass
+
+    factory = make_factory(JobStore([]), MixedSnapshotStore())
+
+    assert factory.restore() == 1
+    assert [project.mission.id for project in factory.queue] == [healthy_snapshot["mission"].id]
+
