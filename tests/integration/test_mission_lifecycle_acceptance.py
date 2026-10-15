@@ -126,11 +126,12 @@ class _RealPipelineMissionRunner:
                 "    assert 'Lifecycle Product' in Path('index.html').read_text(encoding='utf-8')\n"
             ),
         }
-        tests_dir = self.workspace / "tests"
-        tests_dir.mkdir(parents=True, exist_ok=True)
-        (tests_dir / "test_generated_product.py").write_text(
-            files["tests/test_generated_product.py"], encoding="utf-8"
-        )
+        # This deterministic adapter stands in for generated-file materialization;
+        # the subsequent real QA runner and reviewer inspect these exact files.
+        for relative_path, content in files.items():
+            target = self.workspace / relative_path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
         result = await pipeline.run_end_to_end(
             project_request=ProjectCreateRequest(
                 name=mission.name,
