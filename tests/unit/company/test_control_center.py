@@ -263,7 +263,7 @@ def test_dashboard_completed_product_preview_uses_defined_identifier() -> None:
     html = (static_dir / "index.html").read_text(encoding="utf-8")
     css = (static_dir / "styles.css").read_text(encoding="utf-8")
 
-    assert '/app/static/app.js?v=17' in html
+    assert '/app/static/app.js?v=18' in html
     assert '/app/static/styles.css?v=10' in html
     assert 'href="#missions-section"' in html and 'id="missions-section"' in html
     assert 'href="#factory-section"' in html and 'id="factory-section"' in html
@@ -284,7 +284,7 @@ def test_dashboard_exposes_project_output_observability_panel() -> None:
     assert '"/api/missions/" + encodeURIComponent(id) + "/outputs"' in dashboard
     assert 'output.output_type' in dashboard
     assert 'output.repository' in dashboard
-    assert 'app.js?v=17' in html
+    assert 'app.js?v=18' in html
 
 
 def test_cleanup_endpoint_deletes_only_queued_and_blocked_missions() -> None:
