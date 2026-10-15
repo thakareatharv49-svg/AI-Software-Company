@@ -2042,7 +2042,7 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
                 "prompt_tokens": None, "generated_tokens": None, "duration_ms": None,
             }
             try:
-                result, provider_metrics = await provider.generate(compatible_payload)
+                result, provider_metrics = await provider.generate_payload(compatible_payload)
                 metrics.update(provider_metrics)
                 if self._generation_deadline is not None:
                     self._generation_prompt_tokens += int(metrics["prompt_tokens"] or 0)
