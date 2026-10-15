@@ -998,6 +998,15 @@ Requirements:
                         raise RuntimeError(f"Ollama returned empty content for '{path}'")
                     if len(candidate.encode("utf-8")) > 2_000_000:
                         raise RuntimeError(f"Generated file '{path}' exceeds the 2 MB safety limit")
+                    if not self._checkpoint_file_is_reusable(path, candidate):
+                        suffix = PurePosixPath(path).suffix.casefold()
+                        if suffix == ".py":
+                            detail = "generated Python has a syntax error or is empty"
+                        elif suffix == ".json":
+                            detail = "generated JSON is malformed or empty"
+                        else:
+                            detail = "generated source is empty or exceeds the safety limit"
+                        raise RuntimeError(f"Generated file '{path}' is invalid: {detail}")
                     file_content = candidate
                     break
                 except (RuntimeError, json.JSONDecodeError) as exc:
