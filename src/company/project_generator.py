@@ -365,9 +365,13 @@ Rules:
         """Plan a bounded file manifest and resume from durable file checkpoints."""
         checkpoint = checkpoint or self._checkpoint(name, objective)
         saved_checkpoint = checkpoint.load()
+        project_type = classify_project_type(name, objective)
+        type_guidance = project_type_instructions(project_type)
         manifest_prompt = f"""Plan a small, complete software product for this mission.
 Project name: {name}
 Mission objective: {objective}
+Detected deliverable type: {project_type}
+Platform-specific instructions: {type_guidance}
 
 Return only JSON in this exact shape:
 {{"files":[{{"path":"index.html","purpose":"Application entry point","depends_on":[]}}]}}
@@ -881,6 +885,8 @@ Rules:
             file_prompt = f"""Implement exactly one file for a runnable software product.
 Project name: {name}
 Mission objective: {objective}
+Detected deliverable type: {project_type}
+Platform-specific instructions: {type_guidance}
 
 Full file plan:
 {previous_files}
