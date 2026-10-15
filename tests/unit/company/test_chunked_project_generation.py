@@ -34,7 +34,7 @@ async def test_large_mission_generates_each_file_independently(monkeypatch) -> N
         json.dumps({"content": "<!doctype html><html><head><title>Notes</title></head><body><script src=\"app.js\"></script><link rel=\"stylesheet\" href=\"style.css\"></body></html>"}),
         json.dumps({"content": "body { font-family: sans-serif; }"}),
         json.dumps({"content": "function addNote(text) { return { text }; }"}),
-        json.dumps({"content": "def test_mission_behavior(): assert 2 + 2 == 4"}),
+        json.dumps({"content": "def create_task(title):\n    return {'title': title, 'done': False}\n\ndef edit_task(task, title):\n    task['title'] = title\n    return task\n\ndef delete_task(tasks, title):\n    return [task for task in tasks if task['title'] != title]\n\ndef search_tasks(tasks, query):\n    return [task for task in tasks if query.casefold() in task['title'].casefold()]\n\ndef test_create_task():\n    assert create_task('Plan') == {'title': 'Plan', 'done': False}\n\ndef test_edit_task():\n    assert edit_task({'title': 'Old'}, 'New')['title'] == 'New'\n\ndef test_delete_task():\n    assert delete_task([{'title': 'Keep'}, {'title': 'Remove'}], 'Remove') == [{'title': 'Keep'}]\n\ndef test_search_tasks():\n    assert search_tasks([{'title': 'Project Planner'}], 'planner') == [{'title': 'Project Planner'}]\n"}),
     ]
     payloads = []
 
@@ -667,7 +667,7 @@ async def test_large_generation_keeps_file_context_bounded_and_dependency_first(
         json.dumps({"content": "<!doctype html><title>Context</title>"}),
         json.dumps({"content": "body { color: black; }"}),
         json.dumps({"content": "function runApp() { return true; }"}),
-        json.dumps({"content": "def add_note(text):\\n    return {'text': text}\\n\\ndef test_add_note_preserves_text():\\n    assert add_note('Plan')['text'] == 'Plan'\\n"}),
+        json.dumps({"content": "def add_note(text):\n    return {'text': text}\n\ndef test_add_note_preserves_text():\n    assert add_note('Plan')['text'] == 'Plan'\n"}),
     ]
     payloads = []
 
