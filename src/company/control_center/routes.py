@@ -106,7 +106,6 @@ def mission_audit(
     return center.audit(mission_id, event_type=event_type, status=status)
 
 
-@router.get("/missions/{mission_id}/diagnostics")
 _QUEUE_WAIT_WARNING_SECONDS = 300
 _DEFAULT_MISSION_EXECUTION_TIMEOUT_SECONDS = 1800
 _MAX_HEARTBEAT_STALE_SECONDS = 2100
@@ -132,6 +131,7 @@ def _mission_liveness_thresholds(center: CompanyControlCenter) -> tuple[int, int
     return _QUEUE_WAIT_WARNING_SECONDS, heartbeat_stale_after
 
 
+@router.get("/missions/{mission_id}/diagnostics")
 def mission_diagnostics(
     mission_id: str,
     center: CompanyControlCenter = ControlCenter,
