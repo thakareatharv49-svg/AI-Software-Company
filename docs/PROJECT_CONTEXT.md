@@ -341,3 +341,12 @@ The user expects autonomous milestone execution, including code review, CI repai
 - M83 focuses on the orphaned durable-job recovery pass: enforce the same canonical string identity invariant used by snapshot recovery and contain arbitrary exceptions from malformed nested legacy job data to that record.
 - Identity-index corruption remains fail-closed globally; per-record isolation must not weaken uniqueness guarantees or permit ambiguous work to be resurrected.
 - Verification and merge status must be updated only after exact-head CI, secret scan, dependency audit, and both CodeQL checks pass.
+
+
+## Verified engineering handoff — 2026-10-15 UTC (M83 merged)
+
+- **M83 — COMPLETE**, implementation PR [#370](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/370), merge commit `e6d781a8df95a6a84a4036860bc8e5d6b3652e08`. Exact implementation head `f418194f202de747604764c81c155531069533bf` passed CI/quality, secret-history scan, dependency audit, and both Python and JavaScript/TypeScript CodeQL analyses before merge.
+- Orphaned durable-job recovery now requires canonical non-empty string IDs and matching durable/embedded mission IDs during index preflight. An unreadable or ambiguous identity index remains fail-closed.
+- Arbitrary exceptions caused by malformed nested legacy job payloads are contained to the affected orphan record, so later independent healthy jobs can still recover. Added regressions for a malformed nested plan followed by a healthy job and non-string durable identity.
+- **Next planned milestone: M84 — Real-Path Mission Lifecycle Harness.** Exercise the actual public submission-to-queue/worker/QA/review path with deterministic providers and structured evidence. Do not treat unit recovery coverage as end-to-end product acceptance.
+- Remaining major acceptance gaps: large-mission execution/recovery, queue liveness/fairness, preview/revise/approve/publish, and fresh-database OAuth/workspace/tenant isolation.
