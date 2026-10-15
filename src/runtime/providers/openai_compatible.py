@@ -4,9 +4,9 @@ import time
 
 import httpx
 
-from src.config.settings import settings
-from src.runtime.models.messages import ModelRequest, ModelResponse
-from src.runtime.providers.base import ModelProvider
+from config.settings import settings
+from runtime.models.messages import ModelRequest, ModelResponse
+from runtime.providers.base import ModelProvider
 
 
 class OpenAICompatibleProvider(ModelProvider):
