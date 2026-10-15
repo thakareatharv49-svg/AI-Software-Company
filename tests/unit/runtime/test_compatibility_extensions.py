@@ -41,3 +41,7 @@ def test_project_type_classifier_covers_requested_delivery_platforms() -> None:
     assert classify_project_type("Date Utils", "Publish a reusable Python library") == "library"
     assert classify_project_type("Sales Dashboard", "Build a responsive web application") == "web"
     assert "Do not substitute a browser-only mockup" in project_type_instructions("mobile")
+    from src.company.project_generator import OllamaProjectGenerator
+    assert OllamaProjectGenerator._is_browser_mission("Build a Flutter mobile app") is False
+    assert OllamaProjectGenerator._is_browser_mission("Build a Windows desktop application") is False
+    assert OllamaProjectGenerator._is_browser_mission("Build a REST API backend service") is False
