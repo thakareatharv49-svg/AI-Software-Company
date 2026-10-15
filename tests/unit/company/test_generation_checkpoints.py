@@ -208,9 +208,9 @@ async def test_invalid_generated_python_is_retried_before_checkpointing(
                 {"path": "tests/test_library.py", "purpose": "Behavioral tests"},
             ]
         }),
-        json.dumps({"content": "def broken(:\\n    return 1"}),
-        json.dumps({"content": "def add(left: int, right: int) -> int:\\n    return left + right\\n"}),
-        json.dumps({"content": "from src.library import add\\n\\ndef test_add():\\n    assert add(2, 3) == 5\\n"}),
+        json.dumps({"content": "def broken(:\n    return 1"}),
+        json.dumps({"content": "def add(left: int, right: int) -> int:\n    return left + right\n"}),
+        json.dumps({"content": "from src.library import add\n\ndef test_add():\n    assert add(2, 3) == 5\n"}),
     ]
     prompts: list[str] = []
 
@@ -225,7 +225,7 @@ async def test_invalid_generated_python_is_retried_before_checkpointing(
     )
 
     assert generated.files["src/library.py"] == (
-        "def add(left: int, right: int) -> int:\\n    return left + right\\n"
+        "def add(left: int, right: int) -> int:\n    return left + right\n"
     )
     assert len(prompts) == 4
     assert "generated Python has a syntax error" in prompts[2]
