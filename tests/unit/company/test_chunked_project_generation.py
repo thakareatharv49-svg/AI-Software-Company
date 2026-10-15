@@ -667,7 +667,13 @@ async def test_large_generation_keeps_file_context_bounded_and_dependency_first(
         json.dumps({"content": "<!doctype html><title>Context</title>"}),
         json.dumps({"content": "body { color: black; }"}),
         json.dumps({"content": "function runApp() { return true; }"}),
-        json.dumps({"content": "def add_note(text):\n    return {'text': text}\n\ndef test_add_note_preserves_text():\n    assert add_note('Plan')['text'] == 'Plan'\n"}),
+        json.dumps({"content": "\n".join([
+            "def add_note(text):",
+            "    return {'text': text}",
+            "",
+            "def test_add_note_preserves_text():",
+            "    assert add_note('Plan')[''text'] == 'Plan'",
+        ])}),
     ]
     payloads = []
 
