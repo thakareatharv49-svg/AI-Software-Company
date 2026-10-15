@@ -333,3 +333,11 @@ The user expects autonomous milestone execution, including code review, CI repai
 - Regression tests mix malformed null/scalar/list/empty entries and wrong nested types with healthy snapshots; a malformed nested plan does not prevent a later healthy snapshot from restoring.
 - **Next planned milestone M83 — Mixed-Record Restore Isolation:** extend the same failure-isolation guarantee to storage read/write failures and malformed durable records; preserve fail-closed recovery when durable identity cannot be verified. Do not mark M83 active until implementation begins.
 - The research-backed plan is in `docs/IMPROVEMENT_PLAN.md`; product-level end-to-end acceptance gaps remain open until exercised through the real application path.
+
+
+## Verified engineering handoff — 2026-10-15 UTC (M83 implementation in progress)
+
+- Main baseline before M83: `491701122f87d15bb0f0c78336dffe7951a9ccaa` (M82 complete).
+- M83 focuses on the orphaned durable-job recovery pass: enforce the same canonical string identity invariant used by snapshot recovery and contain arbitrary exceptions from malformed nested legacy job data to that record.
+- Identity-index corruption remains fail-closed globally; per-record isolation must not weaken uniqueness guarantees or permit ambiguous work to be resurrected.
+- Verification and merge status must be updated only after exact-head CI, secret scan, dependency audit, and both CodeQL checks pass.

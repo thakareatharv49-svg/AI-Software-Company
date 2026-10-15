@@ -1075,7 +1075,7 @@ See [docs/IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) for the research-backed prio
 These are PLANNED, not complete. Promote one milestone to IN PROGRESS only when its implementation branch starts; mark COMPLETE only after tests and required GitHub checks pass.
 
 - **M82 — Defensive Snapshot Record Decoding:** COMPLETE — validate record and nested-object shapes before dereferencing during restore.
-- **M83 — Mixed-Record Restore Isolation:** corrupt records and persistence failures must not poison healthy recovery candidates.
+- **M83 — Mixed-Record Restore Isolation:** IN PROGRESS — isolate malformed durable orphan records from later healthy jobs, enforce canonical durable identities during orphan enumeration, and fail closed when the identity index itself is untrustworthy.
 - **M84 — Real-Path Mission Lifecycle Harness:** exercise submission through queue, worker, QA, and review with structured evidence.
 - **M85 — Queue Liveness and Stuck-Stage Diagnostics:** deadlines, heartbeats, and actionable stuck/blocked state.
 - **M86 — Idempotent Lifecycle Operations:** duplicate submissions and concurrent retry/cancel/revise/restart safety.
@@ -1097,3 +1097,14 @@ Status: COMPLETE
 - Add mixed-record regressions covering null/scalar/list records, missing fields, wrong nested types, and malformed nested plans alongside a healthy snapshot.
 
 Acceptance: malformed snapshot record shapes fail closed individually; a healthy independent snapshot later in the same restore batch is still restored, with no malformed record entering the queue.
+
+
+## M83 — Mixed-Record Restore Isolation
+Status: IN PROGRESS
+
+- Keep malformed durable orphan job payloads isolated to their own recovery attempt so a later healthy job can still be restored.
+- Require canonical, non-empty string IDs with matching durable and embedded mission identities during orphan-index preflight; do not coerce corrupt IDs into plausible identifiers.
+- Fail closed for the entire durable recovery pass when the identity index is unreadable or ambiguous, because uniqueness cannot be proven.
+- Add regressions for a malformed nested orphan plan followed by a healthy job and for non-string durable identity values.
+
+Acceptance: an independently malformed orphan record cannot abort recovery of later healthy jobs, while any untrustworthy identity index prevents unsafe recovery.
