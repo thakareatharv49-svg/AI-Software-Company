@@ -60,6 +60,27 @@ class OllamaProjectGenerator:
         self._generation_prompt_tokens = 0
         self._generation_output_tokens = 0
 
+    @staticmethod
+    def _checkpoint_file_is_reusable(path: str, content: str) -> bool:
+        """Reject obviously corrupted cached source before treating it as complete.
+
+        Checkpoints survive process restarts, so a syntactically broken Python or
+        JSON file must not be considered finished merely because its manifest
+        contract still matches. Other languages are validated by the product QA
+        pipeline, avoiding assumptions about optional local toolchains here.
+        """
+        if not content.strip() or len(content.encode("utf-8")) > 2_000_000:
+            return False
+        suffix = PurePosixPath(path).suffix.casefold()
+        try:
+            if suffix == ".py":
+                ast.parse(content, filename=path)
+            elif suffix == ".json":
+                json.loads(content)
+        except (SyntaxError, ValueError, TypeError):
+            return False
+        return True
+
     def _checkpoint(self, name: str, objective: str) -> GenerationCheckpointStore:
         # Automatic retries append diagnostic feedback to the objective. Keep the
         # original mission identity stable so interrupted large-project generation
@@ -798,8 +819,7 @@ Rules:
             path: content
             for path, content in cached_files.items()
             if isinstance(content, str)
-            and content.strip()
-            and len(content.encode("utf-8")) <= 2_000_000
+            and self._checkpoint_file_is_reusable(path, content)
         }
         checkpoint.save(manifest=normalized_manifest, files=files)
         test_command = ["python", "-m", "pytest", "-q"]
