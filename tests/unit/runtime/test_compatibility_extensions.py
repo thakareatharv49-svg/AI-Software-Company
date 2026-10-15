@@ -9,11 +9,11 @@ from src.runtime.providers.openai_compatible import OpenAICompatibleProvider
 @pytest.mark.asyncio
 async def test_openai_compatible_provider_maps_json_generation_request() -> None:
     provider = OpenAICompatibleProvider(base_url="http://model.test/v1", api_key="secret", default_model="test-model")
-    response = httpx.Response(200, json={"choices": [{"message": {"content": "{\\\"files\\\": {}}"}}], "usage": {"prompt_tokens": 12, "completion_tokens": 4}}, request=httpx.Request("POST", "http://model.test/v1/chat/completions"))
+    response = httpx.Response(200, json={"choices": [{"message": {"content": '{"files": {}}'}}], "usage": {"prompt_tokens": 12, "completion_tokens": 4}}, request=httpx.Request("POST", "http://model.test/v1/chat/completions"))
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = response
         content, metrics = await provider.generate({"prompt": "Build app", "model": "test-model", "format": {"type": "object"}, "options": {"temperature": 0.1, "num_predict": 2048}})
-    assert content == "{\\\"files\\\": {}}"
+    assert content == '{"files": {}}'
     assert metrics["prompt_tokens"] == 12
     request = mock_post.await_args.kwargs
     assert request["json"]["response_format"] == {"type": "json_object"}
