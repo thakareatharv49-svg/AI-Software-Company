@@ -1076,7 +1076,7 @@ These are PLANNED, not complete. Promote one milestone to IN PROGRESS only when 
 
 - **M82 — Defensive Snapshot Record Decoding:** COMPLETE — validate record and nested-object shapes before dereferencing during restore.
 - **M83 — Mixed-Record Restore Isolation:** COMPLETE — isolate malformed durable orphan records from later healthy jobs, enforce canonical durable identities during orphan enumeration, and fail closed when the identity index itself is untrustworthy.
-- **M84 — Real-Path Mission Lifecycle Harness:** exercise submission through queue, worker, QA, and review with structured evidence.
+- **M84 — Real-Path Mission Lifecycle Harness:** IN PROGRESS — exercise HTTP submission through the actual factory worker, generated files, executed QA, review, durable output manifest, and audit history using deterministic model adapters.
 - **M85 — Queue Liveness and Stuck-Stage Diagnostics:** deadlines, heartbeats, and actionable stuck/blocked state.
 - **M86 — Idempotent Lifecycle Operations:** duplicate submissions and concurrent retry/cancel/revise/restart safety.
 - **M87 — Generated Product QA Evidence:** build/startup smoke checks and browser critical-path checks for supported web products.
@@ -1108,3 +1108,15 @@ Status: COMPLETE
 - Add regressions for a malformed nested orphan plan followed by a healthy job and for non-string durable identity values.
 
 Acceptance: an independently malformed orphan record cannot abort recovery of later healthy jobs, while any untrustworthy identity index prevents unsafe recovery.
+
+
+## M84 — Real-Path Mission Lifecycle Harness
+Status: IN PROGRESS
+
+- Submit a mission through the public FastAPI endpoint, inspect its queued durable job and generated plan, then execute it through the public factory-run endpoint.
+- Keep the production factory, project-generation/execution pipeline, QA runner, reviewer, job persistence, output manifest, and audit trail real; replace only nondeterministic model/agent calls with deterministic test adapters.
+- Capture a machine-readable lifecycle trace in assertion diagnostics: mission ID, job state, stage states, QA status/exit code, review result, output status, and audit event types.
+- Verify generated files exist, a real pytest process ran and passed, the independent review approved, all lifecycle stages completed, and the durable job/output records agree.
+- Avoid real provider credentials and GitHub publication in the default test suite. Keep actual local-model/provider smoke tests separate and opt-in.
+
+Acceptance: one HTTP-submitted mission reaches completed through the factory worker with reproducible file, QA, review, persistence, and audit evidence; failure diagnostics include the structured trace.
