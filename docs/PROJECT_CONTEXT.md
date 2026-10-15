@@ -310,3 +310,15 @@ The user expects autonomous milestone execution, including code review, CI repai
 - **Next implementation:** M82, defensive snapshot record decoding. Inspect actual restore boundaries, validate nested record shape before dereferencing, and prove malformed records do not abort healthy recovery. Keep the current strict durable identity preflight and fail-closed invariants.
 - **Important product acceptance gaps remain open:** end-to-end large-mission execution and recovery, queue liveness/fairness, preview → revise → approve → publish, and clean-database OAuth/workspace/tenant isolation. Do not claim production readiness until their real-path acceptance criteria pass.
 - Continue the working agreement: inspect live GitHub state, use one implementation PR at a time, add regressions, require all required checks on the exact latest PR head, fix failures, merge only after success, verify main, and keep this handoff current. Never ask the user to merge.
+
+
+---
+
+## Latest engineering handoff — 2026-10-15 UTC (M81 and revised plan merged; M82 active)
+
+- **M81 — COMPLETE**, PR #366, merge commit `aaf6f5456cec9b0f80763709d6540c2ece1941df`. All required CI, secret scan, dependency audit, and CodeQL checks passed on exact PR head `f38a3e65b1dcd9174daf3c966f5e02b5bf6d1bc1`.
+- **Research-backed improvement plan merged**, PR #367, merge commit `b0566360f76b75066c5cc5d864a0f422742104e8`. `docs/IMPROVEMENT_PLAN.md` defines priority tracks and measurable exit gates; roadmap milestones M82–M93 are planned capabilities, not claims of implementation.
+- **M82 — IN PROGRESS**, branch `milestone-82-defensive-snapshot-record-decoding`: validate snapshot mapping shape and explicit `CompanyMission`/`MissionPlan` nested types before dereferencing. Isolate malformed record parsing and sanitization exceptions to each record.
+- Regression coverage mixes null/scalar/list/empty records and wrong nested types with a valid snapshot, and covers a malformed nested plan model followed by an independent healthy record.
+- Next: inspect the exact PR head; require quality CI, secret scan, dependency audit, and both CodeQL language analyses to pass; repair any failures on the same branch; merge only after success; verify main and keep this handoff current.
+- End-to-end product gaps remain open until evidence-based acceptance: large-mission execution/recovery, queue liveness/fairness, preview/revise/approve/publish, and fresh-database OAuth/workspace/tenant isolation.
