@@ -16,7 +16,7 @@ def classify_project_type(name: str, objective: str) -> str:
         return "library"
     if any(term in text for term in ("api-only", "api only", "rest api", "backend service", "backend-only", "backend only", "microservice")):
         return "api"
-    if any(term in text for term in ("website", "web app", "web application", "browser app", "browser-based", "frontend", "dashboard", "storefront", "landing page")):
+    if any(term in text for term in ("website", "web app", "web application", "browser app", "browser-based", "frontend", "dashboard", "storefront", "landing page", "calculator", "tic tac toe", "tictactoe", "tic-tac-toe", "todo", "to-do", "task manager", "task list")):
         return "web"
     if any(term in text for term in ("game", "video game", "2d game", "3d game")):
         return "game"
