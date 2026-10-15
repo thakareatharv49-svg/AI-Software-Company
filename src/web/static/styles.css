@@ -118,3 +118,5 @@ h1{font-size:clamp(28px,3vw,42px);line-height:1.12;margin:12px 0 10px;letter-spa
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 
 .factory-mode-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.factory-mode-actions button{min-height:38px}.factory-mode-actions .secondary{background:#1a2233;border:1px solid #303b53;color:#d0d8e9}.factory-mode-actions .secondary:hover{background:#232d42}
+
+.stop-current-button{margin-top:12px;background:#7d2538;border-color:#b84660;color:#fff;font-weight:850;min-height:44px;width:100%;box-shadow:0 6px 22px #9f294333}.stop-current-button:hover{background:#9c2d45}.stop-current-help{font-size:11px;line-height:1.55;margin:8px 0 0!important}
