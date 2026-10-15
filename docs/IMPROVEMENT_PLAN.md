@@ -152,7 +152,7 @@ These are planned, not complete. Keep each implementation in its own focused PR 
 
 1. **M82 — Defensive Snapshot Record Decoding:** safely validate record and nested-object shapes before recovery dereferences; skip corrupt records without losing healthy records.
 2. **M83 — Mixed-Record Restore Isolation:** prove one malformed record, storage exception, or write-back failure cannot abort or poison unrelated healthy restore candidates.
-3. **M84 — Real-Path Mission Lifecycle Harness:** deterministic integration harness for submission through queue/worker/QA/review with structured stage evidence.
+3. **M84 — Real-Path Mission Lifecycle Harness (COMPLETE):** deterministic public HTTP submission and factory execution with the real generated-product pipeline, executed pytest QA, independent review, durable output manifest, audit history, and structured failure trace; exact-head CI/security checks passed and PR #372 was merged.
 4. **M85 — Queue Liveness and Stuck-Stage Diagnostics:** enforce deadlines/heartbeats and expose actionable stuck/blocked state.
 5. **M86 — Idempotent Lifecycle Operations:** cover duplicate submission, retry, cancellation, revision, restart, and concurrent operations.
 6. **M87 — Generated Product QA Evidence:** run build/startup smoke tests and browser critical-path checks for supported web products.
