@@ -34,7 +34,7 @@ async def test_openai_compatible_provider_omits_auth_when_no_key_configured() ->
 
 @pytest.mark.asyncio
 async def test_openai_compatible_provider_implements_shared_runtime_contract() -> None:
-    from src.runtime.models.messages import ModelRequest
+    from runtime.models.messages import ModelRequest
     provider = OpenAICompatibleProvider(base_url="http://model.test/v1", api_key="", default_model="test-model")
     response = httpx.Response(200, json={"choices": [{"message": {"content": "Hello"}}]}, request=httpx.Request("POST", "http://model.test/v1/chat/completions"))
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
