@@ -274,6 +274,8 @@ def test_large_mission_manifest_adds_browser_entrypoint_and_tests(tmp_path) -> N
                 {"files": [{"path": "app.js", "purpose": "Dashboard interactions"}]}
             )
         path = prompt.split("File to generate: ", 1)[1].splitlines()[0]
+        if path.endswith(".py"):
+            return json.dumps({"content": "def test_generated_project_smoke():\n    assert True\n"})
         return json.dumps({"content": f"// generated {path}"})
 
     generator._call = fake_call  # type: ignore[method-assign]

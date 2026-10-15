@@ -194,3 +194,42 @@ def test_owner_requested_revision_uses_a_distinct_checkpoint(tmp_path) -> None:
     revised = generator._checkpoint("Clinic Management System", revision)
 
     assert revised.key_hash != original.key_hash
+
+
+@pytest.mark.asyncio
+async def test_invalid_generated_python_is_retried_before_checkpointing(
+    tmp_path, monkeypatch
+) -> None:
+    generator = OllamaProjectGenerator(checkpoint_dir=tmp_path)
+    responses = [
+        json.dumps({
+            "files": [
+                {"path": "src/library.py", "purpose": "Public library functions"},
+                {"path": "tests/test_library.py", "purpose": "Behavioral tests"},
+            ]
+        }),
+        json.dumps({"content": "def broken(:" + chr(10) + "    return 1"}),
+        json.dumps({"content": "def add(left: int, right: int) -> int:" + chr(10) + "    return left + right" + chr(10)}),
+        json.dumps({"content": "def test_add(): assert 2 + 3 == 5"}),
+    ]
+    prompts: list[str] = []
+
+    async def fake_call(payload):
+        prompts.append(payload["prompt"])
+        return responses.pop(0)
+
+    monkeypatch.setattr(generator, "_call", fake_call)
+    generated = await generator._generate_large_mission(
+        "Reusable Python Library",
+        "Create a Python library that exposes an add function and tests.",
+    )
+
+    assert generated.files["src/library.py"] == "def add(left: int, right: int) -> int:" + chr(10) + "    return left + right" + chr(10)
+    assert len(prompts) == 4
+    assert "generated Python has a syntax error" in prompts[2]
+    checkpoint = generator._checkpoint(
+        "Reusable Python Library",
+        "Create a Python library that exposes an add function and tests.",
+    ).load()
+    assert checkpoint is not None
+    assert checkpoint["files"]["src/library.py"] == generated.files["src/library.py"]
