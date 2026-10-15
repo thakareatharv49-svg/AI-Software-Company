@@ -31,6 +31,50 @@ class GenerationCheckpointStore:
             or not isinstance(payload.get("files"), dict)
         ):
             return None
+
+        # Checkpoints are persisted across process versions and may be edited or
+        # partially corrupted on disk. Validate the full stored shape before the
+        # generator trusts the manifest or iterates cached files.
+        manifest = payload["manifest"]
+        seen_paths: set[str] = set()
+        for item in manifest:
+            if not isinstance(item, dict):
+                return None
+            path = item.get("path")
+            purpose = item.get("purpose")
+            dependencies = item.get("depends_on", [])
+            if (
+                not isinstance(path, str)
+                or not path.strip()
+                or not isinstance(purpose, str)
+                or not purpose.strip()
+                or not isinstance(dependencies, list)
+                or any(not isinstance(dep, str) or not dep.strip() for dep in dependencies)
+            ):
+                return None
+            normalized_path = path.replace("\\\\", "/").strip()
+            path_parts = normalized_path.split("/")
+            if (
+                normalized_path.startswith("/")
+                or ":" in normalized_path
+                or any(part in {"", ".", ".."} for part in path_parts)
+                or "\\n" in normalized_path
+            ):
+                return None
+            path_key = normalized_path.casefold()
+            if path_key in seen_paths:
+                return None
+            seen_paths.add(path_key)
+
+        files = payload["files"]
+        if any(
+            not isinstance(path, str)
+            or not path.strip()
+            or not isinstance(content, str)
+            or path.replace("\\\\", "/").casefold() not in seen_paths
+            for path, content in files.items()
+        ):
+            return None
         return payload
 
     def compatible_files(
