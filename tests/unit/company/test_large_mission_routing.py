@@ -30,6 +30,21 @@ def test_complex_product_categories_use_modular_generation(name, objective):
 def test_small_missions_keep_the_single_pass_path(name, objective):
     assert not OllamaProjectGenerator._is_large_mission(name, objective)
 
+
+@pytest.mark.parametrize(
+    ("name", "objective"),
+    [
+        ("Shadow Arena", "Build a 2D fighting game"),
+        ("Pocket Planner", "Build a native Android app"),
+        ("Appointment API", "Create a REST API for appointments"),
+        ("Data Pipeline", "Build an ETL pipeline"),
+        ("Reusable SDK", "Create a Python library and SDK"),
+        ("Desktop Studio", "Build a Windows desktop app"),
+    ],
+)
+def test_short_non_browser_products_use_resumable_generation(name, objective):
+    assert OllamaProjectGenerator._is_large_mission(name, objective)
+
 @pytest.mark.parametrize(
     "objective",
     [
