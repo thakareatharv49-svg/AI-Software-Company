@@ -367,3 +367,10 @@ The user expects autonomous milestone execution, including code review, CI repai
 - Test assertions include a structured JSON trace on failure and verify all 12 stages complete, the durable job is completed, QA actually runs with exit code 0 and output, review is approved, generated files exist, an output manifest is saved, and FACTORY_PROJECT_COMPLETED is audited.
 - **Next planned milestone: M85 — Queue Liveness and Stuck-Stage Diagnostics.** Add bounded progress/deadline/lease checks and actionable stuck/blocked diagnosis without relying on model-generated claims.
 - Larger product gaps remain open: large-mission execution/recovery under realistic workload, queue fairness/liveness beyond the deterministic acceptance slice, preview/revise/approve/publish tied to exact artifacts, and fresh-database OAuth/workspace/tenant isolation.
+
+
+## Engineering handoff — 2026-10-15 UTC (M85 implementation)
+
+- Mission diagnostics report heartbeat age/staleness, the effective execution timeout, and queue-wait threshold. Running-mission stale detection is bounded by the configured execution deadline, with a short noise floor and hard ceiling; malformed timeout configuration falls back to a safe default.
+- Diagnostics distinguish a suspected stall from a confirmed failure and advise inspecting worker/audit state before retrying, because long model calls and external processes can delay progress updates.
+- Focused tests cover stale/recent heartbeat behavior, configured deadlines, invalid timeout fallback, queued wait thresholds, and existing failure-state reporting. Exact-head CI/security checks and merge are required before treating this handoff as verified.
