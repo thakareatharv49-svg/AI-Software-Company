@@ -10,12 +10,13 @@ from src.runtime.providers.base import ModelProvider
 
 
 class OpenAICompatibleProvider(ModelProvider):
-    name = "openai-compatible"
     """Call OpenAI Chat Completions-compatible hosted or self-hosted endpoints.
 
     Works with OpenAI-compatible gateways and local servers (for example vLLM,
     LM Studio, or compatible proxies). A bearer token is sent only when configured.
     """
+
+    name = "openai-compatible"
 
     def __init__(self, base_url: str | None = None, api_key: str | None = None, default_model: str | None = None, timeout: float | None = None) -> None:
         self.base_url = (base_url or settings.openai_compatible_base_url).rstrip("/")
