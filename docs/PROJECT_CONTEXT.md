@@ -358,3 +358,12 @@ The user expects autonomous milestone execution, including code review, CI repai
 - M84 adds a deterministic acceptance harness through the public mission submission and factory-run HTTP routes. It keeps the real factory, generated-product execution pipeline, pytest QA runner, reviewer, durable job/output manifest, and audit history in the path while replacing only model/agent nondeterminism.
 - The harness must retain a machine-readable failure trace and prove the mission reaches a completed durable state with all stages complete, QA exit code 0, review approved, generated files present, and output/audit evidence.
 - Do not mark complete until exact-head CI, secret scan, dependency audit, and both CodeQL checks pass and the PR is merged. The separate existing real-model large-product test may require Ollama; M84's default acceptance harness must not.
+
+
+## Verified engineering handoff — 2026-10-15 UTC (M84 merged)
+
+- **M84 — COMPLETE**, implementation PR [#372](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/372), merge commit 0cc935e7d36409dbb2eb748c2a9d81938abf3fbc. Exact tested PR head 768f7d7809a0bbad3765fe8ef34f2a15f3baf544 passed CI/quality, secret-history scan, dependency audit, and both Python and JavaScript/TypeScript CodeQL checks before merge.
+- Added a deterministic acceptance test using the public HTTP submission and factory-run endpoints and the real factory worker. Only nondeterministic agent/model calls are replaced; product execution, pytest QA, security review, durable job/output manifest, and audit history remain real.
+- Test assertions include a structured JSON trace on failure and verify all 12 stages complete, the durable job is completed, QA actually runs with exit code 0 and output, review is approved, generated files exist, an output manifest is saved, and FACTORY_PROJECT_COMPLETED is audited.
+- **Next planned milestone: M85 — Queue Liveness and Stuck-Stage Diagnostics.** Add bounded progress/deadline/lease checks and actionable stuck/blocked diagnosis without relying on model-generated claims.
+- Larger product gaps remain open: large-mission execution/recovery under realistic workload, queue fairness/liveness beyond the deterministic acceptance slice, preview/revise/approve/publish tied to exact artifacts, and fresh-database OAuth/workspace/tenant isolation.
