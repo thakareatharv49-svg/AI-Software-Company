@@ -14,6 +14,7 @@ from pathlib import Path, PurePosixPath
 
 from src.company.generation_checkpoints import GenerationCheckpointStore
 from src.company.project_planning import order_manifest_paths
+from src.company.project_types import classify_project_type, project_type_instructions
 
 import httpx
 
@@ -96,12 +97,16 @@ class OllamaProjectGenerator:
                 self._generation_deadline = None
 
     async def _generate_with_budget(self, name: str, objective: str) -> GeneratedProject:
+        project_type = classify_project_type(name, objective)
+        type_guidance = project_type_instructions(project_type)
         prompt = f"""Build a distinct, complete, runnable software product for this mission. Treat the mission objective as the source of truth; do not default to a calculator, Tic-Tac-Toe, todo list, or generic landing page unless that exact product is requested.
 
 Project name: {name}
 Mission objective: {objective}
+Detected deliverable type: {project_type}
+Platform-specific instructions: {type_guidance}
 
-Before writing code, infer the appropriate product category, target user, core workflow, and acceptance criteria from the mission. Implement the requested product—not a generic example—and make its interface, data model, and interactions specific to that objective. For web apps, create a coherent multi-section or multi-page experience when the scope calls for it, with real working interactions and useful sample data. Do not replace requested features with placeholders or merely describe what could be built.
+Before writing code, infer the appropriate product category, target user, core workflow, and acceptance criteria from the mission. Respect the detected deliverable type; do not turn native mobile, desktop, API, CLI, library, game, or automation missions into browser-only applications. Implement the requested product—not a generic example—and make its interface, data model, and interactions specific to that objective. For web apps, create a coherent multi-section or multi-page experience when the scope calls for it, with real working interactions and useful sample data. Do not replace requested features with placeholders or merely describe what could be built.
 
 Return ONLY valid JSON with this shape:
 {{"files": {{"relative/path": "complete file contents"}},
@@ -159,7 +164,7 @@ Rules:
         # Notes App missions have a deterministic, fully offline browser product.
         # This known multi-feature workflow should not fail because a small local
         # model struggles to coordinate HTML, styling, persistence and CRUD behavior.
-        if (
+        if project_type == "web" and (
             "notes app" in request_text
             or "note taking app" in request_text
             or "note-taking app" in request_text
@@ -179,7 +184,7 @@ Rules:
         # Route these to the local implementation instead of making several
         # sequential Ollama calls for a predictable CRUD application.
         todo_terms = ("todo", "to-do", "to do list", "task manager", "task list")
-        if any(term in request_text for term in todo_terms):
+        if project_type == "web" and any(term in request_text for term in todo_terms):
             from src.company.todo_fallback import todo_fallback_files
 
             fallback = GeneratedProject(
@@ -190,7 +195,7 @@ Rules:
         # Expense Tracker is a supported deterministic browser product. Do not
         # let a slow/unavailable local model turn this common mission into a
         # blocked project; the generated app remains fully interactive offline.
-        if (
+        if project_type == "web" and (
             ("expense tracker" in request_text or "expense tracking app" in request_text)
             and getattr(self._call, "__func__", None) is OllamaProjectGenerator._call
         ):
@@ -198,9 +203,9 @@ Rules:
             # Preserve injected/mocked _call implementations so generation and
             # repair behavior remain testable and extensible.
             return self._validated_fallback(name, objective, self._fallback_expense_tracker())
-        if "calculator" in request_text:
+        if project_type == "web" and "calculator" in request_text:
             return self._validated_fallback(name, objective, self._fallback_calculator())
-        if "tic tac toe" in request_text or "tictactoe" in request_text or "tic-tac-toe" in request_text:
+        if project_type == "web" and ("tic tac toe" in request_text or "tictactoe" in request_text or "tic-tac-toe" in request_text):
             return self._validated_fallback(name, objective, self._fallback_tic_tac_toe())
 
         # Large missions are generated file-by-file so one truncated or malformed
@@ -279,8 +284,12 @@ Rules:
         text = mission_text.casefold()
         non_browser_terms = (
             "command-line", "command line", " cli ", "cli tool", "terminal utility",
-            "api-only", "api only", "backend-only", "backend only", "python library",
-            "javascript library", "native mobile app", "desktop app",
+            "api-only", "api only", "rest api", "backend service", "backend-only", "backend only",
+            "python library", "javascript library", "npm package", "sdk",
+            "native mobile app", "mobile app", "mobile application", "android app", "ios app",
+            "react native", "flutter", "desktop app", "desktop application", "windows app",
+            "macos app", "electron app", "tauri app", "video game", "2d game", "3d game",
+            "automation script", "data pipeline", "etl job",
         )
         if any(term in f" {text} " for term in non_browser_terms):
             return False
@@ -356,9 +365,13 @@ Rules:
         """Plan a bounded file manifest and resume from durable file checkpoints."""
         checkpoint = checkpoint or self._checkpoint(name, objective)
         saved_checkpoint = checkpoint.load()
+        project_type = classify_project_type(name, objective)
+        type_guidance = project_type_instructions(project_type)
         manifest_prompt = f"""Plan a small, complete software product for this mission.
 Project name: {name}
 Mission objective: {objective}
+Detected deliverable type: {project_type}
+Platform-specific instructions: {type_guidance}
 
 Return only JSON in this exact shape:
 {{"files":[{{"path":"index.html","purpose":"Application entry point","depends_on":[]}}]}}
@@ -872,6 +885,8 @@ Rules:
             file_prompt = f"""Implement exactly one file for a runnable software product.
 Project name: {name}
 Mission objective: {objective}
+Detected deliverable type: {project_type}
+Platform-specific instructions: {type_guidance}
 
 Full file plan:
 {previous_files}
@@ -1983,7 +1998,12 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
         raise RuntimeError("Ollama repair failed and no deterministic repair is available")
 
     async def _call(self, payload: dict) -> str:
-        request_timeout = settings.ollama_timeout
+        configured_provider = settings.factory_model_provider.strip().casefold()
+        request_timeout = (
+            settings.openai_compatible_timeout
+            if configured_provider in {"openai-compatible", "openai_compatible"}
+            else settings.ollama_timeout
+        )
         if self._generation_deadline is not None:
             remaining = self._generation_deadline - time.monotonic()
             if remaining <= 0:
@@ -1999,18 +2019,54 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
             self._generation_model_calls += 1
             request_timeout = min(request_timeout, remaining)
 
-        model = str(payload.get("model", settings.ollama_model))
+        provider_name = settings.factory_model_provider.strip().casefold()
+        model = str(payload.get("model") or settings.ollama_model)
+        if provider_name not in {"ollama", "openai-compatible", "openai_compatible"}:
+            raise RuntimeError(
+                "FACTORY_MODEL_PROVIDER must be 'ollama' or 'openai-compatible'."
+            )
+        if provider_name in {"openai-compatible", "openai_compatible"}:
+            from src.runtime.providers.openai_compatible import OpenAICompatibleProvider
+
+            compatible_payload = dict(payload)
+            if not compatible_payload.get("model") or compatible_payload.get("model") == settings.ollama_model:
+                compatible_payload["model"] = settings.openai_compatible_model
+            model = str(compatible_payload["model"])
+            provider = OpenAICompatibleProvider(timeout=request_timeout)
+            started_at = time.perf_counter()
+            prompt = payload.get("prompt", "")
+            prompt_chars = len(prompt) if isinstance(prompt, str) else 0
+            outcome = "error"
+            response_chars = 0
+            metrics: dict[str, int | None] = {
+                "prompt_tokens": None, "generated_tokens": None, "duration_ms": None,
+            }
+            try:
+                result, provider_metrics = await provider.generate_payload(compatible_payload)
+                metrics.update(provider_metrics)
+                if self._generation_deadline is not None:
+                    self._generation_prompt_tokens += int(metrics["prompt_tokens"] or 0)
+                    self._generation_output_tokens += int(metrics["generated_tokens"] or 0)
+                response_chars = len(result)
+                outcome = "success"
+                return result
+            finally:
+                logger.info(
+                    "model_generation_request provider=%s model=%s duration_seconds=%.3f "
+                    "prompt_chars=%d response_chars=%d outcome=%s prompt_tokens=%s generated_tokens=%s",
+                    "openai-compatible", model, time.perf_counter() - started_at,
+                    prompt_chars, response_chars, outcome, metrics["prompt_tokens"],
+                    metrics["generated_tokens"],
+                )
+
         prompt = payload.get("prompt", "")
         prompt_chars = len(prompt) if isinstance(prompt, str) else 0
         started_at = time.perf_counter()
         outcome = "error"
         response_chars = 0
         server_metrics: dict[str, int | None] = {
-            "ollama_load_ms": None,
-            "prompt_eval_ms": None,
-            "generation_ms": None,
-            "prompt_tokens": None,
-            "generated_tokens": None,
+            "ollama_load_ms": None, "prompt_eval_ms": None, "generation_ms": None,
+            "prompt_tokens": None, "generated_tokens": None,
         }
         try:
             try:
@@ -2022,8 +2078,6 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
                     response.raise_for_status()
                     data = response.json()
                     if isinstance(data, dict):
-                        # Ollama reports phase durations in nanoseconds. Keep only
-                        # numeric aggregates; never log prompts or generated text.
                         for source_key, log_key in (
                             ("load_duration", "ollama_load_ms"),
                             ("prompt_eval_duration", "prompt_eval_ms"),
@@ -2035,35 +2089,26 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
                             if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
                                 server_metrics[log_key] = (
                                     round(value / 1_000_000)
-                                    if source_key.endswith("_duration")
-                                    else int(value)
+                                    if source_key.endswith("_duration") else int(value)
                                 )
             except httpx.TimeoutException as exc:
                 raise RuntimeError(
-                    "Ollama project generation timed out after "
-                    f"{request_timeout:g}s for model '{model}'. "
-                    "The per-project generation deadline may have been reached; "
-                    "otherwise increase OLLAMA_TIMEOUT or use a faster/smaller mission."
+                    f"Ollama project generation timed out after {request_timeout:g}s for model '{model}'. "
+                    "The per-project generation deadline may have been reached; otherwise increase OLLAMA_TIMEOUT or use a faster model."
                 ) from exc
             except httpx.HTTPStatusError as exc:
-                body = exc.response.text[:500].replace("\\n", " ")
+                body = exc.response.text[:500].replace("\n", " ")
                 raise RuntimeError(
-                    f"Ollama returned HTTP {exc.response.status_code} for model "
-                    f"'{model}': {body}"
+                    f"Ollama returned HTTP {exc.response.status_code} for model '{model}': {body}"
                 ) from exc
             except httpx.HTTPError as exc:
-                raise RuntimeError(
-                    f"Could not reach Ollama at {settings.ollama_base_url}: {exc}"
-                ) from exc
+                raise RuntimeError(f"Could not reach Ollama at {settings.ollama_base_url}: {exc}") from exc
             except ValueError as exc:
-                raise RuntimeError(
-                    f"Ollama returned a non-JSON API response for model '{model}'"
-                ) from exc
+                raise RuntimeError(f"Ollama returned a non-JSON API response for model '{model}'") from exc
 
             if self._generation_deadline is not None:
                 self._generation_prompt_tokens += int(server_metrics["prompt_tokens"] or 0)
                 self._generation_output_tokens += int(server_metrics["generated_tokens"] or 0)
-
             result = data.get("response")
             if not isinstance(result, str) or not result.strip():
                 raise RuntimeError(
@@ -2074,23 +2119,13 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
             outcome = "success"
             return result
         finally:
-            # Log performance metadata only, never prompts or generated source.
-            # This lets operators distinguish model latency from oversized context
-            # without leaking mission content into application logs.
             logger.info(
                 "ollama_generation_request model=%s duration_seconds=%.3f "
-                "prompt_chars=%d response_chars=%d outcome=%s "
-                "ollama_load_ms=%s prompt_eval_ms=%s generation_ms=%s "
-                "prompt_tokens=%s generated_tokens=%s",
-                model,
-                time.perf_counter() - started_at,
-                prompt_chars,
-                response_chars,
-                outcome,
-                server_metrics["ollama_load_ms"],
-                server_metrics["prompt_eval_ms"],
-                server_metrics["generation_ms"],
-                server_metrics["prompt_tokens"],
+                "prompt_chars=%d response_chars=%d outcome=%s ollama_load_ms=%s "
+                "prompt_eval_ms=%s generation_ms=%s prompt_tokens=%s generated_tokens=%s",
+                model, time.perf_counter() - started_at, prompt_chars, response_chars,
+                outcome, server_metrics["ollama_load_ms"], server_metrics["prompt_eval_ms"],
+                server_metrics["generation_ms"], server_metrics["prompt_tokens"],
                 server_metrics["generated_tokens"],
             )
 

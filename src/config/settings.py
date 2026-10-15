@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.2"
     ollama_timeout: float = 600.0
 
+    # Select the factory generation backend without changing mission code. The
+    # OpenAI-compatible option supports hosted APIs and self-hosted gateways.
+    factory_model_provider: str = "ollama"
+    openai_compatible_base_url: str = "https://api.openai.com/v1"
+    openai_compatible_api_key: str = ""
+    openai_compatible_model: str = "gpt-4o-mini"
+    openai_compatible_timeout: float = 600.0
+
     # Untrusted generated code must use the isolated backend outside development.
     sandbox_mode: str = "container"
     sandbox_container_image: str = "ai-software-company-sandbox:latest"
