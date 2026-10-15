@@ -1058,10 +1058,31 @@ Acceptance: every durable recovery path validates identity types consistently an
 
 
 ## M81 — Validate Snapshot Mission Identity Before Recovery
-Status: IN PROGRESS
+Status: COMPLETE
 
 - Validate the snapshot's mission ID as a canonical, non-empty string before checking duplicates or performing durable job lookup.
 - Reject null, numeric, blank, or whitespace-padded IDs instead of allowing malformed legacy model instances to bypass normal validation.
 - Add regression coverage for malformed snapshot mission IDs with no matching durable job.
 
 Acceptance: no snapshot enters reconciliation, durable lookup, or queue restoration unless its mission identity is an explicit canonical non-empty string.
+
+## Revised strategic improvement plan
+
+See [docs/IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) for the research-backed priority sequence, exit gates, and milestone acceptance rules. The next planned work prioritizes end-to-end lifecycle reliability and evidence-based product QA over adding more autonomous agents.
+
+### Planned milestones M82–M93
+
+These are PLANNED, not complete. Promote one milestone to IN PROGRESS only when its implementation branch starts; mark COMPLETE only after tests and required GitHub checks pass.
+
+- **M82 — Defensive Snapshot Record Decoding:** validate record and nested-object shapes before dereferencing during restore.
+- **M83 — Mixed-Record Restore Isolation:** corrupt records and persistence failures must not poison healthy recovery candidates.
+- **M84 — Real-Path Mission Lifecycle Harness:** exercise submission through queue, worker, QA, and review with structured evidence.
+- **M85 — Queue Liveness and Stuck-Stage Diagnostics:** deadlines, heartbeats, and actionable stuck/blocked state.
+- **M86 — Idempotent Lifecycle Operations:** duplicate submissions and concurrent retry/cancel/revise/restart safety.
+- **M87 — Generated Product QA Evidence:** build/startup smoke checks and browser critical-path checks for supported web products.
+- **M88 — Independent Review and Approval Binding:** review findings and approval tied to exact source/artifact identity.
+- **M89 — Tool Policy and Adversarial Safety Tests:** untrusted content, tool authorization, destructive action approval, and sandbox limits.
+- **M90 — Customer Auth/Workspace End-to-End Acceptance:** OAuth, workspace membership, tenant isolation, and role separation.
+- **M91 — Mission Observability and Budget Enforcement:** correlated event timeline, resource ceilings, and bounded autonomous scheduling.
+- **M92 — Release Provenance and Rollback Readiness:** verifiable artifact provenance, SBOM where feasible, and rehearsed rollback.
+- **M93 — Continuous Improvement Evaluation Loop:** measured quality, safety, latency, and cost regression gates.
