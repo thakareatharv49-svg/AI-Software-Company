@@ -27,7 +27,7 @@ async def test_openai_compatible_provider_omits_auth_when_no_key_configured() ->
     response = httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]}, request=httpx.Request("POST", "http://local.test/v1/chat/completions"))
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = response
-        content, _ = await provider.generate({"prompt": "hello"})
+        content, _ = await provider.generate_payload({"prompt": "hello"})
     assert content == "ok"
     assert "Authorization" not in mock_post.await_args.kwargs["headers"]
 
