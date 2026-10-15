@@ -53,7 +53,7 @@
 <div id="pipeline" class="pipeline"><div class="pipeline-step active"><b>01</b><span>Waiting</span><small>Select a mission</small></div></div>
 <div class="factory-mode-actions"><button id="run-queue" class="primary" type="button">Start continuous mode</button><button id="stop-queue" class="secondary" type="button">Stop after current project</button></div>
 <div id="queue-message" class="message" role="status" aria-live="polite"></div>
-<button id="stop" class="secondary" type="button">Stop company</button>
+<button id="stop" class="danger stop-current-button" type="button" aria-label="Stop the currently running project and pause the factory">Stop current project</button><p class="muted stop-current-help">Immediately cancels the active mission and pauses continuous factory mode. Interrupted work is re-queued for recovery.</p>
 </section>
 </div>
 <div class="grid">
@@ -63,7 +63,7 @@
 <section class="card details"><h2 id="detail-title">Mission details</h2><div id="details" class="empty">Select a mission to inspect outputs and audit trail.</div></section>
 </main>
 </div>
-<script src="/app/static/app.js?v=17" defer></script>
+<script src="/app/static/app.js?v=18" defer></script>
 <script src="/app/static/queue-run.js?v=2" defer></script>
 <script src="/app/static/quick-nav.js?v=1" defer></script>
 </body>
