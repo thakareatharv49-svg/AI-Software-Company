@@ -2120,7 +2120,7 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
             return result
         finally:
             logger.info(
-                "model_generation_request provider=ollama model=%s duration_seconds=%.3f "
+                "ollama_generation_request model=%s duration_seconds=%.3f "
                 "prompt_chars=%d response_chars=%d outcome=%s ollama_load_ms=%s "
                 "prompt_eval_ms=%s generation_ms=%s prompt_tokens=%s generated_tokens=%s",
                 model, time.perf_counter() - started_at, prompt_chars, response_chars,
