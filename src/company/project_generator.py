@@ -164,7 +164,7 @@ Rules:
         # Notes App missions have a deterministic, fully offline browser product.
         # This known multi-feature workflow should not fail because a small local
         # model struggles to coordinate HTML, styling, persistence and CRUD behavior.
-        if (
+        if project_type == "web" and (
             "notes app" in request_text
             or "note taking app" in request_text
             or "note-taking app" in request_text
@@ -184,7 +184,7 @@ Rules:
         # Route these to the local implementation instead of making several
         # sequential Ollama calls for a predictable CRUD application.
         todo_terms = ("todo", "to-do", "to do list", "task manager", "task list")
-        if any(term in request_text for term in todo_terms):
+        if project_type == "web" and any(term in request_text for term in todo_terms):
             from src.company.todo_fallback import todo_fallback_files
 
             fallback = GeneratedProject(
@@ -195,7 +195,7 @@ Rules:
         # Expense Tracker is a supported deterministic browser product. Do not
         # let a slow/unavailable local model turn this common mission into a
         # blocked project; the generated app remains fully interactive offline.
-        if (
+        if project_type == "web" and (
             ("expense tracker" in request_text or "expense tracking app" in request_text)
             and getattr(self._call, "__func__", None) is OllamaProjectGenerator._call
         ):
@@ -203,9 +203,9 @@ Rules:
             # Preserve injected/mocked _call implementations so generation and
             # repair behavior remain testable and extensible.
             return self._validated_fallback(name, objective, self._fallback_expense_tracker())
-        if "calculator" in request_text:
+        if project_type == "web" and "calculator" in request_text:
             return self._validated_fallback(name, objective, self._fallback_calculator())
-        if "tic tac toe" in request_text or "tictactoe" in request_text or "tic-tac-toe" in request_text:
+        if project_type == "web" and ("tic tac toe" in request_text or "tictactoe" in request_text or "tic-tac-toe" in request_text):
             return self._validated_fallback(name, objective, self._fallback_tic_tac_toe())
 
         # Large missions are generated file-by-file so one truncated or malformed
