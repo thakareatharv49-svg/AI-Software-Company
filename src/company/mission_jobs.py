@@ -76,6 +76,43 @@ def recover_running_plan(plan: MissionPlan) -> MissionPlan:
     return recovered
 
 
+def resume_failed_plan(plan: MissionPlan) -> MissionPlan:
+    """Resume from the earliest failed/in-flight checkpoint without replaying valid work.
+
+    Failed and interrupted stages are retried. A completed stage is retained only
+    when all of its declared prerequisites are still completed; invalidation then
+    propagates through completed dependents. Attempt counters remain intact.
+    """
+    recovered = plan.model_copy(deep=True)
+    completed_status = "completed"
+    retryable_statuses = {"failed", "running"}
+    for step in recovered.steps:
+        status = str(getattr(step.status, "value", step.status)).strip().casefold()
+        if status in retryable_statuses:
+            step.status = "planned"
+            step.detail = None
+
+    changed = True
+    while changed:
+        changed = False
+        completed = {
+            step.stage.value
+            for step in recovered.steps
+            if str(getattr(step.status, "value", step.status)).strip().casefold()
+            == completed_status
+        }
+        for step in recovered.steps:
+            status = str(getattr(step.status, "value", step.status)).strip().casefold()
+            if status != completed_status:
+                continue
+            if not set(step.depends_on).issubset(completed):
+                step.status = "planned"
+                step.detail = None
+                changed = True
+
+    return recovered
+
+
 def recover_running_job(job: MissionJob) -> MissionJob:
     if job.status != MissionJobStatus.RUNNING:
         return job
