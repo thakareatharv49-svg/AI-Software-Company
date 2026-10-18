@@ -26,6 +26,7 @@ from src.company.mission_jobs import (
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.project_outputs import ProjectOutputManifest
+from src.company.retry_policy import FailureClass, classify_failure
 from src.security.redaction import redact_sensitive_text, redact_sensitive_value
 
 if TYPE_CHECKING:
@@ -1425,7 +1426,17 @@ class ProjectFactory:
             event_type = "FACTORY_PROJECT_COMPLETED"
         elif self.orchestrator.state.status.value == "blocked":
             project.last_error = project.last_error or "Project execution blocked"
-            if project.attempts <= max_retries and max_retries > 0:
+            failure_class = classify_failure(project.last_error)
+            if failure_class == FailureClass.NON_RETRYABLE:
+                project.status = "blocked"
+                self.orchestrator.stop()
+                self._transition_job(
+                    project,
+                    MissionJobStatus.BLOCKED,
+                    f"Project blocked by non-retryable failure: {project.mission.name}",
+                )
+                event_type = "FACTORY_PROJECT_BLOCKED_NON_RETRYABLE"
+            elif project.attempts <= max_retries and max_retries > 0:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=True)
                 # A transiently failing mission must not monopolize the worker.
@@ -1462,6 +1473,15 @@ class ProjectFactory:
                     ),
                 )
                 event_type = "FACTORY_PROJECT_BLOCKED_RATE_LIMIT"
+            elif classify_failure(project.last_error) == FailureClass.NON_RETRYABLE:
+                project.status = "blocked"
+                self.orchestrator.block(project.last_error)
+                self._transition_job(
+                    project,
+                    MissionJobStatus.BLOCKED,
+                    f"Project blocked by non-retryable failure: {project.mission.name}",
+                )
+                event_type = "FACTORY_PROJECT_BLOCKED_NON_RETRYABLE"
             elif project.attempts <= max_retries:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=True)
