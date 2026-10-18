@@ -255,6 +255,7 @@ def mission_diagnostics(
         "running_stages": lifecycle["running_stages"],
         "failed_stages": lifecycle["failed_stages"],
         "planned_stages": lifecycle["planned_stages"],
+        "stage_summary": lifecycle["stage_summary"],
     }
 
 
