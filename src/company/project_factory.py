@@ -113,6 +113,11 @@ class ProjectFactory:
                 )
         restored = 0
         known_ids = {item.mission.id for item in self.queue}
+        # Use one stable enumeration for both identity preflight and orphan
+        # recovery. Calling list_all twice creates a time-of-check/time-of-use
+        # gap: a changing store could pass validation, then return a different
+        # identity index for enqueueing.
+        durable_jobs_snapshot: list[MissionJob] | None = None
 
         # Validate the durable identity index before recovering *any* snapshot.
         # Per-snapshot reconciliation alone is insufficient: a direct lookup can
@@ -123,6 +128,7 @@ class ProjectFactory:
             if callable(list_all_jobs):
                 try:
                     indexed_jobs = list(list_all_jobs())
+                    durable_jobs_snapshot = indexed_jobs
                     seen_durable_ids: set[str] = set()
                     seen_embedded_ids: set[str] = set()
                     for candidate in indexed_jobs:
@@ -519,13 +525,15 @@ class ProjectFactory:
         # restart. This is optional for custom stores that only implement get.
         list_all = getattr(self.job_store, "list_all", None)
         if callable(list_all):
-            try:
-                durable_jobs = list(list_all())
-            except Exception:
+            # Reuse the exact list that passed identity preflight. A store may
+            # change between calls (or return a different view during concurrent
+            # writes); recovery must not enqueue records from an unvalidated view.
+            durable_jobs = durable_jobs_snapshot
+            if durable_jobs is None:
                 import logging
 
                 logging.getLogger(__name__).error(
-                    "Unable to list durable mission jobs during factory restore"
+                    "Skipping orphaned durable recovery without a validated job snapshot"
                 )
                 durable_jobs = []
             # Orphan recovery must validate the entire enumerated identity
