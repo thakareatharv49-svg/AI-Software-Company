@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from inspect import signature
@@ -74,6 +75,8 @@ class FactoryProject:
     attempts: int = 0
     last_error: str | None = None
     retry_feedback: str | None = None
+    # Wall-clock epoch keeps retry cooldowns durable across process restarts.
+    retry_not_before_epoch: float = 0.0
 
 
 @dataclass
@@ -1053,10 +1056,22 @@ class ProjectFactory:
         if max_stages == 0 or not self.queue:
             return None
 
+        # Delayed retries yield to any other eligible project instead of sleeping
+        # at the head of the queue and blocking unrelated work.
+        now = time.time()
+        eligible_index = next(
+            (
+                index for index, item in enumerate(self.queue)
+                if not item.retry_not_before_epoch or item.retry_not_before_epoch <= now
+            ),
+            None,
+        )
+        if eligible_index is None:
+            return None
         # Keep the project in the FIFO queue until its startup state is durable.
         # A failed snapshot/job/audit write must not consume an attempt or strand
         # the mission outside the queue before execution's recovery boundary begins.
-        project = self.queue[0]
+        project = self.queue[eligible_index]
         previous_status = project.status
         previous_attempts = project.attempts
         previous_error = project.last_error
@@ -1114,7 +1129,8 @@ class ProjectFactory:
             raise
 
         # Dequeue only after all startup persistence and audit operations succeed.
-        self.queue.pop(0)
+        self.queue.pop(eligible_index)
+        project.retry_not_before_epoch = 0.0
         self._last_autonomous_result = None
         try:
             # Keep startup inside the guarded execution path. A controller/startup
@@ -1531,6 +1547,14 @@ class ProjectFactory:
         """Append a retry behind already-waiting missions without duplicating it."""
         if not any(item.mission.id == project.mission.id for item in self.queue):
             self.queue.append(project)
+
+    def _apply_retry_backoff(self, project: FactoryProject) -> None:
+        """Persist a capped exponential cooldown for automatic retry attempts."""
+        # 0.5, 1, 2, 4... seconds, capped at 30 seconds. The timestamp is
+        # persisted with the project snapshot so a restart cannot erase cooldown.
+        exponent = min(max(project.attempts - 1, 0), 6)
+        delay_seconds = min(0.5 * (2 ** exponent), 30.0)
+        project.retry_not_before_epoch = time.time() + delay_seconds
 
     @staticmethod
     def _safe_error_detail(value: str) -> str:
