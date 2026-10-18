@@ -139,3 +139,16 @@ def test_diagnostics_reports_queued_wait_threshold_without_false_heartbeat_alert
     assert result["diagnosis"] == "waiting_for_worker"
     assert result["queue_wait_threshold_seconds"] == 300
     assert result["heartbeat_stale"] is False
+
+
+def test_diagnostics_exposes_lifecycle_invariants_and_stage_counts():
+    job = make_job(MissionJobStatus.QUEUED)
+    job.plan.steps = job.plan.steps[:-1]
+
+    result = mission_diagnostics(job.id, Center(job))
+
+    assert result["lifecycle_valid"] is False
+    assert result["stage_count"] == len(job.plan.steps)
+    assert result["expected_stage_count"] > result["stage_count"]
+    assert any("missing required lifecycle stage 'learning'" in issue for issue in result["lifecycle_issues"])
+    assert "research" in result["planned_stages"]
