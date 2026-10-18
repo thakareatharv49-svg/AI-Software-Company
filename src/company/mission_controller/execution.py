@@ -6,6 +6,11 @@ from src.company.events.events import CompanyEvent
 from src.company.mission_controller.models import MissionPlan, MissionStage
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.company.mission_controller.failure_policy import (
+    FailureKind,
+    bounded_repair_attempts,
+    classify_failure,
+)
 
 
 _STAGE_AGENTS: dict[MissionStage, str] = {
@@ -119,19 +124,31 @@ class MissionExecutionPipeline:
 
         result: AgentResult | None = None
         last_error = ""
-        max_attempts = self.max_repair_attempts + 1
+        repair_limit = bounded_repair_attempts(self.max_repair_attempts)
+        max_attempts = repair_limit + 1
         for attempt in range(1, max_attempts + 1):
             step.attempts += 1
             repair_instruction = step.objective
             if attempt > 1:
+                previous_kind = classify_failure(last_error)
+                if previous_kind == FailureKind.TRANSIENT:
+                    retry_guidance = (
+                        "TRANSIENT FAILURE RETRY: The previous attempt appears "
+                        "to have failed due to a temporary service or network issue. "
+                        "Retry the same task without changing unrelated code. "
+                    )
+                else:
+                    retry_guidance = (
+                        "AUTOMATED REPAIR RETRY: Diagnose the specific failure, "
+                        "make the smallest safe correction, and verify the correction. "
+                    )
                 repair_instruction = (
                     f"{step.objective}\n\n"
-                    "AUTOMATED REPAIR RETRY: The previous attempt failed. "
-                    "Diagnose the specific failure, make the smallest safe "
-                    "correction available to you, and verify the correction. "
-                    "Do not claim a check passed unless you actually verified it.\n"
-                    f"Previous failure: {last_error}\n"
-                    f"Repair attempt: {attempt - 1} of {self.max_repair_attempts}"
+                    + retry_guidance
+                    + "Do not claim a check passed unless you actually verified it.\n"
+                    + f"Previous failure: {last_error}\n"
+                    + f"Failure category: {previous_kind.value}\n"
+                    + f"Repair attempt: {attempt - 1} of {repair_limit}"
                 )
 
             try:
@@ -185,6 +202,11 @@ class MissionExecutionPipeline:
                 break
 
             last_error = result.error or "Agent execution failed without an error detail"
+            failure_kind = classify_failure(last_error)
+            # Do not spend repair attempts on provider/configuration failures:
+            # a prompt cannot fix credentials, permissions, quotas, or cooldowns.
+            if failure_kind == FailureKind.NON_RETRYABLE:
+                break
             if attempt < max_attempts:
                 self.orchestrator.events.publish(
                     CompanyEvent(
@@ -203,8 +225,8 @@ class MissionExecutionPipeline:
             step.status = "failed"
             step.detail = (
                 last_error
-                if max_attempts == 1
-                else f"Failed after {max_attempts} attempt(s): {last_error}"
+                if attempt == 1
+                else f"Failed after {attempt} attempt(s): {last_error}"
             )
             self.orchestrator.block(step.detail)
             self.orchestrator.events.publish(
