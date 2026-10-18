@@ -185,11 +185,11 @@ Review this plan after each major track exit gate, after any production incident
 
 The R-series is a focused reliability workstream supporting the existing M86–M93 roadmap; it does not renumber those milestones.
 
-- [x] **R1 — Diagnose mission stages and enforce lifecycle invariants:** shared plan inspection detects missing/duplicate stages, malformed dependency graphs, unknown statuses, multiple in-flight stages, and completed stages whose prerequisites are not complete. Execution refuses malformed plans before invoking an agent, emits a correlated `MISSION_LIFECYCLE_INVALID` event, and the mission diagnostics endpoint exposes structured stage counts and issues.
+- [ ] **R1 — Diagnose mission stages and enforce lifecycle invariants:** shared plan inspection detects missing/duplicate stages, malformed dependency graphs, unknown statuses, multiple in-flight stages, and completed stages whose prerequisites are not complete. Execution refuses malformed plans before invoking an agent, emits a correlated `MISSION_LIFECYCLE_INVALID` event, and the mission diagnostics endpoint exposes structured stage counts and issues.
 - [ ] **R2 — Plan and execute large projects incrementally.**
 - [ ] **R3 — Build a bounded, failure-aware repair loop.**
 - [ ] **R4 — Prove generated-product features with real QA evidence.**
 - [ ] **R5 — Add browser critical-path acceptance for web products.**
 - [ ] **R6 — Enforce evidence-based mission completion.**
 
-R1 implementation is proposed in an open pull request and remains unmerged pending exact-head CI and security checks.
+R1 implementation is proposed in an open pull request and remains unmerged. Acceptance stays unchecked until exact-head CI and security checks pass.
