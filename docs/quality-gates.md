@@ -34,3 +34,8 @@ Run the pipeline and product QA regression tests with:
 ```powershell
 python -m pytest tests/unit/company tests/integration/test_deterministic_product_qa.py -q
 ```
+
+
+## Browser acceptance for web products
+
+When a generated workspace contains a root `index.html`, the factory runs local-only browser acceptance before delivery. The check probes the root route and a bounded number of same-origin internal routes, exercises safe visible controls, blocks external requests, and records browser errors. Missing Playwright/Chromium or failed browser acceptance must not be represented as a passing verification result.
