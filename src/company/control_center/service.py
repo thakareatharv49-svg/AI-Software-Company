@@ -19,7 +19,7 @@ from src.company.execution.pipeline import CompanyExecutionPipeline
 from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import MissionPlan
-from src.company.mission_jobs import MissionJob, MissionJobStatus
+from src.company.mission_jobs import MissionJob, MissionJobStatus, recover_running_job
 from src.company.models.contracts import CompanyMission, CompanyState
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.persistence import (
@@ -28,7 +28,7 @@ from src.company.persistence import (
     ProjectOutputStore,
     ProjectStore,
 )
-from src.company.project_factory import ProjectFactory
+from src.company.project_factory import FactoryProject, ProjectFactory
 from src.company.project_generator import OllamaProjectGenerator
 from src.company.project_outputs import ProjectOutputManifest
 from src.config.settings import settings
@@ -332,12 +332,54 @@ class CompanyControlCenter:
                     except asyncio.CancelledError:
                         raise
                     except Exception as exc:
+                        safe_error = redact_sensitive_text(
+                            f"{type(exc).__name__}: {exc}"
+                        )[:1000]
+                        # A failure can escape the worker after a durable job was
+                        # marked RUNNING. Requeue that job so the next poll does
+                        # not leave it permanently invisible to the QUEUED scan.
+                        try:
+                            for job in self.mission_jobs():
+                                if job.status != MissionJobStatus.RUNNING:
+                                    continue
+                                recovered = recover_running_job(job)
+                                self._job_store.save(recovered)
+                                self._jobs[recovered.id] = recovered
+                                self._sync_mission_from_job(recovered)
+                                queued = next(
+                                    (
+                                        project
+                                        for project in self._factory.queue
+                                        if project.mission.id == recovered.id
+                                    ),
+                                    None,
+                                )
+                                if queued is None:
+                                    queued = FactoryProject(
+                                        mission=recovered.mission,
+                                        plan=recovered.plan,
+                                        status="queued",
+                                        attempts=recovered.attempts,
+                                        last_error=safe_error,
+                                    )
+                                    self._factory.queue.append(queued)
+                                else:
+                                    queued.mission = recovered.mission
+                                    queued.plan = recovered.plan
+                                    queued.status = "queued"
+                                    queued.attempts = recovered.attempts
+                                    queued.last_error = safe_error
+                                self._factory._save(queued)
+                        except Exception:
+                            # Recovery is best-effort; preserve the outer loop
+                            # even when the durable store itself is unavailable.
+                            pass
                         self._orchestrator.events.publish(
                             CompanyEvent(
                                 event_type="FACTORY_CONTINUOUS_LOOP_ERROR",
                                 message=(
                                     "Continuous factory loop recovered from "
-                                    f"{type(exc).__name__}: {exc}"
+                                    f"{safe_error}"
                                 ),
                             )
                         )
