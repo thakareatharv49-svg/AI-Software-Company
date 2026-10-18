@@ -2011,6 +2011,8 @@ class ProjectFactory:
                         raise
                     self._contain_unexpected_worker_error(project, exc)
                 if project is None:
+                    if max_stages == 0:
+                        break
                     if self.queue:
                         now = time.time()
                         if any(item.retry_not_before_epoch <= now for item in self.queue):
