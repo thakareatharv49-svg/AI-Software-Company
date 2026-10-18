@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from inspect import signature
 from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
@@ -74,6 +74,9 @@ class FactoryProject:
     attempts: int = 0
     last_error: str | None = None
     retry_feedback: str | None = None
+    worker_started_at: datetime | None = None
+    last_progress_at: datetime | None = None
+    progress_updates: int = 0
 
 
 @dataclass
@@ -1062,6 +1065,9 @@ class ProjectFactory:
         previous_error = project.last_error
         self._active_project = project
         self._last_autonomous_result = None
+        project.worker_started_at = datetime.now(UTC)
+        project.last_progress_at = project.worker_started_at
+        project.progress_updates = 0
         project.status = "running"
         project.attempts += 1
         project.last_error = None
@@ -1663,6 +1669,53 @@ class ProjectFactory:
         finally:
             self._running = False
 
+    def worker_health(self, stale_after_seconds: float | None = None) -> dict[str, Any]:
+        """Return a read-only worker health snapshot without interrupting active work.
+
+        A stale heartbeat is diagnostic only; it never cancels or requeues work.
+        The default threshold is the configured execution timeout, which avoids
+        treating ordinary long provider calls as stuck before their timeout.
+        """
+        timeout = self.execution_timeout_seconds
+        threshold = max(1.0, float(timeout)) if stale_after_seconds is None else stale_after_seconds
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not math.isfinite(threshold) or threshold <= 0:
+            raise ValueError("stale_after_seconds must be a finite positive number")
+        now = datetime.now(UTC)
+        project = self._active_project
+        if project is None:
+            return {
+                "status": "idle" if not self.queue else "waiting",
+                "checked_at": now.isoformat(),
+                "active_mission_id": None,
+                "active_mission_name": None,
+                "started_at": None,
+                "last_progress_at": None,
+                "heartbeat_age_seconds": None,
+                "progress_updates": 0,
+                "stale_after_seconds": float(threshold),
+                "diagnostic": "No mission is currently assigned to the active worker.",
+            }
+        heartbeat = project.last_progress_at or project.worker_started_at
+        age = max(0.0, (now - heartbeat).total_seconds()) if heartbeat is not None else None
+        stale = age is None or age >= threshold
+        return {
+            "status": "stale" if stale else "healthy",
+            "checked_at": now.isoformat(),
+            "active_mission_id": project.mission.id,
+            "active_mission_name": project.mission.name,
+            "started_at": project.worker_started_at.isoformat() if project.worker_started_at else None,
+            "last_progress_at": heartbeat.isoformat() if heartbeat else None,
+            "heartbeat_age_seconds": age,
+            "progress_updates": project.progress_updates,
+            "stale_after_seconds": float(threshold),
+            "diagnostic": (
+                "No progress heartbeat has been recorded within the threshold. "
+                "Inspect worker logs and execution timeout before taking recovery action; "
+                "the active mission was not cancelled or requeued."
+                if stale else "Worker heartbeat is within the configured threshold."
+            ),
+        }
+
     def _save_output_manifest(self, project: FactoryProject, status: str) -> None:
         if self.output_store is None:
             return
@@ -1758,7 +1811,9 @@ class ProjectFactory:
         return safe_job
 
     def _persist_plan_progress(self, project: FactoryProject) -> None:
-        """Persist live stage status so the dashboard never shows stale all-planned work."""
+        """Persist live stage status and refresh the worker's progress heartbeat."""
+        project.last_progress_at = datetime.now(UTC)
+        project.progress_updates += 1
         self._save(project)
         job = self._load_job(project.mission.id)
         if job is not None:
