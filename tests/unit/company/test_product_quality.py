@@ -657,3 +657,41 @@ def test_feature_traceability_reports_uncovered_common_workflows() -> None:
     assert any("analytics/reporting" in issue for issue in issues)
     assert any("pagination" in issue for issue in issues)
     assert any("accessibility" in issue for issue in issues)
+
+
+
+def test_feature_traceability_covers_more_product_workflows() -> None:
+    objective = (
+        "Support real-time collaboration, offline mode, file uploads, "
+        "multi-tenancy, audit logging, charts, and bulk operations."
+    )
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "tests/test_app.py": (
+                "def test_realtime_collaboration_syncs_shared_changes(): pass\\n"
+                "def test_offline_mode_saves_changes(): pass\\n"
+                "def test_file_uploads_validate_attachments(): pass\\n"
+                "def test_workspace_tenants_are_isolated(): pass\\n"
+                "def test_audit_logging_records_changes(): pass\\n"
+                "def test_charts_visualize_activity(): pass\\n"
+                "def test_bulk_operations_update_records(): pass\\n"
+            )
+        },
+    )
+
+    assert issues == []
+
+
+def test_feature_traceability_reports_missing_upload_and_tenant_tests() -> None:
+    issues = find_uncovered_mission_features(
+        "Add file uploads and multi-tenancy to the app.",
+        {
+            "tests/test_app.py": (
+                "def test_upload_button_is_visible(): pass\\n"
+            )
+        },
+    )
+
+    assert any("file uploads" in issue for issue in issues)
+    assert any("multi-tenancy" in issue for issue in issues)
