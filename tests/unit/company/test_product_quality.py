@@ -348,7 +348,7 @@ def test_detects_high_confidence_credentials_in_shipped_source() -> None:
 
 def test_detects_private_key_material_in_shipped_source() -> None:
     issues = find_exposed_secrets({
-        "config/server.pem": "-----BEGIN PRIVATE KEY-----\\nexample\\n-----END PRIVATE KEY-----",
+        "config/server.pem": "-----BEGIN PRIVATE KEY-----\nexample\n-----END PRIVATE KEY-----",
     })
 
     assert len(issues) == 1
@@ -426,10 +426,10 @@ def test_rejects_tautological_javascript_assertions() -> None:
 def test_accepts_javascript_test_that_checks_product_behavior() -> None:
     issues = find_weak_javascript_tests({
         "tests/notes.test.js": (
-            "test('adds a note', () => {\\n"
-            "  const notes = addNote([], { title: 'Study' });\\n"
-            "  expect(notes).toHaveLength(1);\\n"
-            "  expect(notes[0].title).toBe('Study');\\n"
+            "test('adds a note', () => {\n"
+            "  const notes = addNote([], { title: 'Study' });\n"
+            "  expect(notes).toHaveLength(1);\n"
+            "  expect(notes[0].title).toBe('Study');\n"
             "});"
         ),
     })
@@ -669,13 +669,13 @@ def test_feature_traceability_covers_more_product_workflows() -> None:
         objective,
         {
             "tests/test_app.py": (
-                "def test_realtime_collaboration_syncs_shared_changes(): pass\\n"
-                "def test_offline_mode_saves_changes(): pass\\n"
-                "def test_file_uploads_validate_attachments(): pass\\n"
-                "def test_workspace_tenancy_isolated(): pass\\n"
-                "def test_audit_logging_records_changes(): pass\\n"
-                "def test_charts_visualize_activity(): pass\\n"
-                "def test_bulk_operations_update_records(): pass\\n"
+                "def test_realtime_collaboration_syncs_shared_changes(): pass\n"
+                "def test_offline_mode_saves_changes(): pass\n"
+                "def test_file_uploads_validate_attachments(): pass\n"
+                "def test_workspace_tenancy_isolated(): pass\n"
+                "def test_audit_logging_records_changes(): pass\n"
+                "def test_charts_visualize_activity(): pass\n"
+                "def test_bulk_operations_update_records(): pass\n"
             )
         },
     )
@@ -688,7 +688,7 @@ def test_feature_traceability_reports_missing_upload_and_tenant_tests() -> None:
         "Add file uploads and multi-tenancy to the app.",
         {
             "tests/test_app.py": (
-                "def test_navigation_renders(): pass\\n"
+                "def test_navigation_renders(): pass\n"
             )
         },
     )
