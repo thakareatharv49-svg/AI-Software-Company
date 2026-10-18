@@ -937,6 +937,98 @@ class ProjectFactory:
         self._audit(mission_id, "MISSION_REQUEUED", queued.message, queued.status.value)
         return queued
 
+    def recover_mission(self, mission_id: str, action: str) -> dict[str, Any]:
+        """Execute an explicit, guarded recovery action against durable mission state.
+
+        Supported actions are inspect, resume (already-queued work only), and
+        retry (failed/blocked work only). Never guess that a running mission is
+        safe to restart.
+        """
+        normalized_action = str(action).strip().lower()
+        if normalized_action not in {"inspect", "resume", "retry"}:
+            raise ValueError("Recovery action must be one of: inspect, resume, retry")
+        job = self._load_job(mission_id)
+        if job is None:
+            raise KeyError(mission_id)
+
+        if normalized_action == "inspect":
+            return {
+                "mission_id": mission_id,
+                "status": job.status.value,
+                "action": "inspect",
+                "changed": False,
+                "recommended_action": (
+                    "retry" if job.status in {MissionJobStatus.FAILED, MissionJobStatus.BLOCKED}
+                    else "resume" if job.status == MissionJobStatus.QUEUED
+                    else "none" if job.status == MissionJobStatus.COMPLETED
+                    else "inspect_worker_state"
+                ),
+            }
+
+        if self._running or self._active_project is not None:
+            raise RuntimeError("Cannot recover a mission while the factory worker is active")
+
+        if normalized_action == "retry":
+            if job.status not in {MissionJobStatus.FAILED, MissionJobStatus.BLOCKED}:
+                raise ValueError(
+                    f"Mission '{mission_id}' cannot be retried from '{job.status.value}'"
+                )
+            queued = self.retry(mission_id)
+            self._audit(
+                mission_id,
+                "MISSION_RECOVERY_ACTION",
+                "Explicit recovery action retried a failed mission",
+                queued.status.value,
+                {"action": "retry"},
+            )
+            return {
+                "mission_id": mission_id,
+                "status": queued.status.value,
+                "action": "retry",
+                "changed": True,
+                "recommended_action": "run_queued_mission",
+            }
+
+        if job.status != MissionJobStatus.QUEUED:
+            raise ValueError(
+                f"Mission '{mission_id}' cannot be resumed from '{job.status.value}'; "
+                "only durably queued missions can be rehydrated"
+            )
+        existing = next((item for item in self.queue if item.mission.id == mission_id), None)
+        if existing is not None:
+            return {
+                "mission_id": mission_id,
+                "status": job.status.value,
+                "action": "resume",
+                "changed": False,
+                "recommended_action": "already_queued",
+            }
+
+        # Durable QUEUED status authorizes reconstruction of in-memory work.
+        # Persist the project snapshot before publishing it to the queue.
+        project = FactoryProject(
+            mission=job.mission,
+            plan=job.plan.model_copy(deep=True),
+            status="queued",
+            attempts=job.attempts,
+        )
+        self._save(project)
+        self.queue.append(project)
+        self._audit(
+            mission_id,
+            "MISSION_RECOVERY_ACTION",
+            "Explicit recovery action rehydrated a durably queued mission",
+            job.status.value,
+            {"action": "resume"},
+        )
+        return {
+            "mission_id": mission_id,
+            "status": job.status.value,
+            "action": "resume",
+            "changed": True,
+            "recommended_action": "run_queued_mission",
+        }
+
     def revise(self, mission_id: str, feedback: str) -> MissionJob:
         """Queue a new build revision while preserving the mission identity and history."""
         if self._running:
