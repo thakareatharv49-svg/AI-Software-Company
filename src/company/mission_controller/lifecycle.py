@@ -4,6 +4,7 @@ from collections import Counter
 
 from src.company.mission_controller.models import MissionPlan, MissionStage
 from src.company.mission_controller.planner import validate_mission_plan
+from src.security.redaction import redact_sensitive_text
 
 _ALLOWED_STEP_STATUSES = frozenset({"planned", "running", "completed", "failed"})
 _ALLOWED_STEP_TRANSITIONS = {
@@ -81,5 +82,17 @@ def inspect_mission_lifecycle(plan: MissionPlan) -> dict[str, object]:
         "planned_stages": [
             step.stage.value for step in plan.steps
             if str(getattr(step.status, "value", step.status)).casefold() == "planned"
+        ],
+        "stage_summary": [
+            {
+                "stage": step.stage.value,
+                "status": str(getattr(step.status, "value", step.status)).casefold(),
+                "attempts": max(0, min(1_000_000, int(step.attempts or 0))),
+                "detail": (
+                    redact_sensitive_text(str(step.detail))[:1000]
+                    if step.detail else None
+                ),
+            }
+            for step in plan.steps
         ],
     }
