@@ -37,6 +37,20 @@ def _safe_interaction_label(label: str) -> bool:
 
 
 class _QuietHandler(SimpleHTTPRequestHandler):
+    def translate_path(self, path: str) -> str:
+        # The generated workspace is untrusted. Do not let symlinks or dotfiles
+        # turn the local preview server into a reader for host-side secrets.
+        root = Path(self.directory or ".").resolve()
+        candidate = Path(super().translate_path(path)).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            return str(root / "__blocked_browser_acceptance_path__")
+        relative = candidate.relative_to(root)
+        if any(part.startswith(".") for part in relative.parts):
+            return str(root / "__blocked_browser_acceptance_path__")
+        return str(candidate)
+
     def log_message(self, format: str, *args: Any) -> None:
         return
 
