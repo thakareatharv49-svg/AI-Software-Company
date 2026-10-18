@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from inspect import signature
@@ -76,6 +77,7 @@ class FactoryProject:
     attempts: int = 0
     last_error: str | None = None
     retry_feedback: str | None = None
+    retry_not_before_epoch: float = 0.0
 
 
 @dataclass
@@ -1298,25 +1300,36 @@ class ProjectFactory:
         if max_stages == 0 or not self.queue:
             return None
 
+        now = time.time()
+        eligible_index = next(
+            (index for index, item in enumerate(self.queue)
+             if item.retry_not_before_epoch <= now),
+            None,
+        )
+        if eligible_index is None:
+            return None
+
         # The durable job is the idempotency authority. A stale in-memory queue
         # entry must never re-run a mission that another worker has already
         # claimed or that has reached a terminal lifecycle state.
-        queued_candidate = self.queue[0]
+        queued_candidate = self.queue[eligible_index]
         durable_job = self._load_job(queued_candidate.mission.id)
         if durable_job is not None and durable_job.status != MissionJobStatus.QUEUED:
-            self.queue.pop(0)
+            self.queue.pop(eligible_index)
             return None
 
         # Keep the project in the FIFO queue until its startup state is durable.
         # A failed snapshot/job/audit write must not consume an attempt or strand
         # the mission outside the queue before execution's recovery boundary begins.
-        project = self.queue[0]
+        project = self.queue[eligible_index]
         previous_status = project.status
         previous_attempts = project.attempts
         previous_error = project.last_error
+        previous_retry_not_before = project.retry_not_before_epoch
         self._active_project = project
         self._last_autonomous_result = None
         project.status = "running"
+        project.retry_not_before_epoch = 0.0
         project.attempts += 1
         project.last_error = None
         try:
@@ -1343,6 +1356,7 @@ class ProjectFactory:
             project.status = previous_status
             project.attempts = previous_attempts
             project.last_error = previous_error
+            project.retry_not_before_epoch = previous_retry_not_before
             self._active_project = None
             self._last_autonomous_result = None
             try:
@@ -1368,7 +1382,7 @@ class ProjectFactory:
             raise
 
         # Dequeue only after all startup persistence and audit operations succeed.
-        self.queue.pop(0)
+        self.queue.pop(eligible_index)
         self._last_autonomous_result = None
         try:
             # Keep startup inside the guarded execution path. A controller/startup
@@ -1670,6 +1684,7 @@ class ProjectFactory:
             elif project.attempts <= max_retries and max_retries > 0:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=True)
+                self._apply_retry_backoff(project)
                 # A transiently failing mission must not monopolize the worker.
                 # Let already queued missions run before this mission's next attempt.
                 self._requeue_for_fairness(project)
@@ -1744,7 +1759,10 @@ class ProjectFactory:
             execution_failed = (
                 not results
                 or any(not result.success for result in results)
-                or any(step.status != "completed" for step in project.plan.steps)
+                or (
+                    max_stages is None
+                    and any(step.status != "completed" for step in project.plan.steps)
+                )
             )
             if execution_failed and project.attempts > max_retries:
                 project.status = "blocked"
@@ -1830,6 +1848,11 @@ class ProjectFactory:
         )
         self._active_project = None
         return project
+
+    def _apply_retry_backoff(self, project: FactoryProject) -> None:
+        """Set a bounded exponential cooldown for a failed automatic retry."""
+        delay_seconds = min(0.5 * (2 ** min(max(project.attempts - 1, 0), 6)), 30.0)
+        project.retry_not_before_epoch = time.time() + delay_seconds
 
     def _requeue_for_fairness(self, project: FactoryProject) -> None:
         """Move a retry to the tail, removing stale duplicate queue entries."""
@@ -1954,6 +1977,15 @@ class ProjectFactory:
                         raise
                     self._contain_unexpected_worker_error(project, exc)
                 if project is None:
+                    if self.queue:
+                        deadlines = [
+                            item.retry_not_before_epoch
+                            for item in self.queue
+                            if item.retry_not_before_epoch > time.time()
+                        ]
+                        if deadlines:
+                            await asyncio.sleep(min(max(min(deadlines) - time.time(), 0.01), 1.0))
+                            continue
                     break
                 if project.status != "queued" and project.mission.id not in completed_ids:
                     completed.append(project)
