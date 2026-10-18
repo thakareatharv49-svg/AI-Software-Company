@@ -1264,23 +1264,25 @@ class ProjectFactory:
                     timeout=self.execution_timeout_seconds,
                 )
         except asyncio.CancelledError:
-            # Cancellation (for example, an application shutdown) bypasses
-            # the ordinary Exception handler on modern Python. Re-queue the
-            # active mission before propagating cancellation so persisted state
-            # is not stranded as running and completed stages remain resumable.
+            # Cancellation bypasses ordinary Exception handling. Never enqueue
+            # a second in-process copy until the interrupted state has been
+            # persisted; if durable recovery writes fail, leave the job for the
+            # startup recovery path rather than risking duplicate execution.
             project.status = "queued"
-            project.last_error = "Factory execution cancelled; mission re-queued for safe resume."
+            project.last_error = (
+                "Factory execution cancelled; interrupted work requires safe resume."
+            )
             project.plan = recover_running_plan(project.plan)
-            if not any(item.mission.id == project.mission.id for item in self.queue):
-                self.queue.insert(0, project)
-            try:
-                self.orchestrator.stop()
-            except Exception:
-                pass
+            durable_recovery_ready = True
             try:
                 self._save(project)
             except Exception:
-                pass
+                durable_recovery_ready = False
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "Unable to persist cancelled mission snapshot; leaving it out of the in-process queue"
+                )
             try:
                 job = self._load_job(project.mission.id)
                 if job is not None and job.status == MissionJobStatus.RUNNING:
@@ -1293,23 +1295,52 @@ class ProjectFactory:
                                 }
                             ),
                             MissionJobStatus.QUEUED,
-                            f"Execution interrupted; mission safely re-queued: {project.mission.name}",
+                            f"Execution interrupted; mission requires safe resume: {project.mission.name}",
                         )
                     )
             except Exception:
-                pass
-            try:
-                self._audit(
-                    project.mission.id,
-                    "MISSION_EXECUTION_CANCELLED",
-                    project.last_error,
-                    MissionJobStatus.QUEUED.value,
-                    {"attempt": project.attempts, "recovered_for_resume": True},
+                durable_recovery_ready = False
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "Unable to persist cancelled mission job; leaving it out of the in-process queue"
                 )
+            try:
+                self.orchestrator.stop()
             except Exception:
                 pass
-            finally:
-                self._active_project = None
+            if durable_recovery_ready:
+                if not any(item.mission.id == project.mission.id for item in self.queue):
+                    self.queue.insert(0, project)
+                try:
+                    self._audit(
+                        project.mission.id,
+                        "MISSION_EXECUTION_CANCELLED",
+                        project.last_error,
+                        MissionJobStatus.QUEUED.value,
+                        {"attempt": project.attempts, "recovered_for_resume": True},
+                    )
+                except Exception:
+                    pass
+            else:
+                # Do not claim this is safely queued. The durable RUNNING job,
+                # if present, is recoverable on restart; operator diagnostics
+                # must explain why automatic in-process retry was withheld.
+                project.last_error = (
+                    "Execution was cancelled, but recovery persistence failed. "
+                    "Automatic retry was withheld to prevent duplicate execution."
+                )
+                try:
+                    self._audit(
+                        project.mission.id,
+                        "MISSION_CANCELLATION_RECOVERY_FAILED",
+                        project.last_error,
+                        MissionJobStatus.RUNNING.value,
+                        {"attempt": project.attempts, "recovered_for_resume": False},
+                    )
+                except Exception:
+                    pass
+            self._active_project = None
             raise
         except Exception as exc:
             if isinstance(exc, TimeoutError):
