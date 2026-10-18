@@ -1458,7 +1458,10 @@ class ProjectFactory:
             execution_failed = (
                 not results
                 or any(not result.success for result in results)
-                or any(step.status != "completed" for step in project.plan.steps)
+                or (
+                    max_stages is None
+                    and any(step.status != "completed" for step in project.plan.steps)
+                )
             )
             if execution_failed and project.attempts > max_retries:
                 project.status = "blocked"
