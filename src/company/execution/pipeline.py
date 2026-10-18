@@ -1,6 +1,6 @@
 from collections.abc import Callable
 import os
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from src.agents.execution.context import AgentExecutionContext
@@ -51,6 +51,8 @@ class PipelineResult:
     github_pending: bool = False
     browser_preview: bool = False
     memory_id: str | None = None
+    # Per-command QA evidence, including generated unit/integration suites.
+    qa_checks: list[dict] = field(default_factory=list)
 
 
 class CompanyExecutionPipeline:
@@ -263,6 +265,14 @@ class CompanyExecutionPipeline:
                 f"{qa_result.stderr or qa_result.stdout}"
             )
 
+        qa_checks: list[dict] = [{
+            "kind": "configured",
+            "command": list(qa_request.command),
+            "status": qa_result.status.value,
+            "exit_code": qa_result.exit_code,
+            "duration_ms": qa_result.duration_ms,
+        }]
+
         # A custom smoke/build command must not silently replace the generated
         # product's own test suite. If tests are present and the configured QA
         # command did not already invoke pytest, run the suite separately in the
@@ -307,6 +317,13 @@ class CompanyExecutionPipeline:
             # The debugger's successful final attempt is already the verification
             # of the post-repair workspace; do not execute the suite a second time.
             product_test_result = product_test_debug.test_result or await self.qa_runner.run(product_test_request)
+            qa_checks.append({
+                "kind": "python_tests",
+                "command": list(product_test_request.command),
+                "status": product_test_result.status.value,
+                "exit_code": product_test_result.exit_code,
+                "duration_ms": product_test_result.duration_ms,
+            })
             self._publish_event(
                 "qa.generated_product_tests.completed",
                 project_id=project.id,
@@ -374,6 +391,13 @@ class CompanyExecutionPipeline:
             # Reuse the debugger's successful final attempt to avoid a duplicate
             # Node process after the suite has already passed.
             javascript_test_result = javascript_test_debug.test_result or await self.qa_runner.run(javascript_test_request)
+            qa_checks.append({
+                "kind": "javascript_tests",
+                "command": list(javascript_test_request.command),
+                "status": javascript_test_result.status.value,
+                "exit_code": javascript_test_result.exit_code,
+                "duration_ms": javascript_test_result.duration_ms,
+            })
             self._publish_event(
                 "qa.generated_product_tests.completed",
                 project_id=project.id,
@@ -603,6 +627,7 @@ class CompanyExecutionPipeline:
             github_pending=github_pending,
             browser_preview=("index.html" in files),
             memory_id=memory_entry.id,
+            qa_checks=qa_checks,
         )
 
     @staticmethod
