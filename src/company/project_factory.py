@@ -1673,7 +1673,20 @@ class ProjectFactory:
                         raise
                     self._contain_unexpected_worker_error(project, exc)
                 if project is None:
-                    break
+                    if not self.queue:
+                        break
+                    # If every queued mission is cooling down, wait only until the
+                    # earliest retry becomes eligible. Other ready missions are
+                    # selected by run_next without waiting for delayed entries.
+                    deadlines = [
+                        item.retry_not_before_epoch
+                        for item in self.queue
+                        if item.retry_not_before_epoch > time.time()
+                    ]
+                    if not deadlines:
+                        break
+                    await asyncio.sleep(max(0.01, min(1.0, min(deadlines) - time.time())))
+                    continue
                 if project.status != "queued" and project.mission.id not in completed_ids:
                     completed.append(project)
                     completed_ids.add(project.mission.id)
