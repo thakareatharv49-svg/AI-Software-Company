@@ -688,7 +688,7 @@ def test_feature_traceability_reports_missing_upload_and_tenant_tests() -> None:
         "Add file uploads and multi-tenancy to the app.",
         {
             "tests/test_app.py": (
-                "def test_upload_button_is_visible(): pass\\n"
+                "def test_navigation_renders(): pass\\n"
             )
         },
     )
