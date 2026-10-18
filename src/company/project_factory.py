@@ -2012,13 +2012,16 @@ class ProjectFactory:
                     self._contain_unexpected_worker_error(project, exc)
                 if project is None:
                     if self.queue:
+                        now = time.time()
+                        if any(item.retry_not_before_epoch <= now for item in self.queue):
+                            continue
                         deadlines = [
                             item.retry_not_before_epoch
                             for item in self.queue
-                            if item.retry_not_before_epoch > time.time()
+                            if item.retry_not_before_epoch > now
                         ]
                         if deadlines:
-                            await asyncio.sleep(min(max(min(deadlines) - time.time(), 0.01), 1.0))
+                            await asyncio.sleep(min(max(min(deadlines) - now, 0.01), 1.0))
                             continue
                     break
                 if project.status != "queued" and project.mission.id not in completed_ids:
