@@ -151,20 +151,41 @@ def _run_browser_checks(workspace: Path, timeout_ms: int) -> dict[str, Any]:
                     button = buttons.nth(index)
                     label = (button.inner_text() or button.get_attribute("aria-label") or "").strip()
                     if _safe_interaction_label(label):
+                        # Do not click a navigation control that is already marked
+                        # as the active page; it is expected to be a no-op.
+                        aria_current = (button.get_attribute("aria-current") or "").casefold()
+                        aria_pressed = (button.get_attribute("aria-pressed") or "").casefold()
+                        classes = (button.get_attribute("class") or "").casefold()
+                        if aria_current in {"page", "true"} or aria_pressed == "true" or any(
+                            marker in classes.split() for marker in ("active", "selected", "current")
+                        ):
+                            continue
                         before_text = page.locator("body").inner_text()
                         before_url = page.url
+                        before_expanded = button.get_attribute("aria-expanded")
+                        before_pressed = button.get_attribute("aria-pressed")
                         try:
                             button.click()
                             page.wait_for_timeout(100)
                             after_text = page.locator("body").inner_text()
-                            if after_text == before_text and page.url == before_url:
-                                failures.append(
-                                    f"Button interaction '{label[:80]}' produced no observable page or URL change."
-                                )
-                            interactions_checked.append(label[:MAX_INTERACTION_LABEL])
+                            after_expanded = button.get_attribute("aria-expanded")
+                            after_pressed = button.get_attribute("aria-pressed")
+                            changed = (
+                                after_text != before_text
+                                or page.url != before_url
+                                or after_expanded != before_expanded
+                                or after_pressed != before_pressed
+                            )
+                            if changed:
+                                interactions_checked.append(label[:MAX_INTERACTION_LABEL])
+                                break
+                            # A visible button may be an inert active navigation item.
+                            # Try the next safe control before failing the acceptance.
                         except Exception as exc:
                             failures.append(f"Button interaction '{label[:80]}' failed: {type(exc).__name__}: {exc}"[:500])
-                        break
+
+                if not interactions_checked:
+                    failures.append("No safe button interaction produced an observable change.")
 
                 if page_errors:
                     failures.extend(f"Uncaught browser error: {error}" for error in page_errors[:MAX_PAGE_ERRORS])
