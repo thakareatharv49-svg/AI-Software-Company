@@ -10,6 +10,7 @@ from src.company.control_center.service import (
     MissionSubmission,
     control_center,
 )
+from src.company.mission_controller.lifecycle import inspect_mission_lifecycle
 from src.company.mission_controller.models import MissionPlan
 from src.company.mission_controller.planner import validate_mission_plan
 from src.company.mission_jobs import MissionJob, MissionJobStatus
@@ -223,6 +224,7 @@ def mission_diagnostics(
 
     current_step = running_steps[0] if running_steps else None
     failed_step = failed_steps[-1] if failed_steps else None
+    lifecycle = inspect_mission_lifecycle(job.plan)
     return {
         "mission_id": job.id,
         "status": status_value,
@@ -245,6 +247,14 @@ def mission_diagnostics(
             } else None
         ),
         "attempts": job.attempts,
+        "lifecycle_valid": lifecycle["valid"],
+        "lifecycle_issues": lifecycle["issues"],
+        "stage_count": lifecycle["stage_count"],
+        "expected_stage_count": lifecycle["expected_stage_count"],
+        "completed_stage_count": lifecycle["completed_stages"],
+        "running_stages": lifecycle["running_stages"],
+        "failed_stages": lifecycle["failed_stages"],
+        "planned_stages": lifecycle["planned_stages"],
     }
 
 
