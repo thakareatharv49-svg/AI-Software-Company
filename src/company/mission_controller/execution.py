@@ -7,6 +7,7 @@ from src.company.mission_controller.lifecycle import inspect_mission_lifecycle, 
 from src.company.mission_controller.models import MissionPlan, MissionStage
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.security.redaction import redact_sensitive_text
 
 
 _STAGE_AGENTS: dict[MissionStage, str] = {
@@ -204,7 +205,7 @@ class MissionExecutionPipeline:
                     ),
                 )
             except Exception as exc:
-                error = f"{type(exc).__name__}: {exc}"
+                error = redact_sensitive_text(f"{type(exc).__name__}: {exc}")[:1000]
                 result = AgentResult(
                     task_id=task_id,
                     agent_name=agent_name,
@@ -215,7 +216,9 @@ class MissionExecutionPipeline:
             if result.success:
                 break
 
-            last_error = result.error or "Agent execution failed without an error detail"
+            last_error = redact_sensitive_text(
+                result.error or "Agent execution failed without an error detail"
+            )[:1000]
             if attempt < max_attempts:
                 self.orchestrator.events.publish(
                     CompanyEvent(
