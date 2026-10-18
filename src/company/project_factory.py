@@ -1393,6 +1393,7 @@ class ProjectFactory:
                 self._reset_for_retry(project, reset_completed=True)
                 # A transiently failing mission must not monopolize the worker.
                 # Let already queued missions run before this mission's next attempt.
+                self._apply_retry_backoff(project)
                 self._requeue_for_fairness(project)
                 self._transition_job(
                     project,
@@ -1430,6 +1431,7 @@ class ProjectFactory:
                 self._reset_for_retry(project, reset_completed=True)
                 # A transiently failing mission must not monopolize the worker.
                 # Let already queued missions run before this mission's next attempt.
+                self._apply_retry_backoff(project)
                 self._requeue_for_fairness(project)
                 self._transition_job(
                     project,
@@ -1496,6 +1498,7 @@ class ProjectFactory:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=max_stages is None)
                 # Preserve FIFO fairness when resuming a paused or failed attempt.
+                self._apply_retry_backoff(project)
                 self._requeue_for_fairness(project)
                 self._transition_job(
                     project,
