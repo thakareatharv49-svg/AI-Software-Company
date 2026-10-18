@@ -831,6 +831,145 @@ class ProjectFactory:
         self._audit(mission_id, "MISSION_CANCELLED", cancelled.message, cancelled.status.value)
         return cancelled
 
+    def reconcile_mission(self, mission_id: str, *, repair: bool = False) -> dict[str, Any]:
+        """Compare durable job, persisted snapshot, and in-memory queue.
+
+        By default this is read-only. Repair is deliberately limited to the
+        unambiguous case where a durable QUEUED job has no in-memory copy and
+        the factory is idle. Conflicting or incomplete evidence is reported,
+        never guessed away.
+        """
+        if not isinstance(repair, bool):
+            raise ValueError("repair must be a boolean")
+        job = self._load_job(mission_id)
+        if job is None:
+            return {
+                "mission_id": mission_id,
+                "consistent": False,
+                "repair_attempted": False,
+                "discrepancies": ["durable_job_missing"],
+                "recommended_action": "inspect_durable_job_store",
+            }
+
+        queued = [item for item in self.queue if item.mission.id == mission_id]
+        active_id = self._active_project.mission.id if self._active_project else None
+        snapshots: list[dict[str, Any]] = []
+        snapshot_error = False
+        if self.store is not None:
+            try:
+                for item in self.store.load_pending():
+                    if isinstance(item, dict):
+                        mission = item.get("mission")
+                        if getattr(mission, "id", None) == mission_id:
+                            snapshots.append(item)
+            except Exception:
+                snapshot_error = True
+
+        discrepancies: list[str] = []
+        if snapshot_error:
+            discrepancies.append("project_snapshot_store_unavailable")
+        if len(snapshots) > 1:
+            discrepancies.append("duplicate_project_snapshots")
+        if len(queued) > 1:
+            discrepancies.append("duplicate_in_memory_queue_entries")
+        if job.status == MissionJobStatus.QUEUED and not queued:
+            discrepancies.append("durable_queued_job_missing_from_memory_queue")
+        if job.status != MissionJobStatus.QUEUED and queued:
+            discrepancies.append("memory_queue_conflicts_with_durable_status")
+        if job.status == MissionJobStatus.RUNNING and active_id != mission_id:
+            discrepancies.append("durable_running_job_has_no_matching_active_worker")
+        if active_id == mission_id and job.status != MissionJobStatus.RUNNING:
+            discrepancies.append("active_worker_conflicts_with_durable_status")
+        if snapshots:
+            snapshot = snapshots[0]
+            raw_plan = snapshot.get("plan")
+            if not isinstance(raw_plan, MissionPlan):
+                discrepancies.append("project_snapshot_plan_invalid")
+            elif raw_plan.model_dump() != job.plan.model_dump():
+                discrepancies.append("project_snapshot_plan_differs_from_durable_job")
+            if snapshot.get("status") != job.status.value:
+                discrepancies.append("project_snapshot_status_differs_from_durable_job")
+        elif self.store is not None and not snapshot_error:
+            discrepancies.append("project_snapshot_missing")
+
+        repair_attempted = False
+        if repair and not snapshot_error and not discrepancies:
+            # No work needed; preserve idempotency.
+            pass
+        elif repair:
+            repair_attempted = True
+            if self._running or self._active_project is not None:
+                raise RuntimeError("Cannot reconcile recovery state while the factory worker is active")
+            # Only one safe repair is permitted: rehydrate a missing in-memory
+            # queue entry from a single, valid, durably QUEUED job, with no
+            # conflicting snapshot evidence.
+            safe_to_rehydrate = (
+                job.status == MissionJobStatus.QUEUED
+                and not queued
+                and not snapshot_error
+                and len(snapshots) <= 1
+                and not any(
+                    item in discrepancies
+                    for item in (
+                        "duplicate_project_snapshots",
+                        "duplicate_in_memory_queue_entries",
+                        "project_snapshot_plan_invalid",
+                        "project_snapshot_plan_differs_from_durable_job",
+                        "project_snapshot_status_differs_from_durable_job",
+                        "memory_queue_conflicts_with_durable_status",
+                        "durable_running_job_has_no_matching_active_worker",
+                        "active_worker_conflicts_with_durable_status",
+                    )
+                )
+            )
+            if safe_to_rehydrate:
+                project = FactoryProject(
+                    mission=job.mission,
+                    plan=job.plan.model_copy(deep=True),
+                    status="queued",
+                    attempts=job.attempts,
+                )
+                self._save(project)
+                self.queue.append(project)
+                discrepancies = [
+                    item for item in discrepancies
+                    if item != "durable_queued_job_missing_from_memory_queue"
+                    and item != "project_snapshot_missing"
+                ]
+                if self.store is not None and not snapshots:
+                    # _save wrote the missing snapshot; confirm the next inspect.
+                    discrepancies.append("snapshot_repair_written_verification_pending")
+            elif discrepancies:
+                self._audit(
+                    mission_id,
+                    "MISSION_RECONCILIATION_WITHHELD",
+                    "Automatic reconciliation withheld because durable state is ambiguous",
+                    job.status.value,
+                    {"discrepancies": discrepancies},
+                )
+
+        consistent = not discrepancies
+        recommended_action = (
+            "none" if consistent
+            else "inspect_store_outage" if snapshot_error
+            else "inspect_duplicate_or_conflicting_state"
+            if any("duplicate" in item or "conflicts" in item or "differs" in item for item in discrepancies)
+            else "restart_or_restore_factory"
+            if "durable_running_job_has_no_matching_active_worker" in discrepancies
+            else "reconcile_durable_queued_job"
+        )
+        return {
+            "mission_id": mission_id,
+            "durable_status": job.status.value,
+            "snapshot_count": len(snapshots),
+            "queue_entry_count": len(queued),
+            "active_worker_matches": active_id == mission_id,
+            "consistent": consistent,
+            "repair_attempted": repair_attempted,
+            "discrepancies": discrepancies,
+            "recommended_action": recommended_action,
+        }
+
     def has_queued_mission(self, mission_id: str) -> bool:
         return any(item.mission.id == mission_id for item in self.queue)
 
