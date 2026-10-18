@@ -108,11 +108,71 @@ class AutonomousCompanyAcceptance:
                 "Project identity is present.",
             )
         )
+        qa_result = result.pipeline.qa_result
+        qa_status_passed = self._status_value(
+            getattr(qa_result, "status", None)
+        ) == "passed"
         checks.append(
             AcceptanceCheck(
                 "qa_passed",
-                self._status_value(result.pipeline.qa_result.status) == "passed",
-                "QA gate passed.",
+                qa_status_passed,
+                "QA runner reports passed."
+                if qa_status_passed
+                else "QA runner did not report passed.",
+            )
+        )
+        qa_exit_code = getattr(qa_result, "exit_code", None)
+        qa_exit_code_passed = (
+            isinstance(qa_exit_code, int)
+            and not isinstance(qa_exit_code, bool)
+            and qa_exit_code == 0
+        )
+        checks.append(
+            AcceptanceCheck(
+                "qa_exit_code_zero",
+                qa_exit_code_passed,
+                "QA process exited successfully."
+                if qa_exit_code_passed
+                else f"QA process exit code must be 0; received {qa_exit_code!r}.",
+            )
+        )
+
+        # The command ledger is created by the execution pipeline and records
+        # each configured/generated suite that actually ran. Missing or malformed
+        # provenance must never be mistaken for a completed verification run.
+        qa_checks = getattr(result.pipeline, "qa_checks", None)
+        ledger_is_valid = isinstance(qa_checks, list) and bool(qa_checks)
+        ledger_failures: list[str] = []
+        if ledger_is_valid:
+            for index, check in enumerate(qa_checks):
+                if not isinstance(check, dict):
+                    ledger_failures.append(f"check {index + 1} has an invalid record")
+                    continue
+                status = self._status_value(check.get("status"))
+                exit_code = check.get("exit_code")
+                if status != "passed":
+                    ledger_failures.append(
+                        f"{check.get('kind', f'check {index + 1}')} status={status or 'missing'}"
+                    )
+                if not (
+                    isinstance(exit_code, int)
+                    and not isinstance(exit_code, bool)
+                    and exit_code == 0
+                ):
+                    ledger_failures.append(
+                        f"{check.get('kind', f'check {index + 1}')} exit_code={exit_code!r}"
+                    )
+        ledger_passed = ledger_is_valid and not ledger_failures
+        checks.append(
+            AcceptanceCheck(
+                "qa_evidence_complete",
+                ledger_passed,
+                "Every recorded QA command has a passing status and zero exit code."
+                if ledger_passed
+                else (
+                    "QA command evidence is missing, malformed, or failing: "
+                    + ("; ".join(ledger_failures[:8]) if ledger_failures else "no QA command ledger")
+                ),
             )
         )
         checks.append(
@@ -140,6 +200,27 @@ class AutonomousCompanyAcceptance:
                     else (
                         "App-like mission has no browser preview; generated "
                         "files must include a root index.html."
+                    ),
+                )
+            )
+            browser_acceptance = getattr(
+                result.pipeline, "browser_acceptance", None
+            )
+            browser_status = self._status_value(
+                browser_acceptance.get("status")
+                if isinstance(browser_acceptance, dict)
+                else None
+            )
+            browser_passed = preview_available and browser_status == "passed"
+            checks.append(
+                AcceptanceCheck(
+                    "browser_acceptance_passed",
+                    browser_passed,
+                    "Browser acceptance passed for the generated web product."
+                    if browser_passed
+                    else (
+                        "Browser product requires recorded passing browser acceptance; "
+                        f"received {browser_status or 'missing'}."
                     ),
                 )
             )
