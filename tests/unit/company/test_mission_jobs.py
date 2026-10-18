@@ -226,3 +226,57 @@ def test_durable_job_normalization_sanitizes_fields_even_after_model_copy() -> N
     assert len(safe.message) <= 4000
     assert "jobSecret123456" not in safe.message
     assert safe.attempts == 0
+
+
+
+def test_resume_failed_plan_preserves_valid_completed_stages_and_resets_failure() -> None:
+    from src.company.mission_jobs import resume_failed_plan
+
+    plan = build_mission_plan(CompanyMission(name="Resume", objective="Resume safely"))
+    steps = {step.stage.value: step for step in plan.steps}
+    for stage in ("research", "product", "architecture", "tasks", "agents", "execution"):
+        steps[stage].status = "completed"
+        steps[stage].detail = f"{stage} verified"
+    steps["qa"].status = "failed"
+    steps["qa"].attempts = 2
+    steps["qa"].detail = "test suite failed"
+    steps["security"].status = "completed"
+    steps["security"].detail = "security review passed"
+
+    recovered = resume_failed_plan(plan)
+    recovered_steps = {step.stage.value: step for step in recovered.steps}
+
+    assert recovered_steps["research"].status == "completed"
+    assert recovered_steps["execution"].status == "completed"
+    assert recovered_steps["security"].status == "completed"
+    assert recovered_steps["qa"].status == "planned"
+    assert recovered_steps["qa"].detail is None
+    assert recovered_steps["qa"].attempts == 2
+    assert recovered_steps["github"].status == "planned"
+    assert recovered_steps["deployment"].status == "planned"
+    # The original durable plan is immutable from the caller's perspective.
+    assert steps["qa"].status == "failed"
+    assert steps["qa"].detail == "test suite failed"
+
+
+def test_resume_failed_plan_resets_interrupted_stage_and_dependents_only() -> None:
+    from src.company.mission_jobs import resume_failed_plan
+
+    plan = build_mission_plan(CompanyMission(name="Resume", objective="Resume interrupted work"))
+    steps = {step.stage.value: step for step in plan.steps}
+    steps["research"].status = "completed"
+    steps["product"].status = "running"
+    steps["product"].detail = "process interrupted"
+    steps["architecture"].status = "completed"
+    steps["architecture"].detail = "stale completion"
+    steps["product"].attempts = 1
+
+    recovered = resume_failed_plan(plan)
+    recovered_steps = {step.stage.value: step for step in recovered.steps}
+
+    assert recovered_steps["research"].status == "completed"
+    assert recovered_steps["product"].status == "planned"
+    assert recovered_steps["product"].detail is None
+    assert recovered_steps["product"].attempts == 1
+    assert recovered_steps["architecture"].status == "planned"
+    assert recovered_steps["architecture"].detail is None
