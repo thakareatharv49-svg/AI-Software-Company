@@ -7,6 +7,7 @@ from src.agents.execution.context import AgentExecutionContext
 from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentRequest, AgentResult
 from src.company.artifact_validation import validate_generated_artifacts
+from src.company.browser_acceptance import run_browser_acceptance
 from src.company.gates.quality import ProductionQualityGate
 from src.company.github_native.publish_queue import GitHubPublishQueue
 from src.company.github_native.service import GitHubNativeService
@@ -51,6 +52,7 @@ class PipelineResult:
     github_pending: bool = False
     browser_preview: bool = False
     memory_id: str | None = None
+    browser_acceptance: dict | None = None
 
 
 class CompanyExecutionPipeline:
@@ -395,6 +397,28 @@ class CompanyExecutionPipeline:
                     f"{javascript_test_result.stderr or javascript_test_result.stdout}"
                 )
 
+        browser_acceptance = None
+        if "index.html" in files:
+            browser_acceptance = await run_browser_acceptance(
+                qa_request.working_directory,
+            )
+            self._publish_event(
+                "qa.browser_acceptance.completed",
+                project_id=project.id,
+                payload={
+                    "status": browser_acceptance.get("status", "unknown"),
+                    "routes_checked": browser_acceptance.get("routes_checked", [])[:8],
+                    "interactions_checked": browser_acceptance.get("interactions_checked", [])[:8],
+                    "detail": str(browser_acceptance.get("detail", ""))[:2000],
+                },
+            )
+            if browser_acceptance.get("status") != "passed":
+                self.project_engine.transition(project.id, ProjectStatus.DEBUGGING)
+                raise RuntimeError(
+                    "Browser acceptance failed for project "
+                    f"{project.id}: {browser_acceptance.get('detail', 'No detail provided')}"
+                )
+
         # QA repair agents can edit the workspace on disk. Reconcile those
         # edits before security review and GitHub publishing so the delivered
         # files are exactly the version that passed the final QA command.
@@ -603,6 +627,7 @@ class CompanyExecutionPipeline:
             github_pending=github_pending,
             browser_preview=("index.html" in files),
             memory_id=memory_entry.id,
+            browser_acceptance=browser_acceptance,
         )
 
     @staticmethod
