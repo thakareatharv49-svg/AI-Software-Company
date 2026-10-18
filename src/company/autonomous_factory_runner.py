@@ -203,11 +203,22 @@ class FactoryAutonomousRunner:
         security_approved = bool(getattr(security, "approved", security_status == "approved"))
         stdout = redact_sensitive_text(str(getattr(qa, "stdout", "") or ""))[:2000]
         stderr = redact_sensitive_text(str(getattr(qa, "stderr", "") or ""))[:2000]
+        browser_check = getattr(result.pipeline, "browser_acceptance", None)
+        if isinstance(browser_check, dict):
+            browser_evidence = (
+                f"browser_status={redact_sensitive_text(str(browser_check.get('status', 'unknown')))[:40]}; "
+                f"routes={redact_sensitive_text(','.join(str(item) for item in browser_check.get('routes_checked', [])[:8]))[:500]}; "
+                f"interactions={redact_sensitive_text(','.join(str(item) for item in browser_check.get('interactions_checked', [])[:8]))[:500]}; "
+                f"detail={redact_sensitive_text(str(browser_check.get('detail', '')))[:1000]}"
+            )
+        else:
+            browser_evidence = "browser_status=not_recorded"
         qa_evidence = (
             "Factory QA runner result: "
             f"status={qa_status}; exit_code={qa_exit_code}; "
             f"duration_ms={qa_duration_ms}; command={' '.join(command)[:500]}; "
-            f"stdout={stdout or '[empty]'}; stderr={stderr or '[empty]'}"
+            f"stdout={stdout or '[empty]'}; stderr={stderr or '[empty]'}; "
+            f"{browser_evidence}"
         )[:5200]
         security_summary = redact_sensitive_text(
             str(getattr(security, "summary", "") or "")
