@@ -334,7 +334,7 @@ class CompanyControlCenter:
                                             f"Could not synchronize queued mission {job.id}: "
                                             f"{type(exc).__name__}"
                                         ),
-                                        metadata={"mission_id": job.id},
+                                        project_id=job.id,
                                     )
                                 )
                                 continue
