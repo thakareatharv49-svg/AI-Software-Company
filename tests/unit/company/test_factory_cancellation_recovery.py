@@ -104,8 +104,13 @@ async def test_cancellation_does_not_requeue_when_recovery_persistence_fails(cap
             self.jobs[job.id] = job
 
     class FailingProjectStore:
+        def __init__(self):
+            self.saves = 0
+
         def save(self, project):
-            raise OSError("snapshot store unavailable")
+            self.saves += 1
+            if self.saves >= 3:
+                raise OSError("snapshot store unavailable")
 
         def load_pending(self):
             return []
