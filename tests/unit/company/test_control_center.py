@@ -504,6 +504,6 @@ async def test_continuous_factory_skips_one_queue_sync_failure_and_processes_nex
         if event.event_type == "FACTORY_QUEUE_SYNC_ERROR"
     ]
     assert len(queue_errors) == 1
-    assert first.mission.id in queue_errors[0].message
+    assert queue_errors[0].project_id == first.mission.id
     assert "OSError" in queue_errors[0].message
     assert "sensitive-storage-detail" not in queue_errors[0].message
