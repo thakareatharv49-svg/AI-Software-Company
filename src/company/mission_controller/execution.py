@@ -3,6 +3,7 @@ from src.agents.execution.executor import AgentExecutor
 from src.agents.models.contracts import AgentDefinition, AgentRequest, AgentResult
 from src.agents.registry.registry import AgentRegistry
 from src.company.events.events import CompanyEvent
+from src.company.mission_controller.lifecycle import inspect_mission_lifecycle, validate_step_transition
 from src.company.mission_controller.models import MissionPlan, MissionStage
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
@@ -71,6 +72,25 @@ class MissionExecutionPipeline:
                 error="Company must be running before executing a stage",
             )
 
+        lifecycle = inspect_mission_lifecycle(plan)
+        if not lifecycle["valid"]:
+            error = "Mission lifecycle invariant violation: " + "; ".join(lifecycle["issues"])
+            self.orchestrator.block(error)
+            self.orchestrator.events.publish(
+                CompanyEvent(
+                    event_type="MISSION_LIFECYCLE_INVALID",
+                    message=error[:1000],
+                    project_id=self.orchestrator.state.current_project_id,
+                    task_id=self.orchestrator.state.current_task_id,
+                )
+            )
+            return AgentResult(
+                task_id=self.orchestrator.state.current_task_id or "",
+                agent_name="mission-controller",
+                success=False,
+                error=error,
+            )
+
         self.register_default_agents(plan)
 
         step = self._next_ready_step(plan)
@@ -104,6 +124,17 @@ class MissionExecutionPipeline:
         if self.orchestrator.state.current_task_id != task_id:
             self.orchestrator.assign_task(task_id)
 
+        try:
+            validate_step_transition(step.status, "running")
+        except ValueError as exc:
+            error = f"Mission stage cannot start: {exc}"
+            self.orchestrator.block(error)
+            return AgentResult(
+                task_id=task_id,
+                agent_name="mission-controller",
+                success=False,
+                error=error,
+            )
         step.status = "running"
         agent_name = _STAGE_AGENTS[step.stage]
         agent = self.registry.get(agent_name)
@@ -200,6 +231,7 @@ class MissionExecutionPipeline:
 
         assert result is not None
         if not result.success:
+            validate_step_transition(step.status, "failed")
             step.status = "failed"
             step.detail = (
                 last_error
@@ -222,6 +254,7 @@ class MissionExecutionPipeline:
                 error=step.detail,
             )
 
+        validate_step_transition(step.status, "completed")
         step.status = "completed"
         self.orchestrator.complete_task()
         self.orchestrator.events.publish(
