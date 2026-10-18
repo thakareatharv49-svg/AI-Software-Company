@@ -141,15 +141,17 @@ def test_repeated_restore_after_interrupted_stage_is_idempotent():
     assert factory.queue[0].plan.model_dump() == first_plan
 
 
-def test_snapshot_write_failure_does_not_publish_recovered_job_to_queue():
+def test_snapshot_write_failure_does_not_hide_durable_queued_job():
     job = make_job("snapshot failure")
     jobs = MemoryJobStore([job])
     projects = MemoryProjectStore()
     projects.fail_save = True
     factory = make_factory(jobs, projects)
 
-    assert factory.restore() == 0
-    assert factory.queue == []
+    # The durable job is already QUEUED, so restore can safely rehydrate it
+    # even when the redundant project snapshot cannot be refreshed.
+    assert factory.restore() == 1
+    assert [project.mission.id for project in factory.queue] == [job.id]
 
 
 def test_durable_running_job_write_failure_does_not_publish_interrupted_work():
