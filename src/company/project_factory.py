@@ -1753,8 +1753,15 @@ class ProjectFactory:
         return safe_job
 
     def _persist_plan_progress(self, project: FactoryProject) -> None:
-        """Persist live stage status so the dashboard never shows stale all-planned work."""
-        self._save(project)
+        """Persist durable job progress before its recoverable project snapshot.
+
+        The mission-job store is authoritative during restore. Writing the
+        project snapshot first can therefore lose fresh stage progress if the
+        process crashes or the job write fails between the two writes. Update
+        the authoritative job first; only publish the matching snapshot after
+        that succeeds. If the snapshot write then fails, restore can rebuild it
+        from the newer durable job.
+        """
         job = self._load_job(project.mission.id)
         if job is not None:
             self._save_job(
@@ -1765,6 +1772,7 @@ class ProjectFactory:
                     }
                 )
             )
+        self._save(project)
 
     def _save_job(self, job: MissionJob) -> None:
         if self.job_store is not None:
