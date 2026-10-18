@@ -72,3 +72,49 @@ class MissionPlan(BaseModel):
     generation_output_tokens: int | None = None
     steps: list[PlannedStep]
 
+    def engineering_task_order(self) -> list[EngineeringTask]:
+        """Return a stable dependency-first order or reject an invalid task graph.
+
+        Task state is durable in the plan, so callers can persist completed slices
+        and resume by asking for the next ready tasks without regenerating finished work.
+        """
+        tasks = self.engineering_tasks
+        by_id: dict[str, EngineeringTask] = {}
+        for task in tasks:
+            if not task.id or task.id in by_id:
+                raise ValueError("engineering task IDs must be unique non-empty strings")
+            by_id[task.id] = task
+
+        for task in tasks:
+            missing = [dependency for dependency in task.depends_on if dependency not in by_id]
+            if missing:
+                raise ValueError(
+                    f"engineering task {task.id!r} has missing dependencies: "
+                    + ", ".join(missing)
+                )
+            if task.id in task.depends_on:
+                raise ValueError(f"engineering task {task.id!r} depends on itself")
+
+        ordered: list[EngineeringTask] = []
+        completed_ids: set[str] = set()
+        remaining = list(tasks)
+        while remaining:
+            ready = [task for task in remaining if all(dep in completed_ids for dep in task.depends_on)]
+            if not ready:
+                raise ValueError("engineering task dependencies contain a cycle")
+            for task in ready:
+                ordered.append(task)
+                completed_ids.add(task.id)
+                remaining.remove(task)
+        return ordered
+
+    def ready_engineering_tasks(self) -> list[EngineeringTask]:
+        """Return planned slices whose prerequisites are durably completed."""
+        ordered = self.engineering_task_order()
+        by_id = {task.id: task for task in self.engineering_tasks}
+        return [
+            task for task in ordered
+            if task.status == "planned"
+            and all(by_id[dep].status == "completed" for dep in task.depends_on)
+        ]
+
