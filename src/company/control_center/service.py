@@ -32,6 +32,7 @@ from src.company.project_factory import FactoryProject, ProjectFactory
 from src.company.project_generator import OllamaProjectGenerator
 from src.company.project_outputs import ProjectOutputManifest
 from src.config.settings import settings
+from src.security.redaction import redact_sensitive_text
 from src.company.generated_task_planning import build_generated_task_plan
 from src.company.research.engine import StaticResearchProvider
 from src.manager.models.contracts import Mission as ManagerMission
