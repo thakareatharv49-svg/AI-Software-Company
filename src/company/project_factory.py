@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from inspect import signature
 from typing import TYPE_CHECKING, Any, Protocol
 from uuid import uuid4
