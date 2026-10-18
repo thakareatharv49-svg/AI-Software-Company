@@ -76,3 +76,17 @@ def test_allowed_stage_transitions(current, target):
 def test_invalid_stage_transitions_are_rejected(current, target):
     with pytest.raises(ValueError):
         validate_step_transition(current, target)
+
+
+def test_stage_summary_sanitizes_details_and_preserves_attempt_counts():
+    plan = build_mission_plan(CompanyMission(name="Trace", objective="Build an app"))
+    plan.steps[0].attempts = 2
+    plan.steps[0].detail = "provider failed: password=hiddenSecret123"
+
+    result = inspect_mission_lifecycle(plan)
+    summary = result["stage_summary"][0]
+
+    assert summary["stage"] == "research"
+    assert summary["attempts"] == 2
+    assert "hiddenSecret123" not in summary["detail"]
+    assert "password=[REDACTED]" in summary["detail"]
