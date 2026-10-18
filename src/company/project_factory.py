@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from inspect import signature
@@ -27,6 +28,7 @@ from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.project_outputs import ProjectOutputManifest
 from src.company.retry_policy import FailureClass, classify_failure
+from src.company.recovery_diagnostics import build_recovery_diagnostics
 from src.security.redaction import redact_sensitive_text, redact_sensitive_value
 
 if TYPE_CHECKING:
@@ -76,6 +78,10 @@ class FactoryProject:
     attempts: int = 0
     last_error: str | None = None
     retry_feedback: str | None = None
+    worker_started_at: datetime | None = None
+    last_progress_at: datetime | None = None
+    progress_updates: int = 0
+    retry_not_before_epoch: float = 0.0
 
 
 @dataclass
@@ -1298,25 +1304,39 @@ class ProjectFactory:
         if max_stages == 0 or not self.queue:
             return None
 
+        now = time.time()
+        eligible_index = next(
+            (index for index, item in enumerate(self.queue)
+             if item.retry_not_before_epoch <= now),
+            None,
+        )
+        if eligible_index is None:
+            return None
+
         # The durable job is the idempotency authority. A stale in-memory queue
         # entry must never re-run a mission that another worker has already
         # claimed or that has reached a terminal lifecycle state.
-        queued_candidate = self.queue[0]
+        queued_candidate = self.queue[eligible_index]
         durable_job = self._load_job(queued_candidate.mission.id)
         if durable_job is not None and durable_job.status != MissionJobStatus.QUEUED:
-            self.queue.pop(0)
+            self.queue.pop(eligible_index)
             return None
 
         # Keep the project in the FIFO queue until its startup state is durable.
         # A failed snapshot/job/audit write must not consume an attempt or strand
         # the mission outside the queue before execution's recovery boundary begins.
-        project = self.queue[0]
+        project = self.queue[eligible_index]
         previous_status = project.status
         previous_attempts = project.attempts
         previous_error = project.last_error
+        previous_retry_not_before = project.retry_not_before_epoch
         self._active_project = project
         self._last_autonomous_result = None
         project.status = "running"
+        project.worker_started_at = datetime.now(UTC)
+        project.last_progress_at = project.worker_started_at
+        project.progress_updates = 0
+        project.retry_not_before_epoch = 0.0
         project.attempts += 1
         project.last_error = None
         try:
@@ -1343,6 +1363,7 @@ class ProjectFactory:
             project.status = previous_status
             project.attempts = previous_attempts
             project.last_error = previous_error
+            project.retry_not_before_epoch = previous_retry_not_before
             self._active_project = None
             self._last_autonomous_result = None
             try:
@@ -1368,7 +1389,7 @@ class ProjectFactory:
             raise
 
         # Dequeue only after all startup persistence and audit operations succeed.
-        self.queue.pop(0)
+        self.queue.pop(eligible_index)
         self._last_autonomous_result = None
         try:
             # Keep startup inside the guarded execution path. A controller/startup
@@ -1670,6 +1691,7 @@ class ProjectFactory:
             elif project.attempts <= max_retries and max_retries > 0:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=True)
+                self._apply_retry_backoff(project)
                 # A transiently failing mission must not monopolize the worker.
                 # Let already queued missions run before this mission's next attempt.
                 self._requeue_for_fairness(project)
@@ -1716,6 +1738,7 @@ class ProjectFactory:
             elif project.attempts <= max_retries:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=True)
+                self._apply_retry_backoff(project)
                 # A transiently failing mission must not monopolize the worker.
                 # Let already queued missions run before this mission's next attempt.
                 self._requeue_for_fairness(project)
@@ -1744,7 +1767,10 @@ class ProjectFactory:
             execution_failed = (
                 not results
                 or any(not result.success for result in results)
-                or any(step.status != "completed" for step in project.plan.steps)
+                or (
+                    max_stages is None
+                    and any(step.status != "completed" for step in project.plan.steps)
+                )
             )
             if execution_failed and project.attempts > max_retries:
                 project.status = "blocked"
@@ -1783,6 +1809,7 @@ class ProjectFactory:
             elif execution_failed:
                 project.status = "queued"
                 self._reset_for_retry(project, reset_completed=max_stages is None)
+                self._apply_retry_backoff(project)
                 # Preserve FIFO fairness when resuming a paused or failed attempt.
                 self._requeue_for_fairness(project)
                 self._transition_job(
@@ -1804,12 +1831,39 @@ class ProjectFactory:
 
         self._save(project)
         job = self._load_job(project.mission.id)
+        stage_counts: dict[str, int] = {}
+        stage_timeline = []
+        for step in project.plan.steps:
+            status = str(getattr(step.status, "value", step.status))
+            stage_counts[status] = stage_counts.get(status, 0) + 1
+            stage_timeline.append({
+                "stage": step.stage.value,
+                "status": status,
+                "attempts": max(0, int(getattr(step, "attempts", 0) or 0)),
+                "detail": self._safe_error_detail(str(step.detail)) if step.detail else None,
+            })
         audit_metadata = {
             "attempt": project.attempts,
             "stages_executed": project.stages_executed,
             "orchestrator_status": self.orchestrator.state.status.value,
             "execution_mode": (
                 "autonomous" if self.autonomous_runner is not None else "agent_pipeline"
+            ),
+            "stage_counts": stage_counts,
+            "stage_timeline": stage_timeline,
+            "retry_decision": (
+                "retry_queued" if "RETRY_QUEUED" in event_type
+                else "blocked" if "BLOCKED" in event_type
+                else "paused" if "PAUSED" in event_type
+                else "completed" if "COMPLETED" in event_type
+                else "other"
+            ),
+            "recovery_diagnostics": build_recovery_diagnostics(
+                status=project.status,
+                last_error=project.last_error,
+                attempts=project.attempts,
+                steps=project.plan.steps,
+                queue_depth=len(self.queue),
             ),
         }
         if project.last_error:
@@ -1830,6 +1884,11 @@ class ProjectFactory:
         )
         self._active_project = None
         return project
+
+    def _apply_retry_backoff(self, project: FactoryProject) -> None:
+        """Set a bounded exponential cooldown for a failed automatic retry."""
+        delay_seconds = min(0.5 * (2 ** min(max(project.attempts - 1, 0), 6)), 30.0)
+        project.retry_not_before_epoch = time.time() + delay_seconds
 
     def _requeue_for_fairness(self, project: FactoryProject) -> None:
         """Move a retry to the tail, removing stale duplicate queue entries."""
@@ -1954,6 +2013,20 @@ class ProjectFactory:
                         raise
                     self._contain_unexpected_worker_error(project, exc)
                 if project is None:
+                    if max_stages == 0:
+                        break
+                    if self.queue:
+                        now = time.time()
+                        if any(item.retry_not_before_epoch <= now for item in self.queue):
+                            continue
+                        deadlines = [
+                            item.retry_not_before_epoch
+                            for item in self.queue
+                            if item.retry_not_before_epoch > now
+                        ]
+                        if deadlines:
+                            await asyncio.sleep(min(max(min(deadlines) - now, 0.01), 1.0))
+                            continue
                     break
                 if project.status != "queued" and project.mission.id not in completed_ids:
                     completed.append(project)
@@ -2066,15 +2139,11 @@ class ProjectFactory:
         return safe_job
 
     def _persist_plan_progress(self, project: FactoryProject) -> None:
-        """Persist durable job progress before its recoverable project snapshot.
-
-        The mission-job store is authoritative during restore. Writing the
-        project snapshot first can therefore lose fresh stage progress if the
-        process crashes or the job write fails between the two writes. Update
-        the authoritative job first; only publish the matching snapshot after
-        that succeeds. If the snapshot write then fails, restore can rebuild it
-        from the newer durable job.
-        """
+        """Persist authoritative progress, refresh heartbeat, and record a timeline breadcrumb."""
+        project.last_progress_at = datetime.now(UTC)
+        project.progress_updates += 1
+        # The durable job remains authoritative during restore: write it before
+        # publishing the matching project snapshot.
         job = self._load_job(project.mission.id)
         if job is not None:
             self._save_job(
@@ -2086,6 +2155,73 @@ class ProjectFactory:
                 )
             )
         self._save(project)
+        timeline = [
+            {
+                "stage": step.stage.value,
+                "status": str(getattr(step.status, "value", step.status)),
+                "attempts": max(0, int(getattr(step, "attempts", 0) or 0)),
+                "detail": self._safe_error_detail(str(step.detail)) if step.detail else None,
+            }
+            for step in project.plan.steps
+        ]
+        self._audit(
+            project.mission.id,
+            "MISSION_PROGRESS_SNAPSHOT",
+            f"Persisted mission progress: {project.mission.name}",
+            job.status.value if job is not None else None,
+            {
+                "attempt": project.attempts,
+                "stages_executed": project.stages_executed,
+                "stage_timeline": timeline,
+                "progress_updates": project.progress_updates,
+                "qa_status": getattr(getattr(project.plan, "qa_status", None), "value", getattr(project.plan, "qa_status", None)),
+                "security_status": getattr(getattr(project.plan, "security_status", None), "value", getattr(project.plan, "security_status", None)),
+            },
+        )
+
+    def worker_health(self, stale_after_seconds: float | None = None) -> dict[str, Any]:
+        """Return a read-only worker heartbeat snapshot; stale detection never cancels work."""
+        threshold = (
+            max(1.0, float(self.execution_timeout_seconds))
+            if stale_after_seconds is None
+            else stale_after_seconds
+        )
+        if (
+            isinstance(threshold, bool)
+            or not isinstance(threshold, (int, float))
+            or not math.isfinite(threshold)
+            or threshold <= 0
+        ):
+            raise ValueError("stale_after_seconds must be a finite positive number")
+        project = self._active_project
+        now = datetime.now(UTC)
+        last = project.last_progress_at if project is not None else None
+        age = max(0.0, (now - last).total_seconds()) if last is not None else None
+        if project is None:
+            status = "idle"
+        elif age is not None and age > threshold:
+            status = "stale"
+        else:
+            status = "healthy"
+        return {
+            "status": status,
+            "active_mission_id": project.mission.id if project is not None else None,
+            "active_mission_name": project.mission.name if project is not None else None,
+            "worker_started_at": project.worker_started_at.isoformat() if project and project.worker_started_at else None,
+            "last_progress_at": last.isoformat() if last else None,
+            "heartbeat_age_seconds": age,
+            "stale_after_seconds": float(threshold),
+            "progress_updates": project.progress_updates if project is not None else 0,
+            "queue_depth": len(self.queue),
+            "diagnostic": (
+                "No mission is currently active."
+                if project is None
+                else "Worker progress heartbeat is stale; inspect before restarting. Work was not cancelled or requeued."
+                if status == "stale"
+                else "Active mission has a recent progress heartbeat."
+            ),
+        }
+
 
     def _save_job(self, job: MissionJob) -> None:
         if self.job_store is not None:
