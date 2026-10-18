@@ -102,3 +102,41 @@ def test_runner_failure_diagnostics_redact_secrets():
     assert "super-secret" not in execution_step.detail
     assert secret not in execution_step.detail
     assert "[REDACTED_TOKEN]" in execution_step.detail
+
+
+
+def test_quality_evidence_includes_all_executed_qa_checks_with_redaction():
+    result = _result(stdout="primary suite passed")
+    secret = "ghp_" + "Z" * 32
+    result.pipeline.qa_checks = [
+        {
+            "kind": "configured",
+            "command": ["python", "-m", "pytest", "-q"],
+            "status": "passed",
+            "exit_code": 0,
+            "duration_ms": 120,
+        },
+        {
+            "kind": "javascript_tests",
+            "command": ["node", "--test", "--token", secret],
+            "status": "passed",
+            "exit_code": 0,
+            "duration_ms": 55,
+        },
+    ]
+
+    evidence = FactoryAutonomousRunner._quality_evidence_updates(result, ["pytest"])
+
+    assert "configured:passed exit=0 duration_ms=120" in evidence["qa_evidence"]
+    assert "javascript_tests:passed exit=0 duration_ms=55" in evidence["qa_evidence"]
+    assert "node --test" in evidence["qa_evidence"]
+    assert secret not in evidence["qa_evidence"]
+
+
+def test_quality_evidence_handles_legacy_pipeline_without_check_ledger():
+    result = _result(stdout="legacy run passed")
+
+    evidence = FactoryAutonomousRunner._quality_evidence_updates(result, ["pytest"])
+
+    assert "legacy run passed" in evidence["qa_evidence"]
+    assert "[no per-command ledger available]" in evidence["qa_evidence"]

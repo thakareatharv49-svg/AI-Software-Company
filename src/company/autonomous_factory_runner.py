@@ -203,11 +203,22 @@ class FactoryAutonomousRunner:
         security_approved = bool(getattr(security, "approved", security_status == "approved"))
         stdout = redact_sensitive_text(str(getattr(qa, "stdout", "") or ""))[:2000]
         stderr = redact_sensitive_text(str(getattr(qa, "stderr", "") or ""))[:2000]
+        checks = getattr(result.pipeline, "qa_checks", []) or []
+        check_evidence = "; ".join(
+            f"{redact_sensitive_text(str(check.get('kind', 'check')))[:80]}:"
+            f"{redact_sensitive_text(str(check.get('status', 'unknown')))[:40]} "
+            f"exit={check.get('exit_code', 'unknown')} "
+            f"duration_ms={check.get('duration_ms', 'unknown')} "
+            f"command={' '.join(redact_sensitive_text(str(part))[:120] for part in check.get('command', []))[:300]}"
+            for check in checks[:12]
+            if isinstance(check, dict)
+        )
         qa_evidence = (
             "Factory QA runner result: "
             f"status={qa_status}; exit_code={qa_exit_code}; "
             f"duration_ms={qa_duration_ms}; command={' '.join(command)[:500]}; "
-            f"stdout={stdout or '[empty]'}; stderr={stderr or '[empty]'}"
+            f"stdout={stdout or '[empty]'}; stderr={stderr or '[empty]'}; "
+            f"checks={check_evidence or '[no per-command ledger available]'}"
         )[:5200]
         security_summary = redact_sensitive_text(
             str(getattr(security, "summary", "") or "")
