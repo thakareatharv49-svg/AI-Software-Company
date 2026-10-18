@@ -262,7 +262,7 @@ _MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
     ("collaboration", {"collaboration", "collaborative", "realtime", "shared", "sharing"}, {"collaboration", "collaborative", "realtime", "shared", "sharing"}),
     ("offline mode", {"offline", "offline-first"}, {"offline", "offline-first"}),
     ("file uploads", {"upload", "uploads", "uploading", "attachment", "attachments"}, {"upload", "uploads", "uploading", "attachment", "attachments"}),
-    ("multi-tenancy", {"tenant", "tenants", "multi-tenancy", "workspace", "workspaces"}, {"tenant", "tenants", "multi-tenancy", "workspace", "workspaces"}),
+    ("multi-tenancy", {"tenant", "tenants", "tenancy", "workspace", "workspaces"}, {"tenant", "tenants", "tenancy", "workspace", "workspaces"}),
     ("audit logging", {"audit", "auditing", "auditlog", "auditlogs"}, {"audit", "auditing", "auditlog", "auditlogs"}),
     ("charts/data visualization", {"chart", "charts", "visualization", "visualize", "graph", "graphs"}, {"chart", "charts", "visualization", "visualize", "graph", "graphs"}),
     ("bulk operations", {"bulk", "batch", "batching", "bulk-action", "bulk-actions"}, {"bulk", "batch", "batching", "bulk-action", "bulk-actions"}),
