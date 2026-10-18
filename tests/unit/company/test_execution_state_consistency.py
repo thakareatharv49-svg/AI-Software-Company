@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import pytest
 
 from src.company.mission_controller.planner import build_mission_plan
