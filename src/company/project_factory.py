@@ -1500,12 +1500,49 @@ class ProjectFactory:
 
         self._save(project)
         job = self._load_job(project.mission.id)
+        stage_counts: dict[str, int] = {}
+        stage_timeline: list[dict[str, Any]] = []
+        for step in project.plan.steps:
+            stage_counts[step.status] = stage_counts.get(step.status, 0) + 1
+            stage_timeline.append(
+                {
+                    "stage": step.stage.value,
+                    "status": step.status,
+                    "attempts": max(0, int(step.attempts)),
+                    "detail": self._safe_error_detail(step.detail)[:500]
+                    if step.detail
+                    else None,
+                }
+            )
+        task_counts: dict[str, int] = {}
+        for task in project.plan.engineering_tasks:
+            task_counts[task.status] = task_counts.get(task.status, 0) + 1
         audit_metadata = {
             "attempt": project.attempts,
             "stages_executed": project.stages_executed,
             "orchestrator_status": self.orchestrator.state.status.value,
             "execution_mode": (
                 "autonomous" if self.autonomous_runner is not None else "agent_pipeline"
+            ),
+            "stage_counts": stage_counts,
+            "stage_timeline": stage_timeline,
+            "engineering_task_counts": task_counts,
+            "qa": {
+                "status": project.plan.qa_status,
+                "exit_code": project.plan.qa_exit_code,
+                "duration_ms": project.plan.qa_duration_ms,
+            },
+            "security_status": project.plan.security_status,
+            "retry_decision": (
+                "retry_queued"
+                if event_type == "FACTORY_PROJECT_RETRY_QUEUED"
+                else "blocked"
+                if "BLOCKED" in event_type
+                else "paused"
+                if event_type == "FACTORY_PROJECT_PAUSED"
+                else "completed"
+                if event_type == "FACTORY_PROJECT_COMPLETED"
+                else "other"
             ),
         }
         if project.last_error:
@@ -1758,7 +1795,7 @@ class ProjectFactory:
         return safe_job
 
     def _persist_plan_progress(self, project: FactoryProject) -> None:
-        """Persist live stage status so the dashboard never shows stale all-planned work."""
+        """Persist stage progress and append a redacted point to the mission timeline."""
         self._save(project)
         job = self._load_job(project.mission.id)
         if job is not None:
@@ -1770,6 +1807,33 @@ class ProjectFactory:
                     }
                 )
             )
+        # This is an append-only operational breadcrumb: if a later stage fails,
+        # operators can still see the last persisted state that preceded it.
+        stage_snapshot = [
+            {
+                "stage": step.stage.value,
+                "status": step.status,
+                "attempts": max(0, int(step.attempts)),
+                "detail": self._safe_error_detail(step.detail)[:500]
+                if step.detail
+                else None,
+            }
+            for step in project.plan.steps
+        ]
+        self._audit(
+            project.mission.id,
+            "MISSION_PROGRESS_SNAPSHOT",
+            f"Mission progress persisted: {project.mission.name}",
+            project.status,
+            {
+                "attempt": project.attempts,
+                "stages_executed": project.stages_executed,
+                "stage_timeline": stage_snapshot,
+                "qa_status": project.plan.qa_status,
+                "qa_exit_code": project.plan.qa_exit_code,
+                "security_status": project.plan.security_status,
+            },
+        )
 
     def _save_job(self, job: MissionJob) -> None:
         if self.job_store is not None:
