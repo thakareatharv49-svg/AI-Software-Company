@@ -672,7 +672,7 @@ def test_feature_traceability_covers_more_product_workflows() -> None:
                 "def test_realtime_collaboration_syncs_shared_changes(): pass\\n"
                 "def test_offline_mode_saves_changes(): pass\\n"
                 "def test_file_uploads_validate_attachments(): pass\\n"
-                "def test_workspace_tenants_are_isolated(): pass\\n"
+                "def test_workspace_tenancy_isolated(): pass\\n"
                 "def test_audit_logging_records_changes(): pass\\n"
                 "def test_charts_visualize_activity(): pass\\n"
                 "def test_bulk_operations_update_records(): pass\\n"
