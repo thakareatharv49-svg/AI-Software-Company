@@ -20,6 +20,7 @@ from src.company.mission_jobs import (
     MissionJobStatus,
     recover_running_job,
     recover_running_plan,
+    resume_failed_plan,
     transition_job,
 )
 from src.company.models.contracts import CompanyMission
@@ -907,16 +908,10 @@ class ProjectFactory:
             f"Mission manually re-queued: {job.mission.name}",
         )
         self._save_job(queued)
-        # A manual retry starts a fresh attempt. Persist the reset plan as well
-        # as the queued job so stale failed/running steps cannot poison the retry.
-        plan = queued.plan.model_copy(deep=True)
-        for step in plan.steps:
-            # Manual retry restarts the mission from its first lifecycle stage.
-            # Clear completed statuses too, otherwise the dashboard can display
-            # stale success while the new attempt is still executing.
-            if step.status != "planned" or step.detail is not None:
-                step.status = "planned"
-                step.detail = None
+        # Resume from the last valid checkpoint instead of replaying completed
+        # stages. Failed/in-flight stages are reset, and any completed downstream
+        # stage whose prerequisites are no longer complete is invalidated.
+        plan = resume_failed_plan(queued.plan)
         queued = queued.model_copy(update={"plan": plan})
         self._save_job(queued)
         project = FactoryProject(
