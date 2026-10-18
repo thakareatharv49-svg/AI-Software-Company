@@ -402,7 +402,8 @@ async def test_factory_can_use_real_m36_runner_adapter() -> None:
 
     class Pipeline:
         project = Project()
-        qa_result = SimpleNamespace(status=SimpleNamespace(value="passed"))
+        qa_result = SimpleNamespace(status=SimpleNamespace(value="passed"), exit_code=0)
+        qa_checks = [{"kind": "python", "status": "passed", "exit_code": 0}]
         review_result = SimpleNamespace(status=SimpleNamespace(value="approved"))
         github_message = "pull request created"
         memory_id = "memory-1"
@@ -499,7 +500,8 @@ async def test_factory_autonomous_runner_materializes_project_workspace(tmp_path
             (),
             {"id": "workspace-project", "name": "Workspace", "repository": None},
         )()
-        qa_result = SimpleNamespace(status=SimpleNamespace(value="passed"))
+        qa_result = SimpleNamespace(status=SimpleNamespace(value="passed"), exit_code=0)
+        qa_checks = [{"kind": "python", "status": "passed", "exit_code": 0}]
         review_result = SimpleNamespace(status=SimpleNamespace(value="approved"))
         github_message = None
         memory_id = None
