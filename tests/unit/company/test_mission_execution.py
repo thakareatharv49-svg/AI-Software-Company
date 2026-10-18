@@ -211,3 +211,37 @@ async def test_qa_stage_receives_explicit_evidence_expectations() -> None:
     assert result.success is True
     assert "Report the exact checks performed." in runtime.last_prompt
     assert "Do not report success when required checks were not run." in runtime.last_prompt
+
+
+@pytest.mark.asyncio
+async def test_invalid_lifecycle_plan_is_blocked_before_agent_execution() -> None:
+    class NeverCalledRuntime:
+        def __init__(self):
+            self.calls = 0
+
+        async def generate(self, request):
+            self.calls += 1
+            raise AssertionError("invalid lifecycle must be rejected before model execution")
+
+    runtime = NeverCalledRuntime()
+    orchestrator = CompanyOrchestrator()
+    mission = CompanyMission(name="Malformed plan", objective="Create a useful app")
+    controller = MissionController(orchestrator)
+    plan, _ = controller.start(mission)
+    plan.steps = plan.steps[:-1]
+
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(runtime),
+        AgentRegistry(),
+    )
+    result = await pipeline.execute_next(mission, plan)
+
+    assert result.success is False
+    assert "missing required lifecycle stage 'learning'" in (result.error or "")
+    assert runtime.calls == 0
+    assert orchestrator.state.status.value == "blocked"
+    assert any(
+        event.event_type == "MISSION_LIFECYCLE_INVALID"
+        for event in orchestrator.events.list_events()
+    )
