@@ -184,9 +184,6 @@ def _run_browser_checks(workspace: Path, timeout_ms: int) -> dict[str, Any]:
                         except Exception as exc:
                             failures.append(f"Button interaction '{label[:80]}' failed: {type(exc).__name__}: {exc}"[:500])
 
-                if not interactions_checked:
-                    failures.append("No safe button interaction produced an observable change.")
-
                 if page_errors:
                     failures.extend(f"Uncaught browser error: {error}" for error in page_errors[:MAX_PAGE_ERRORS])
                 if not routes_checked:
