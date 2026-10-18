@@ -137,8 +137,16 @@ def _run_browser_checks(workspace: Path, timeout_ms: int) -> dict[str, Any]:
                     button = buttons.nth(index)
                     label = (button.inner_text() or button.get_attribute("aria-label") or "").strip()
                     if _safe_interaction_label(label):
+                        before_text = page.locator("body").inner_text()
+                        before_url = page.url
                         try:
                             button.click()
+                            page.wait_for_timeout(100)
+                            after_text = page.locator("body").inner_text()
+                            if after_text == before_text and page.url == before_url:
+                                failures.append(
+                                    f"Button interaction '{label[:80]}' produced no observable page or URL change."
+                                )
                             interactions_checked.append(label[:MAX_INTERACTION_LABEL])
                         except Exception as exc:
                             failures.append(f"Button interaction '{label[:80]}' failed: {type(exc).__name__}: {exc}"[:500])
