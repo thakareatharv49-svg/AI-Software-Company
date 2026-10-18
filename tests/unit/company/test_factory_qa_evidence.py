@@ -102,3 +102,19 @@ def test_runner_failure_diagnostics_redact_secrets():
     assert "super-secret" not in execution_step.detail
     assert secret not in execution_step.detail
     assert "[REDACTED_TOKEN]" in execution_step.detail
+
+
+def test_quality_evidence_includes_browser_acceptance_summary():
+    result = _result(stdout="tests passed")
+    result.pipeline.browser_acceptance = {
+        "status": "passed",
+        "routes_checked": ["/", "/settings"],
+        "interactions_checked": ["Save"],
+        "detail": "Routes and safe interaction passed.",
+    }
+
+    evidence = FactoryAutonomousRunner._quality_evidence_updates(result, ["pytest"])
+
+    assert "browser_status=passed" in evidence["qa_evidence"]
+    assert "routes=/,/settings" in evidence["qa_evidence"]
+    assert "interactions=Save" in evidence["qa_evidence"]
