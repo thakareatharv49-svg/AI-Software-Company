@@ -25,6 +25,7 @@ from src.company.mission_jobs import (
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.project_outputs import ProjectOutputManifest
+from src.company.recovery_diagnostics import build_recovery_diagnostics
 from src.security.redaction import redact_sensitive_text, redact_sensitive_value
 
 if TYPE_CHECKING:
@@ -1500,6 +1501,13 @@ class ProjectFactory:
 
         self._save(project)
         job = self._load_job(project.mission.id)
+        recovery_diagnostics = build_recovery_diagnostics(
+            status=project.status,
+            last_error=project.last_error,
+            attempts=project.attempts,
+            steps=project.plan.steps,
+            queue_depth=len(self.queue),
+        )
         audit_metadata = {
             "attempt": project.attempts,
             "stages_executed": project.stages_executed,
@@ -1507,6 +1515,7 @@ class ProjectFactory:
             "execution_mode": (
                 "autonomous" if self.autonomous_runner is not None else "agent_pipeline"
             ),
+            "recovery_diagnostics": recovery_diagnostics,
         }
         if project.last_error:
             audit_metadata["error"] = project.last_error
