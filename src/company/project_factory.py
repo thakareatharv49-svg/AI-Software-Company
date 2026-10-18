@@ -1050,7 +1050,26 @@ class ProjectFactory:
             )
         # A zero-stage budget is an intentional no-op, not an execution attempt.
         # Leave the mission queued so a later run with a positive budget can resume it.
+        # A factory instance may be driven by both the background worker and
+        # a direct run_next call. Reject overlapping execution before inspecting
+        # or mutating the queue: otherwise two coroutines can claim different
+        # queue entries and run missions concurrently.
+        if self._active_project is not None:
+            raise RuntimeError(
+                "Factory execution is already active for mission "
+                f"'{self._active_project.mission.id}'"
+            )
+
         if max_stages == 0 or not self.queue:
+            return None
+
+        # The durable job is the idempotency authority. A stale in-memory queue
+        # entry must never re-run a mission that another worker has already
+        # claimed or that has reached a terminal lifecycle state.
+        queued_candidate = self.queue[0]
+        durable_job = self._load_job(queued_candidate.mission.id)
+        if durable_job is not None and durable_job.status != MissionJobStatus.QUEUED:
+            self.queue.pop(0)
             return None
 
         # Keep the project in the FIFO queue until its startup state is durable.
