@@ -249,6 +249,16 @@ _MISSION_FEATURES: tuple[tuple[str, set[str], set[str]], ...] = (
     ("validation", {"validation", "validate", "validated"}, {"validation", "validate", "validated"}),
     ("sorting", {"sort", "sorting", "order"}, {"sort", "sorting", "order"}),
     ("undo/redo", {"undo", "redo"}, {"undo", "redo"}),
+    ("notifications", {"notification", "notifications", "notify", "reminder", "reminders"}, {"notification", "notifications", "notify", "reminder", "reminders"}),
+    ("analytics/reporting", {"analytics", "analytic", "report", "reports", "reporting", "insights"}, {"analytics", "analytic", "report", "reports", "reporting", "insights"}),
+    ("pagination", {"pagination", "paginate", "paginated", "page"}, {"pagination", "paginate", "paginated", "page"}),
+    ("responsive layout", {"responsive", "mobile", "tablet"}, {"responsive", "mobile", "tablet"}),
+    ("accessibility", {"accessibility", "accessible", "a11y", "aria"}, {"accessibility", "accessible", "a11y", "aria"}),
+    ("role-based permissions", {"role", "roles", "permission", "permissions", "authorization", "authorize"}, {"role", "roles", "permission", "permissions", "authorization", "authorize"}),
+    ("API/integration", {"api", "integration", "integrations", "webhook", "webhooks"}, {"api", "integration", "integrations", "webhook", "webhooks"}),
+    ("backup/restore", {"backup", "backups", "restore", "restoration"}, {"backup", "backups", "restore", "restoration"}),
+    ("recurring scheduling", {"recurring", "schedule", "scheduling", "scheduled"}, {"recurring", "schedule", "scheduling", "scheduled"}),
+    ("payments", {"payment", "payments", "checkout", "billing", "invoice", "invoices"}, {"payment", "payments", "checkout", "billing", "invoice", "invoices"}),
 )
 
 

@@ -614,3 +614,46 @@ def test_feature_traceability_accepts_named_javascript_test_titles() -> None:
     )
 
     assert issues == []
+
+
+def test_feature_traceability_covers_common_product_workflows() -> None:
+    objective = (
+        "Build a responsive dashboard with notifications, analytics, pagination, "
+        "accessibility, role-based permissions, API integration, backup and restore, "
+        "recurring scheduling, and payments."
+    )
+    issues = find_uncovered_mission_features(
+        objective,
+        {
+            "tests/test_dashboard.py": (
+                "def test_responsive_layout(): pass\n"
+                "def test_notifications_are_sent(): pass\n"
+                "def test_analytics_report(): pass\n"
+                "def test_pagination_limits_results(): pass\n"
+                "def test_accessibility_labels(): pass\n"
+                "def test_role_permissions(): pass\n"
+                "def test_api_integration(): pass\n"
+                "def test_backup_and_restore(): pass\n"
+                "def test_recurring_schedule(): pass\n"
+                "def test_payment_checkout(): pass\n"
+            )
+        },
+    )
+
+    assert issues == []
+
+
+def test_feature_traceability_reports_uncovered_common_workflows() -> None:
+    issues = find_uncovered_mission_features(
+        "Add notifications, analytics, pagination, accessibility, and payments.",
+        {
+            "tests/test_app.py": (
+                "def test_notifications_are_sent(): pass\n"
+                "def test_payment_checkout(): pass\n"
+            )
+        },
+    )
+
+    assert any("analytics/reporting" in issue for issue in issues)
+    assert any("pagination" in issue for issue in issues)
+    assert any("accessibility" in issue for issue in issues)
