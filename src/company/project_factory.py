@@ -1550,9 +1550,13 @@ class ProjectFactory:
         return project
 
     def _requeue_for_fairness(self, project: FactoryProject) -> None:
-        """Append a retry behind already-waiting missions without duplicating it."""
-        if not any(item.mission.id == project.mission.id for item in self.queue):
-            self.queue.append(project)
+        """Move a retry to the tail, removing stale duplicate queue entries."""
+        # A recovery/cleanup path may leave the same mission in the queue already.
+        # Merely avoiding a duplicate would preserve its old position and let a
+        # retry jump ahead of missions that have waited longer.
+        mission_id = project.mission.id
+        self.queue = [item for item in self.queue if item.mission.id != mission_id]
+        self.queue.append(project)
 
     @staticmethod
     def _safe_error_detail(value: str) -> str:
