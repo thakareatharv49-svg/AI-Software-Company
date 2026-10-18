@@ -2209,7 +2209,7 @@ class ProjectFactory:
             "diagnostic": (
                 "No mission is currently active."
                 if project is None
-                else "Worker progress heartbeat is stale; inspect before restarting."
+                else "Worker progress heartbeat is stale; inspect before restarting. Work was not cancelled or requeued."
                 if status == "stale"
                 else "Active mission has a recent progress heartbeat."
             ),
