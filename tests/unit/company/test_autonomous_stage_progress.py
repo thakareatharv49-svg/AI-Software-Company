@@ -200,7 +200,8 @@ async def test_progress_persistence_failure_does_not_abort_autonomous_run(tmp_pa
                 ),
                 pipeline=SimpleNamespace(
                     project=SimpleNamespace(id="telemetry-ok", name="Notes"),
-                    qa_result=SimpleNamespace(status="passed"),
+                    qa_result=SimpleNamespace(status="passed", exit_code=0),
+                    qa_checks=[{"kind": "python", "status": "passed", "exit_code": 0}],
                     review_result=SimpleNamespace(status="approved"),
                 ),
                 deployment=SimpleNamespace(status="completed"),
