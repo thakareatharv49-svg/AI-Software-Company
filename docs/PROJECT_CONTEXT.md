@@ -414,3 +414,8 @@ This section was checked against live GitHub state on 2026-10-15. It supersedes 
 - User expects the assistant to handle implementation, tests, CI troubleshooting, PR creation, and merging where connector permissions allow. Do not ask the user to merge.
 - Never claim a merge, successful CI, completed milestone, or saved file without checking GitHub's actual result.
 - Keep the company/factory branding **AI Software Company** and HQ branding **Nexora**.
+
+
+## Next major program: large-project delivery (M86–M97)
+
+The next broad problem is reliable end-to-end delivery of useful, multi-file applications rather than small demos or unverified completion claims. The 12-step breakdown and acceptance criteria are recorded in `docs/MILESTONES.md` under **Large-Project Delivery Program — M86–M97**. All twelve are PLANNED, not completed. Start with M86 (a reproducible benchmark baseline), implement one milestone per PR from verified latest `main`, add tests and evidence, resolve all required CI/security failures, and merge only after the exact PR head is green. Prioritize real factory-path integration tests and honest completion gates over adding disconnected helper modules.
