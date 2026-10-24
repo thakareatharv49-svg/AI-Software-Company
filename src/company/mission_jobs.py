@@ -66,13 +66,41 @@ class MissionJob(BaseModel):
         return redact_sensitive_text(str(value))[:4000]
 
 
+def _recover_engineering_tasks(plan: MissionPlan, *, retry_failed: bool) -> None:
+    """Reset interrupted task leases and invalidate stale completed descendants."""
+    for task in plan.engineering_tasks:
+        status = str(getattr(task.status, "value", task.status)).strip().casefold()
+        if status == "running" or (retry_failed and status == "failed"):
+            task.status = "planned"
+            task.detail = None
+
+    # Dependency-first order makes invalidation deterministic and propagates
+    # from reset prerequisites to any descendants that had stale completion.
+    try:
+        ordered = plan.engineering_task_order()
+    except ValueError:
+        # Leave malformed graph details intact for the execution preflight to
+        # reject explicitly; recovery must not guess at an invalid dependency DAG.
+        return
+    completed: set[str] = set()
+    for task in ordered:
+        status = str(getattr(task.status, "value", task.status)).strip().casefold()
+        if status == "completed" and not set(task.depends_on).issubset(completed):
+            task.status = "planned"
+            task.detail = None
+            status = "planned"
+        if status == "completed":
+            completed.add(task.id)
+
+
 def recover_running_plan(plan: MissionPlan) -> MissionPlan:
-    """Make interrupted in-flight stages safe to retry after a process restart."""
+    """Make interrupted in-flight stages and engineering tasks safe to resume."""
     recovered = plan.model_copy(deep=True)
     for step in recovered.steps:
         if str(getattr(step.status, "value", step.status)).strip().casefold() == "running":
             step.status = "planned"
             step.detail = None
+    _recover_engineering_tasks(recovered, retry_failed=False)
     return recovered
 
 
@@ -91,6 +119,7 @@ def resume_failed_plan(plan: MissionPlan) -> MissionPlan:
         if status in retryable_statuses:
             step.status = "planned"
             step.detail = None
+    _recover_engineering_tasks(recovered, retry_failed=True)
 
     changed = True
     while changed:
