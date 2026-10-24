@@ -43,6 +43,33 @@ def test_cli_mission_does_not_default_to_a_web_demo():
     assert "Stable exit codes" in architecture.interfaces
 
 
+
+def test_full_stack_mission_is_not_misclassified_as_api_only():
+    architecture = build_architecture_plan(
+        mission("Build a full-stack web app with API and persistent settings.")
+    )
+
+    assert architecture.project_type == "full_stack_web_app"
+    assert "web/index.html" in architecture.repository_layout
+    assert "src/routes/" in architecture.repository_layout
+    assert "Browser-to-API HTTP contract" in architecture.interfaces
+
+
+def test_browser_mission_reports_missing_node_validation_tool():
+    architecture = build_architecture_plan(
+        mission("Build a responsive browser app."),
+        capabilities=RuntimeCapabilities(
+            languages=["python", "javascript", "html", "css"],
+            frameworks=[],
+            tools=["python", "pytest"],
+            packages=["pytest"],
+            database_engines=[],
+        ),
+    )
+
+    assert architecture.status == "blocked_unsupported_dependency"
+    assert "node" in architecture.unsupported_dependencies
+
 def test_missing_required_runtime_capability_blocks_architecture_before_coding():
     architecture = build_architecture_plan(
         mission("Build a REST API with CRUD endpoints."),
