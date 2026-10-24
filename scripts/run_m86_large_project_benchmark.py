@@ -222,7 +222,24 @@ def evaluate_case(case: dict[str, Any], files: list[str], plan: dict[str, Any],
             except OSError:
                 continue
         all_text = "\n".join(chunks).casefold()
+    artifact_issues: list[str] = ["Workspace not found; artifact safety could not be verified."]
+    if workspace:
+        try:
+            from src.company.artifact_validation import validate_generated_artifacts
+            artifact_map: dict[str, str] = {}
+            for relative in files:
+                artifact_path = workspace / relative
+                try:
+                    if artifact_path.stat().st_size <= 250_000:
+                        artifact_map[relative] = artifact_path.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+            artifact_issues = validate_generated_artifacts(artifact_map)
+        except Exception as exc:
+            artifact_issues = [f"Artifact validator failed: {type(exc).__name__}: {exc}"]
     checks = [
+        {"id": "artifact_safety", "passed": workspace is not None and not artifact_issues,
+         "detail": "Artifact validator passed." if workspace is not None and not artifact_issues else "; ".join(artifact_issues[:8])},
         {"id": "factory_terminal_success", "passed": mission_status == "completed",
          "detail": f"Factory mission status: {mission_status or 'unknown'}"},
         {"id": "required_files", "passed": not missing,
