@@ -34,15 +34,15 @@ def build_architecture_plan(
     if _has(objective, "cli", "command-line", "command line", "terminal utility"):
         project_type = "cli_utility"
         evidence.append("The mission explicitly requests a command-line or terminal utility.")
+    elif _has(objective, "full-stack", "full stack", "frontend and backend", "web app with api"):
+        project_type = "full_stack_web_app"
+        evidence.append("The mission explicitly requests both a user interface and a service.")
     elif _has(objective, "api", "rest", "endpoint", "backend service", "http service"):
         project_type = "api_service"
         evidence.append("The mission explicitly requests an API, endpoint, or backend service.")
     elif _has(objective, "library", "sdk", "package"):
         project_type = "python_library"
         evidence.append("The mission explicitly requests a reusable library, SDK, or package.")
-    elif _has(objective, "full-stack", "full stack", "frontend and backend", "web app with api"):
-        project_type = "full_stack_web_app"
-        evidence.append("The mission explicitly requests both a user interface and a service.")
     elif _has(objective, "website", "web app", "web application", "browser", "dashboard", "responsive"):
         project_type = "browser_app"
         evidence.append("The mission emphasizes browser, website, dashboard, or responsive UI behavior.")
