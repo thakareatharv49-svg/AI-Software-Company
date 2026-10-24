@@ -6,6 +6,7 @@ they do not claim to run tests, review UI, scan code, or publish artifacts thems
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Literal
 
 Severity = Literal["critical", "high", "medium", "low"]
@@ -169,8 +170,18 @@ def evaluate_improvement(
         baseline.cost_units, candidate.quality_score, candidate.safety_score,
         candidate.latency_seconds, candidate.cost_units,
     )
+    if any(not math.isfinite(value) for value in values):
+        reasons.append("metrics must be finite numbers")
     if any(value < 0 for value in values):
         reasons.append("metrics cannot be negative")
+    if any(value > 1 for value in (baseline.quality_score, baseline.safety_score, candidate.quality_score, candidate.safety_score)):
+        reasons.append("quality and safety scores must be between 0 and 1")
+    thresholds = (
+        minimum_quality_delta, minimum_safety_delta,
+        maximum_latency_regression, maximum_cost_regression,
+    )
+    if any(not math.isfinite(value) or value < 0 for value in thresholds):
+        reasons.append("regression thresholds must be finite and non-negative")
     if candidate.quality_score - baseline.quality_score < minimum_quality_delta:
         reasons.append("quality improvement is below the required threshold")
     if candidate.safety_score - baseline.safety_score < minimum_safety_delta:
