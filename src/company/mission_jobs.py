@@ -100,7 +100,7 @@ def recover_running_plan(plan: MissionPlan) -> MissionPlan:
         if str(getattr(step.status, "value", step.status)).strip().casefold() == "running":
             step.status = "planned"
             step.detail = None
-    _recover_engineering_tasks(recovered, retry_failed=False)
+    _recover_engineering_tasks(recovered, retry_failed=True)
     return recovered
 
 
