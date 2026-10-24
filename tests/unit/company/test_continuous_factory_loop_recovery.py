@@ -46,7 +46,17 @@ async def test_continuous_runner_recovers_running_job_and_redacts_exception() ->
     class Factory:
         def __init__(self, owner):
             self.owner = owner
-            self.queue = []
+            # A running durable job should still have an active queue entry when
+            # its worker raises; this ensures the first run exercises recovery.
+            self.queue = [
+                SimpleNamespace(
+                    mission=mission,
+                    plan=plan,
+                    status="queued",
+                    attempts=2,
+                    last_error=None,
+                )
+            ]
             self.calls = 0
 
         def has_queued_mission(self, mission_id):
