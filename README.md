@@ -4,6 +4,10 @@ AI Software Company is an autonomous software factory with a browser control cen
 
 **Persistent engineering context:** Read [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) before continuing work. It records the current architecture, verified milestone/PR history, known issues, safety constraints, and the required handoff workflow. The permanent product roadmap remains in [docs/MILESTONES.md](docs/MILESTONES.md).
 
+## Development methodology
+
+This project follows the **Waterfall Model**: requirements and acceptance criteria → system design → implementation → verification and validation → release → maintenance. Each phase has an explicit exit gate. If verification finds a defect, fix it in the relevant earlier phase and rerun affected checks. See `docs/MILESTONES.md` for the phase-gate policy and current milestone sequence.
+
 ## Company structure
 
 Nexora HQ is the parent-company dashboard for tracking ventures, company-level activity, and integration health. AI Software Company owns software mission execution, generated applications, previews, and its internal factory workflows. The optional `/api/hq/status` endpoint exposes aggregate mission counts to Nexora HQ using a dedicated bearer token; it does not expose mission details or any execution controls.
