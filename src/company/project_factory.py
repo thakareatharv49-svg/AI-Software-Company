@@ -743,6 +743,44 @@ class ProjectFactory:
                     requirement.acceptance_check, 2000
                 )
                 requirement.source = safe_text(requirement.source, 120)
+        architecture = safe.architecture_plan
+        if architecture is not None:
+            architecture.project_type = safe_text(architecture.project_type, 120)
+            architecture.language = safe_text(architecture.language, 120)
+            architecture.framework = (
+                safe_text(architecture.framework, 120)
+                if architecture.framework is not None
+                else None
+            )
+            architecture.runtime = safe_text(architecture.runtime, 200)
+            architecture.status = safe_text(architecture.status, 120)
+            architecture.rationale = [
+                safe_text(value, 2000) for value in architecture.rationale
+            ]
+            architecture.repository_layout = [
+                safe_text(value, 500) for value in architecture.repository_layout
+            ]
+            architecture.components = [
+                safe_text(value, 1000) for value in architecture.components
+            ]
+            architecture.interfaces = [
+                safe_text(value, 1000) for value in architecture.interfaces
+            ]
+            architecture.data_model = [
+                safe_text(value, 1000) for value in architecture.data_model
+            ]
+            architecture.validation_strategy = [
+                safe_text(value, 1000) for value in architecture.validation_strategy
+            ]
+            architecture.unsupported_dependencies = [
+                safe_text(value, 200) for value in architecture.unsupported_dependencies
+            ]
+            for dependency in architecture.dependencies:
+                dependency.name = safe_text(dependency.name, 200)
+                dependency.purpose = safe_text(dependency.purpose, 1000)
+                dependency.kind = safe_text(dependency.kind, 120)
+                if dependency.reason is not None:
+                    dependency.reason = safe_text(dependency.reason, 1000)
         safe.qa_command = [safe_text(value, 500) for value in safe.qa_command]
         for step in safe.steps:
             step.objective = safe_text(step.objective, 2000)
