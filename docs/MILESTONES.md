@@ -1174,14 +1174,14 @@ Status: IN PROGRESS
 Acceptance: representative missions receive valid, environment-compatible plans and unsupported dependencies are identified before implementation. M88 remains IN PROGRESS until required exact-head CI/security checks pass and representative missions are verified through the running factory path. M86 and M87 real-path gates remain outstanding.
 
 ### M89 — Executable Dependency-Aware Task Graph
-Status: PLANNED
+Status: IN PROGRESS
 
-- Wire dependency ordering into the actual factory execution path, not only planning helpers.
-- Prevent a task from starting until its required predecessors have verified completion.
-- Detect cycles, missing dependencies, and impossible plans before consuming execution time.
-- Persist task state and dependency outcomes so restart/resume cannot skip prerequisites.
+- Added an execution-boundary preflight that rejects malformed engineering task DAGs before agent/tool work begins, while preserving compatibility for legacy plans with no engineering-task list.
+- Execution requests now receive engineering tasks in stable dependency-first order and a separate list of task IDs whose prerequisites are already marked completed.
+- Added regression coverage for reverse-ordered dependencies, ready-task filtering, duplicate IDs, missing/self dependencies, and cycles.
+- Remaining gate: execute engineering tasks as individually checkpointed units in the real worker path, persist each task transition during execution, and prove interruption/restart resumes without bypassing prerequisites.
 
-Acceptance: integration tests prove correct ordering, blocked downstream tasks, cycle rejection, and correct behavior after restart.
+Acceptance: integration tests prove correct ordering, blocked downstream tasks, cycle rejection, and correct behavior after restart. M89 remains IN PROGRESS until task-level checkpoint/resume and real factory-path evidence pass.
 
 ### M90 — Multi-File Implementation and Incremental Resume
 Status: PLANNED
