@@ -121,7 +121,8 @@ class FactoryApi:
                 workspace = _find_workspace(mission_id)
                 files = _workspace_files(workspace) if workspace else []
                 result["artifact_files"] = files
-                result["checks"] = evaluate_case(case, files, plan, status)
+                result["workspace_found"] = workspace is not None
+                result["checks"] = evaluate_case(case, files, plan, status, workspace=workspace)
         except BenchmarkError as exc:
             result["errors"].append(str(exc))
         except Exception as exc:  # keep a structured record for unexpected per-case errors
@@ -163,7 +164,7 @@ def _stage_evidence(plan: dict[str, Any]) -> list[dict[str, Any]]:
 def _test_evidence(plan: dict[str, Any]) -> dict[str, Any] | None:
     keys = (
         "qa_status", "qa_exit_code", "qa_duration_ms", "qa_command",
-        "qa_stdout", "qa_stderr", "quality_evidence",
+        "qa_stdout", "qa_stderr", "qa_evidence", "quality_evidence",
     )
     found = {key: plan[key] for key in keys if key in plan}
     if not found:
@@ -205,13 +206,12 @@ def _workspace_files(workspace: Path) -> list[str]:
 
 
 def evaluate_case(case: dict[str, Any], files: list[str], plan: dict[str, Any],
-                  mission_status: str) -> list[dict[str, Any]]:
+                  mission_status: str, *, workspace: Path | None = None) -> list[dict[str, Any]]:
     file_set = set(files)
     required_files = list(case.get("expected_files", []))
     missing = [path for path in required_files if path not in file_set]
     all_text = ""
     # Only inspect bounded, ordinary text files under the mission workspace.
-    workspace = _find_workspace(str(plan.get("mission_id", ""))) if plan.get("mission_id") else None
     if workspace:
         chunks = []
         for relative in files:
@@ -242,6 +242,11 @@ def _test_exit_code(plan: dict[str, Any]) -> int | None:
         if isinstance(value, int) and not isinstance(value, bool):
             return value
     evidence = plan.get("quality_evidence")
+    if isinstance(evidence, str):
+        import re
+        match = re.search(r"\\bexit_code=(-?\\d+)\\b", evidence)
+        if match:
+            return int(match.group(1))
     if isinstance(evidence, dict):
         for key in ("qa_exit_code", "test_exit_code", "exit_code"):
             value = evidence.get(key)
