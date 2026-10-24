@@ -9,6 +9,7 @@ from src.company.quality_release_gates import (
     SoakEvidence,
     evaluate_improvement,
     evaluate_integrated_acceptance,
+    evaluate_factory_plan_quality,
     evaluate_product_quality,
     evaluate_release_readiness,
     evaluate_soak,
@@ -146,14 +147,72 @@ def test_integrated_acceptance_blocks_when_any_required_gate_fails():
 
 
 def test_integrated_acceptance_passes_only_when_all_gates_pass():
-    quality = good_quality()
+    quality = good_quality(candidate_revision="candidate")
     release = ReleaseEvidence("candidate", "candidate", "passed", "passed", True, True)
     soak = SoakEvidence(
         (MissionOutcome("one", "completed"), MissionOutcome("two", "blocked", "cancelled by policy")),
         ("one", "two"),
+        candidate_revision="candidate",
     )
     baseline = ImprovementMetrics(0.8, 0.9, 10, 100)
-    candidate = ImprovementMetrics(0.85, 0.92, 10.5, 105)
+    candidate = ImprovementMetrics(0.85, 0.92, 10.5, 105, candidate_revision="candidate")
     decision = evaluate_integrated_acceptance(quality, release, soak, baseline, candidate)
     assert decision.status == "passed"
     assert decision.reasons == ()
+
+
+def test_factory_plan_adapter_requires_real_qa_and_security_evidence():
+    from types import SimpleNamespace
+
+    plan = SimpleNamespace(
+        requirements_contract=SimpleNamespace(functional_requirements=[object()]),
+        acceptance_criteria=["app starts"],
+        qa_status="passed",
+        qa_evidence="pytest: 12 passed",
+        security_status="passed",
+        security_evidence="scanner: no findings",
+    )
+    decision = evaluate_factory_plan_quality(
+        plan, responsive_checks_passed=True, accessibility_checks_passed=True
+    )
+    assert decision.status == "passed"
+
+    plan.security_evidence = ""
+    decision = evaluate_factory_plan_quality(
+        plan, responsive_checks_passed=True, accessibility_checks_passed=True
+    )
+    assert decision.status == "blocked"
+    assert any("security checks" in reason for reason in decision.reasons)
+
+
+def test_factory_plan_adapter_does_not_infer_responsive_or_accessibility():
+    from types import SimpleNamespace
+
+    plan = SimpleNamespace(
+        requirements_contract=None,
+        acceptance_criteria=["app starts"],
+        qa_status="passed",
+        qa_evidence="test command succeeded",
+        security_status="passed",
+        security_evidence="security scan succeeded",
+    )
+    decision = evaluate_factory_plan_quality(
+        plan, responsive_checks_passed=False, accessibility_checks_passed=False
+    )
+    assert decision.status == "blocked"
+    assert any("responsive" in reason for reason in decision.reasons)
+    assert any("accessibility" in reason for reason in decision.reasons)
+
+
+def test_integrated_acceptance_blocks_stale_soak_or_improvement_evidence():
+    quality = good_quality(candidate_revision="new")
+    release = ReleaseEvidence("new", "new", "passed", "passed", True, True)
+    soak = SoakEvidence((MissionOutcome("one", "completed"),), ("one",), candidate_revision="old")
+    baseline = ImprovementMetrics(0.8, 0.9, 10, 100)
+    candidate = ImprovementMetrics(0.85, 0.92, 10, 100, candidate_revision="old")
+    decision = evaluate_integrated_acceptance(
+        quality, release, soak, baseline, candidate
+    )
+    assert decision.status == "blocked"
+    assert any("soak evidence does not match" in reason for reason in decision.reasons)
+    assert any("improvement metrics do not match" in reason for reason in decision.reasons)
