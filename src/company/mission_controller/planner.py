@@ -57,7 +57,7 @@ _STAGE_DEPENDENCIES: dict[MissionStage, list[str]] = {
 }
 
 _GENERIC_OBJECTIVE = re.compile(
-    r"^(?:build|create|make|develop|implement)\\s+(?:(?:a|an|the)\\s+)?"
+    r"^(?:build|create|make|develop|implement)\s+(?:(?:a|an|the)\s+)?"
     r"(?:app|application|website|tool|platform|system|software|product)[.!?]?$",
     re.IGNORECASE,
 )
@@ -65,10 +65,10 @@ _GENERIC_OBJECTIVE = re.compile(
 
 def _objective_chunks(objective: str) -> list[str]:
     """Split a mission into stable, non-empty statements without inventing scope."""
-    chunks = re.split(r"(?<=[.!?])\\s+|\\n+|;\\s*", objective.strip())
+    chunks = re.split(r"(?<=[.!?])\s+|\n+|;\s*", objective.strip())
     result: list[str] = []
     for chunk in chunks:
-        normalized = chunk.strip(" \\t\\r\\n-*•")
+        normalized = chunk.strip(" \t\r\n-*•")
         if normalized and normalized not in result:
             result.append(normalized)
     return result
