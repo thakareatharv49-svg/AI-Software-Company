@@ -1140,14 +1140,15 @@ Status: COMPLETE
 The factory must reliably deliver useful, multi-file applications rather than repeatedly producing small demos, getting stuck on long missions, or treating generated files as proof that a product works. These milestones turn that broad problem into independently testable increments. **All milestones below begin as PLANNED**; do not mark one complete until its acceptance criteria pass on the real factory path.
 
 ### M86 — Large-Project Benchmark and Baseline
-Status: PLANNED
+Status: IN PROGRESS
 
-- Define a small, repeatable benchmark set for materially different projects (for example, a multi-page web app with persistence, an API-backed application, and a command-line utility with tests).
-- Record mission input, expected files/features, test commands, acceptance checks, duration, retry count, and final outcome in machine-readable fixtures.
-- Run the benchmark against current main first and preserve the baseline; do not tune against an unrecorded subjective impression.
-- Keep provider-dependent tests opt-in; the default suite must be deterministic and credential-free.
+- Add a versioned, machine-readable benchmark catalog for three materially different project types: a persistent browser app, an API-backed service, and a CLI utility.
+- Capture each mission, expected file layout, required capabilities, test command, and explicit acceptance-check identifiers in `tests/fixtures/large_project_benchmark_cases.json`.
+- Add contract tests that reject missing/duplicate cases, incomplete acceptance contracts, unsafe expected paths, and artifact-validation failures that lack actionable diagnostics.
+- Use the existing artifact validator and real factory lifecycle integration tests as baseline components; do not interpret catalog validation alone as proof that the generator passes every benchmark.
+- Next: implement the runner that executes each case through the real factory, records stage/check outcomes, duration, retries, and command evidence, then preserve the first measured baseline. Provider-dependent generation must remain opt-in; the default suite must be deterministic and credential-free.
 
-Acceptance: baseline results are reproducible and identify exactly which stage or acceptance check fails for each fixture.
+Acceptance: baseline results are reproducible and identify exactly which stage or acceptance check fails for each fixture. M86 remains IN PROGRESS until the runner has captured real factory-path outcomes for all three cases.
 
 ### M87 — Mission Requirements and Acceptance Contract
 Status: PLANNED
