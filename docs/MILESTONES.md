@@ -1268,3 +1268,26 @@ Acceptance: a deterministic multi-mission soak test completes or safely blocks e
 4. Run the relevant tests, full CI, security workflows, and regression suite; investigate and fix failures on the same PR.
 5. Merge only after all required checks pass on the exact latest PR head. Verify the merge and update this roadmap with evidence-backed status.
 6. Do not start the next milestone while the current milestone has unresolved correctness or security failures.
+
+
+## Project development methodology — Waterfall
+
+**Method: Waterfall, with evidence-based phase gates.** Development proceeds through ordered phases. A later phase does not begin until the current phase's deliverables are reviewed and its exit criteria are satisfied. Milestones are implementation slices inside the relevant phase, not permission to skip earlier phases.
+
+1. **Requirements analysis:** document scope, user stories, non-goals, constraints, risks, and measurable acceptance criteria.
+2. **System and detailed design:** document architecture, interfaces, data model, project-type/toolchain decisions, security boundaries, and verification strategy.
+3. **Implementation:** implement the approved design in focused milestones, with tests and code review.
+4. **Verification and validation:** execute unit, integration, end-to-end, security, and acceptance checks; link each requirement to evidence. A running process or generated files alone is not acceptance.
+5. **Deployment/release:** package the exact tested revision; require security/quality gates and the appropriate human approval before external publication.
+6. **Maintenance:** triage defects and changes, record their impact on requirements/design/tests, and schedule them into a controlled follow-on release.
+
+### Waterfall phase-gate rules
+
+- Keep phase deliverables and approval status in GitHub documentation/issues/PRs so decisions survive chat sessions.
+- Requirements must be testable before design is signed off; design must be reviewed before implementation starts for that scope.
+- Each milestone PR must state its phase, requirements/design references, acceptance criteria, tests/evidence, risks, and exit status.
+- If verification finds a defect, return to the relevant implementation or design step, fix it, and repeat the affected verification. This is controlled defect correction, not skipping the sequence.
+- Do not label a phase or milestone complete while required evidence is missing, checks are failing/pending, or critical findings remain unresolved.
+- Merge only after required CI/security checks pass on the exact PR head. Release approval must refer to the exact artifact/revision that was tested.
+- M86–M97 form the current large-project delivery program. Complete them in order; do not claim that planning or benchmark-contract tests prove real product delivery.
+
