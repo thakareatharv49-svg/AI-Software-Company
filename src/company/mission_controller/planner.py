@@ -1,5 +1,6 @@
 import re
 
+from src.company.mission_controller.architecture import build_architecture_plan
 from src.company.mission_controller.models import (
     EngineeringTask,
     MissionPlan,
@@ -7,6 +8,7 @@ from src.company.mission_controller.models import (
     PlannedStep,
     RequirementItem,
     RequirementsContract,
+    RuntimeCapabilities,
 )
 from src.company.models.contracts import CompanyMission
 
@@ -164,9 +166,13 @@ def _build_engineering_tasks(criteria: list[str]) -> list[EngineeringTask]:
     return tasks
 
 
-def build_mission_plan(mission: CompanyMission) -> MissionPlan:
-    """Build a durable plan and persist its requirements contract with the plan."""
+def build_mission_plan(
+    mission: CompanyMission,
+    capabilities: RuntimeCapabilities | None = None,
+) -> MissionPlan:
+    """Build a durable requirements and architecture plan before engineering."""
     contract = build_requirements_contract(mission)
+    architecture = build_architecture_plan(mission, contract, capabilities)
     criteria = contract.acceptance_criteria
     return MissionPlan(
         mission_id=mission.id,
@@ -174,6 +180,7 @@ def build_mission_plan(mission: CompanyMission) -> MissionPlan:
         objective=mission.objective,
         constraints=list(mission.constraints),
         requirements_contract=contract,
+        architecture_plan=architecture,
         acceptance_criteria=criteria,
         engineering_tasks=_build_engineering_tasks(criteria),
         steps=[
@@ -239,6 +246,21 @@ def validate_mission_plan(plan: MissionPlan) -> list[str]:
         issues.append("Mission plan must contain at least one acceptance criterion.")
     if not plan.engineering_tasks:
         issues.append("Mission plan must contain at least one engineering task.")
+    architecture = plan.architecture_plan
+    if architecture is not None:
+        if architecture.mission_id != plan.mission_id:
+            issues.append("Architecture plan mission ID does not match its plan.")
+        if not architecture.repository_layout:
+            issues.append("Architecture plan must define a repository layout.")
+        if not architecture.components or not architecture.interfaces:
+            issues.append("Architecture plan must define components and interfaces.")
+        if not architecture.validation_strategy:
+            issues.append("Architecture plan must define a validation strategy.")
+        if architecture.status != "ready":
+            if architecture.unsupported_dependencies:
+                issues.append("Architecture requires unsupported capabilities: " + ", ".join(architecture.unsupported_dependencies) + ".")
+            elif architecture.status == "needs_clarification":
+                issues.append("Architecture plan requires mission clarification before implementation.")
     contract = plan.requirements_contract
     if contract is not None:
         if contract.mission_id != plan.mission_id:

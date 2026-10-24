@@ -1162,14 +1162,16 @@ Status: IN PROGRESS
 Acceptance: representative missions produce durable, versioned contracts; vague missions are explicitly flagged; existing persisted plans without a contract remain loadable; contract/plan mismatches are rejected; all requirements remain traceable to their source and acceptance check. M87 remains IN PROGRESS until checks pass and the capability is verified through the real factory path.
 
 ### M88 — Architecture and Project-Type Planning
-Status: PLANNED
+Status: IN PROGRESS
 
-- Select project type and technology from mission requirements and available runtime capabilities, not from a hard-coded demo default.
-- Produce a repository layout, component boundaries, interfaces, data model where applicable, and explicit validation strategy.
-- Check selected dependencies and tools against the configured environment before implementation begins.
-- Make architecture decisions visible and persist them for resumable execution.
+- Added persisted architecture/dependency models and an explicit RuntimeCapabilities profile, optional for legacy plan compatibility.
+- Added deterministic mission-based selection for browser apps, API services, CLI utilities, Python libraries, full-stack web apps, and a conservative general Python app.
+- Plans now record rationale, stack/runtime, repository layout, component boundaries, interfaces, data-model guidance, and a project-specific validation strategy.
+- Preflight checks required language, framework/runtime and test-tool capabilities; unsupported prerequisites block the architecture instead of being silently assumed.
+- Architecture plans are validated for identity and required design sections, and are sanitized during durable mission restoration.
+- Added focused tests and docs/M88_ARCHITECTURE_PLANNING.md. RuntimeCapabilities must reflect the configured worker/sandbox; the default profile is only a local-development baseline and is not automatic host discovery.
 
-Acceptance: representative missions receive valid, environment-compatible plans and unsupported dependencies are identified before implementation.
+Acceptance: representative missions receive valid, environment-compatible plans and unsupported dependencies are identified before implementation. M88 remains IN PROGRESS until required exact-head CI/security checks pass and representative missions are verified through the running factory path. M86 and M87 real-path gates remain outstanding.
 
 ### M89 — Executable Dependency-Aware Task Graph
 Status: PLANNED

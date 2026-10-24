@@ -152,7 +152,7 @@ The authoritative sequence is in `docs/MILESTONES.md`. This section must stay al
 
 1. **M86 — Large-Project Benchmark and Baseline (IN PROGRESS):** define distinct web/API/CLI benchmark cases and capture reproducible real-factory results with stage/check evidence, duration, retries, and command outputs. The initial fixture catalog and contract tests are in PR #421; the real benchmark runner and first measured baseline are still required.
 2. **M87 — Mission Requirements and Acceptance Contract:** persist user-visible requirements, non-goals, deliverables, and evidence-linked acceptance criteria.
-3. **M88 — Architecture and Project-Type Planning:** choose compatible stacks from mission requirements and environment capabilities; persist architecture and toolchain decisions.
+3. **M88 — Architecture and Project-Type Planning (IN PROGRESS):** choose project types from mission evidence, persist repository layout/component/interface/validation decisions, and preflight dependencies against a supplied RuntimeCapabilities profile. Implementation is documented in docs/M88_ARCHITECTURE_PLANNING.md; real factory-path and exact-head CI/security gates remain.
 4. **M89 — Executable Dependency-Aware Task Graph:** enforce prerequisites in the actual worker path, including cycle/missing-dependency rejection and restart safety.
 5. **M90 — Multi-File Implementation and Incremental Resume:** verify cross-module coherence and resume safely without duplicate or contradictory output.
 6. **M91 — Project Bootstrap and Runtime Compatibility:** generate project manifests/configuration, check runtimes early, and report unsupported capabilities precisely.
