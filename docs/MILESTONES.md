@@ -1129,3 +1129,141 @@ Status: COMPLETE
 - Derive stale-running detection from the configured execution timeout with a 60-second noise floor and 2,100-second ceiling; invalid timeout settings fall back to the safe default.
 - Distinguish a suspected stalled worker from a confirmed failure and recommend inspecting worker/audit state before retrying.
 - Test recent/stale progress, configured and invalid deadlines, queued wait thresholds, and existing blocked/failed/cancelled outcomes.
+
+
+---
+
+# Large-Project Delivery Program — M86–M97
+
+## Problem statement
+
+The factory must reliably deliver useful, multi-file applications rather than repeatedly producing small demos, getting stuck on long missions, or treating generated files as proof that a product works. These milestones turn that broad problem into independently testable increments. **All milestones below begin as PLANNED**; do not mark one complete until its acceptance criteria pass on the real factory path.
+
+### M86 — Large-Project Benchmark and Baseline
+Status: PLANNED
+
+- Define a small, repeatable benchmark set for materially different projects (for example, a multi-page web app with persistence, an API-backed application, and a command-line utility with tests).
+- Record mission input, expected files/features, test commands, acceptance checks, duration, retry count, and final outcome in machine-readable fixtures.
+- Run the benchmark against current main first and preserve the baseline; do not tune against an unrecorded subjective impression.
+- Keep provider-dependent tests opt-in; the default suite must be deterministic and credential-free.
+
+Acceptance: baseline results are reproducible and identify exactly which stage or acceptance check fails for each fixture.
+
+### M87 — Mission Requirements and Acceptance Contract
+Status: PLANNED
+
+- Convert each mission into explicit user-visible requirements, non-goals, deliverables, and testable acceptance criteria before coding.
+- Persist the contract with the mission so retries and restarts use the same agreed requirements.
+- Detect ambiguous or contradictory requirements and ask for clarification when they materially affect implementation rather than silently inventing scope.
+- Track each requirement as planned, implemented, verified, or blocked with evidence.
+
+Acceptance: every benchmark mission has a durable requirements contract and no requirement is marked verified without linked test or review evidence.
+
+### M88 — Architecture and Project-Type Planning
+Status: PLANNED
+
+- Select project type and technology from mission requirements and available runtime capabilities, not from a hard-coded demo default.
+- Produce a repository layout, component boundaries, interfaces, data model where applicable, and explicit validation strategy.
+- Check selected dependencies and tools against the configured environment before implementation begins.
+- Make architecture decisions visible and persist them for resumable execution.
+
+Acceptance: representative missions receive valid, environment-compatible plans and unsupported dependencies are identified before implementation.
+
+### M89 — Executable Dependency-Aware Task Graph
+Status: PLANNED
+
+- Wire dependency ordering into the actual factory execution path, not only planning helpers.
+- Prevent a task from starting until its required predecessors have verified completion.
+- Detect cycles, missing dependencies, and impossible plans before consuming execution time.
+- Persist task state and dependency outcomes so restart/resume cannot skip prerequisites.
+
+Acceptance: integration tests prove correct ordering, blocked downstream tasks, cycle rejection, and correct behavior after restart.
+
+### M90 — Multi-File Implementation and Incremental Resume
+Status: PLANNED
+
+- Ensure engineering tasks create and update a coherent repository across modules instead of isolated placeholder files.
+- Validate imports, interfaces, routes, models, and configuration across file boundaries as work progresses.
+- Resume from the last safe verified stage after interruption; invalidate only outputs whose dependencies changed.
+- Keep generated changes scoped to the mission workspace and preserve prior verified artifacts.
+
+Acceptance: a multi-module fixture builds a coherent application, and a simulated interruption resumes without duplicate or contradictory output.
+
+### M91 — Project Bootstrap and Runtime Compatibility
+Status: PLANNED
+
+- Detect the selected stack and generate appropriate manifests, lock/configuration files, environment examples, and startup instructions.
+- Verify required runtimes and tools are present before expensive execution; report actionable blockers when they are missing.
+- Support configured project types through explicit capability adapters instead of claiming universal compatibility.
+- Never write real secrets into generated repositories or test artifacts.
+
+Acceptance: each supported benchmark project can be bootstrapped in the restricted test environment, or fails early with a precise capability diagnosis.
+
+### M92 — Real Build and Test Execution
+Status: PLANNED
+
+- Discover or use declared build, lint, type-check, and test commands for each supported project type.
+- Run commands in the restricted sandbox with timeouts, bounded output, and recorded exit codes.
+- Distinguish missing tooling, dependency installation failure, test failure, timeout, and infrastructure failure.
+- Require actual command evidence; inferred or model-reported success is not sufficient.
+
+Acceptance: deliberately broken fixtures fail with the correct classification, and passing fixtures include reproducible command and exit-code evidence.
+
+### M93 — Application-Level Acceptance Testing
+Status: PLANNED
+
+- Add stack-appropriate checks for API routes, database behavior, core user flows, navigation, and browser console/runtime errors where applicable.
+- Use isolated test data and local-only network policies by default.
+- Test important requirements from M87 against the running application, not only against source files.
+- Record skipped checks and explain why they were skipped.
+
+Acceptance: each applicable acceptance criterion has a passed, failed, or explicitly blocked result with evidence; a healthy process alone cannot pass the gate.
+
+### M94 — Evidence-Driven Repair Loop
+Status: PLANNED
+
+- Convert failing build/test/acceptance evidence into bounded repair tasks linked to the failed requirement.
+- Retry only failures classified as safely repairable; apply backoff to transient failures and stop on non-retryable configuration/authentication failures.
+- Re-run the failed check and relevant regression tests after each repair.
+- Bound repair attempts and cost/time; escalate with diagnostics rather than looping indefinitely.
+
+Acceptance: known-broken fixtures are repaired when the fix is in scope, unresolved failures remain blocked, and retry limits are demonstrably enforced.
+
+### M95 — Product Quality Review and Revision
+Status: PLANNED
+
+- Produce a review report covering requirements coverage, usability, accessibility basics, error states, responsive behavior, security checks, and known limitations.
+- Separate objective automated evidence from subjective reviewer feedback.
+- Support a revise-and-review cycle before final approval; preserve reviewer findings and verify each claimed fix.
+- Never let a model's self-approval override failed automated gates or unresolved critical issues.
+
+Acceptance: a deliberately incomplete product is not approved; revisions must pass the relevant checks and close or explicitly disclose each finding.
+
+### M96 — Release Readiness and Artifact Integrity
+Status: PLANNED
+
+- Package source, run instructions, configuration examples, test evidence, limitations, and a concise release summary.
+- Verify the exact artifact/repository revision being approved matches the revision that passed QA and review.
+- Require explicit policy/approval checks before external GitHub publishing or other irreversible actions.
+- Prevent release if required tests, security checks, or critical review findings remain unresolved.
+
+Acceptance: a release candidate has traceable source revision and evidence; a failed or changed revision cannot reuse stale approval.
+
+### M97 — Continuous Multi-Mission Delivery Soak Test
+Status: PLANNED
+
+- Exercise several different missions through the real queue and worker, including a failure, cancellation, restart, and recovery scenario.
+- Verify one mission's retry or failure does not starve unrelated ready work or corrupt another mission's state.
+- Measure completion rate, blocked rate, retries, queue wait, time-to-first-progress, and recovery outcomes.
+- Start the next eligible mission only after the prior mission reaches an evidence-backed terminal/review state; respect configured human approval gates.
+
+Acceptance: a deterministic multi-mission soak test completes or safely blocks every mission with a traceable reason, no cross-mission state leakage, and no false success.
+
+## Execution rules for M86–M97
+
+1. Work on one milestone at a time, branching from the latest verified main.
+2. Inspect the current implementation before changing it; reuse existing capabilities and avoid duplicate subsystems.
+3. Add focused unit tests plus integration coverage at the real factory boundary wherever applicable.
+4. Run the relevant tests, full CI, security workflows, and regression suite; investigate and fix failures on the same PR.
+5. Merge only after all required checks pass on the exact latest PR head. Verify the merge and update this roadmap with evidence-backed status.
+6. Do not start the next milestone while the current milestone has unresolved correctness or security failures.
