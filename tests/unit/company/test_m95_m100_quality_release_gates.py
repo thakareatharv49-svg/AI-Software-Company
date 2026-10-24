@@ -65,7 +65,7 @@ def test_duplicate_finding_ids_are_rejected():
 
 
 def test_release_gate_binds_approval_to_exact_tested_revision():
-    good = ReleaseEvidence("abc123", "abc123", "passed", "passed", True, True, True)
+    good = ReleaseEvidence("abc123", "abc123", "passed", "passed", True, True, True, "sha256:artifact-a", "sha256:artifact-a")
     assert evaluate_release_readiness(good).status == "passed"
     changed = ReleaseEvidence("def456", "abc123", "passed", "passed", True, True, True)
     decision = evaluate_release_readiness(changed)
@@ -277,3 +277,18 @@ def test_factory_acceptance_audit_records_only_same_tested_revision():
     )
     assert record["status"] == "passed"
     assert saved[-1].metadata["candidate_revision"] == "same-sha"
+
+
+def test_external_release_requires_matching_artifact_digests():
+    missing = ReleaseEvidence("rev", "rev", "passed", "passed", True, True, True)
+    decision = evaluate_release_readiness(missing)
+    assert decision.status == "blocked"
+    assert any("requires candidate and tested artifact digests" in reason for reason in decision.reasons)
+
+    mismatched = ReleaseEvidence(
+        "rev", "rev", "passed", "passed", True, True, True,
+        "sha256:candidate", "sha256:tested",
+    )
+    decision = evaluate_release_readiness(mismatched)
+    assert decision.status == "blocked"
+    assert any("digest differs" in reason for reason in decision.reasons)
