@@ -292,3 +292,19 @@ async def test_real_factory_worker_persists_engineering_task_checkpoints():
         statuses and all(status == "completed" for status in statuses)
         for statuses in persisted_task_states
     )
+
+
+
+def test_restart_retries_task_failure_persisted_before_worker_crash():
+    mission_plan = plan([
+        task("foundation", status="completed"),
+        task("feature", ["foundation"], status="failed"),
+        task("release", ["feature"], status="completed"),
+    ])
+
+    recovered = recover_running_plan(mission_plan)
+
+    assert recovered.engineering_tasks[0].status == "completed"
+    assert recovered.engineering_tasks[1].status == "planned"
+    assert recovered.engineering_tasks[2].status == "planned"
+    assert [item.id for item in recovered.ready_engineering_tasks()] == ["feature"]
