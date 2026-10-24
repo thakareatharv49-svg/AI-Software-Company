@@ -7,6 +7,7 @@ from src.company.mission_controller.controller import MissionController
 from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import EngineeringTask, MissionPlan, MissionStage, PlannedStep
 from src.company.mission_controller.planner import validate_mission_plan
+from src.company.mission_jobs import recover_running_plan, resume_failed_plan
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 
@@ -206,3 +207,34 @@ async def test_failed_task_stops_dependents_and_preserves_checkpointed_prerequis
         and snapshot[1] == ("feature", "planned")
         for snapshot in checkpoints
     )
+
+
+
+def test_restart_requeues_running_task_and_invalidates_completed_descendants():
+    mission_plan = plan([
+        task("foundation", status="completed"),
+        task("feature", ["foundation"], status="running"),
+        task("release", ["feature"], status="completed"),
+    ])
+
+    recovered = recover_running_plan(mission_plan)
+
+    assert recovered.engineering_tasks[0].status == "completed"
+    assert recovered.engineering_tasks[1].status == "planned"
+    assert recovered.engineering_tasks[2].status == "planned"
+    assert [item.id for item in recovered.ready_engineering_tasks()] == ["feature"]
+
+
+def test_retry_resets_failed_task_and_completed_descendants_but_keeps_valid_prerequisites():
+    mission_plan = plan([
+        task("foundation", status="completed"),
+        task("feature", ["foundation"], status="failed"),
+        task("release", ["feature"], status="completed"),
+    ])
+
+    recovered = resume_failed_plan(mission_plan)
+
+    assert recovered.engineering_tasks[0].status == "completed"
+    assert recovered.engineering_tasks[1].status == "planned"
+    assert recovered.engineering_tasks[2].status == "planned"
+    assert [item.id for item in recovered.ready_engineering_tasks()] == ["feature"]
