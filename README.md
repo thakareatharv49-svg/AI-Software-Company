@@ -4,6 +4,10 @@ AI Software Company is an autonomous software factory with a browser control cen
 
 **Persistent engineering context:** Read [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) before continuing work. It records the current architecture, verified milestone/PR history, known issues, safety constraints, and the required handoff workflow. The permanent product roadmap remains in [docs/MILESTONES.md](docs/MILESTONES.md).
 
+## Development methodology
+
+This project uses a **Waterfall + Incremental hybrid model**. Waterfall governs ordered lifecycle phases and explicit approval gates; Incremental development delivers approved scope as small, dependency-ordered, testable capabilities. Each increment needs acceptance criteria and focused plus regression tests, while the parent phase remains open until all phase-exit evidence is satisfied. If verification finds a defect, fix the relevant design/implementation and rerun affected checks. See `docs/MILESTONES.md` for the policy and milestone sequence.
+
 ## Company structure
 
 Nexora HQ is the parent-company dashboard for tracking ventures, company-level activity, and integration health. AI Software Company owns software mission execution, generated applications, previews, and its internal factory workflows. The optional `/api/hq/status` endpoint exposes aggregate mission counts to Nexora HQ using a dedicated bearer token; it does not expose mission details or any execution controls.
@@ -45,10 +49,10 @@ The legacy owner console remains at **http://127.0.0.1:8000/owner** for deployme
 ## What AI Software Company does
 
 1. You give the company a software mission from the web control center.
-2. The local Ollama model turns the mission into a small runnable project.
+2. The configured model and factory plan a mission-specific, multi-file product. Supported project types include browser applications, API services, CLI tools, libraries, and other explicitly supported stacks; unsupported toolchains must be reported rather than silently replaced.
 3. The company materializes the project in an isolated workspace and executes generated code in a restricted Docker container by default.
 4. Automated tests run inside the workspace.
-5. QA and security gates run before completion.
+5. QA and security gates run before completion; generated files or a healthy process alone are not proof that the requested product works.
 6. The exact reviewed artifact is held behind approval and publication gates; publishing is blocked if its digest changes or required checks fail.
 7. The result is recorded in the company dashboard.
 
@@ -90,3 +94,7 @@ GitHub delivery can be enabled with a GitHub token:
 GitHub publishing is gated by the review workflow: required tests and security checks must pass, and the user must approve the exact artifact before publication. If the artifact changes after approval, publishing is rejected. Configure GitHub writes only when you are ready to enable this integration.
 
 GitHub and deployment integrations remain optional and are protected by the existing gates.
+
+## Development approach: Waterfall + Incremental
+
+Nexora uses Waterfall for ordered lifecycle phases and approval gates, combined with Incremental development to deliver each approved scope in small, testable additions. Requirements and design are reviewed before implementation. Each increment is dependency-ordered, tied to acceptance criteria, and verified with focused and regression tests. An increment passing does not mark its parent milestone or phase complete. Defects return to the affected design/implementation step, and impacted checks are rerun. Merge only when required checks pass on the exact PR head; external release requires approval of the exact tested revision. Milestones M86–M97 remain sequential gates.

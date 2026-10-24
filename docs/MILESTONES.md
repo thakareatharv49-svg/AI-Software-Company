@@ -1140,14 +1140,15 @@ Status: COMPLETE
 The factory must reliably deliver useful, multi-file applications rather than repeatedly producing small demos, getting stuck on long missions, or treating generated files as proof that a product works. These milestones turn that broad problem into independently testable increments. **All milestones below begin as PLANNED**; do not mark one complete until its acceptance criteria pass on the real factory path.
 
 ### M86 — Large-Project Benchmark and Baseline
-Status: PLANNED
+Status: IN PROGRESS
 
-- Define a small, repeatable benchmark set for materially different projects (for example, a multi-page web app with persistence, an API-backed application, and a command-line utility with tests).
-- Record mission input, expected files/features, test commands, acceptance checks, duration, retry count, and final outcome in machine-readable fixtures.
-- Run the benchmark against current main first and preserve the baseline; do not tune against an unrecorded subjective impression.
-- Keep provider-dependent tests opt-in; the default suite must be deterministic and credential-free.
+- Add a versioned, machine-readable benchmark catalog for three materially different project types: a persistent browser app, an API-backed service, and a CLI utility.
+- Capture each mission, expected file layout, required capabilities, test command, and explicit acceptance-check identifiers in `tests/fixtures/large_project_benchmark_cases.json`.
+- Add contract tests that reject missing/duplicate cases, incomplete acceptance contracts, unsafe expected paths, and artifact-validation failures that lack actionable diagnostics.
+- Use the existing artifact validator and real factory lifecycle integration tests as baseline components; do not interpret catalog validation alone as proof that the generator passes every benchmark.
+- Added `scripts/run_m86_large_project_benchmark.py` to submit each case through `/api/missions` and the real `/factory-run` path, then collect durable job/diagnostic/audit/output evidence, workspace file paths, stage status/errors, elapsed time, retry metadata, QA evidence, artifact-safety validation, and case checks. Usage and interpretation are documented in `docs/M86_LARGE_PROJECT_BENCHMARK.md`. Runner contract tests are in `tests/unit/company/test_m86_large_project_benchmark_runner.py`. The real model-backed three-case run and measured baseline are still outstanding; unit tests do not substitute for that gate. Provider-dependent execution remains opt-in and is not part of ordinary CI.
 
-Acceptance: baseline results are reproducible and identify exactly which stage or acceptance check fails for each fixture.
+Acceptance: baseline results are reproducible and identify exactly which stage or acceptance check fails for each fixture. M86 remains IN PROGRESS until the runner has captured real factory-path outcomes for all three cases.
 
 ### M87 — Mission Requirements and Acceptance Contract
 Status: PLANNED
@@ -1267,3 +1268,34 @@ Acceptance: a deterministic multi-mission soak test completes or safely blocks e
 4. Run the relevant tests, full CI, security workflows, and regression suite; investigate and fix failures on the same PR.
 5. Merge only after all required checks pass on the exact latest PR head. Verify the merge and update this roadmap with evidence-backed status.
 6. Do not start the next milestone while the current milestone has unresolved correctness or security failures.
+
+
+## Lifecycle methodology — Waterfall + Incremental
+
+**Method: Waterfall + Incremental.** Waterfall governs ordered lifecycle phases and evidence-based approval gates; Incremental development delivers approved scope in small, coherent, dependency-ordered capabilities. A later phase does not begin until the current phase's deliverables are reviewed and its exit criteria are satisfied. Passing an increment does not complete its parent milestone or phase.
+
+1. **Requirements analysis:** document scope, user stories, non-goals, constraints, risks, and measurable acceptance criteria.
+2. **System and detailed design:** document architecture, interfaces, data model, project-type/toolchain decisions, security boundaries, and verification strategy.
+3. **Implementation:** implement the approved design in focused milestones, with tests and code review.
+4. **Verification and validation:** execute unit, integration, end-to-end, security, and acceptance checks; link each requirement to evidence. A running process or generated files alone is not acceptance.
+5. **Deployment/release:** package the exact tested revision; require security/quality gates and the appropriate human approval before external publication.
+6. **Maintenance:** triage defects and changes, record their impact on requirements/design/tests, and schedule them into a controlled follow-on release.
+
+### Waterfall phase-gate rules
+
+- Keep phase deliverables and approval status in GitHub documentation/issues/PRs so decisions survive chat sessions.
+- Requirements must be testable before design is signed off; design must be reviewed before implementation starts for that scope.
+- Each milestone PR must state its phase, requirements/design references, acceptance criteria, tests/evidence, risks, and exit status.
+- If verification finds a defect, return to the relevant implementation or design step, fix it, and repeat the affected verification. This is controlled defect correction, not skipping the sequence.
+- Do not label a phase or milestone complete while required evidence is missing, checks are failing/pending, or critical findings remain unresolved.
+- Merge only after required CI/security checks pass on the exact PR head. Release approval must refer to the exact artifact/revision that was tested.
+- M86–M97 form the current large-project delivery program. Complete them in order; do not claim that planning or benchmark-contract tests prove real product delivery.
+
+
+## Combined development model: Waterfall + Incremental
+
+The project uses a hybrid model. Waterfall controls lifecycle phases and approval gates; Incremental development controls how approved scope is delivered.
+
+Waterfall phases are ordered: requirements analysis, system/detail design, implementation, verification and validation, release/deployment, and maintenance. Review requirements, architecture, risks, and measurable acceptance criteria before implementing that scope.
+
+Within each approved phase or milestone, divide work into small, coherent, dependency-ordered increments. Each increment must state requirement IDs, design references, acceptance criteria, tests, and known limitations. Use focused pull requests, keep main releasable, and run targeted and regression tests. A passing increment does not prove its parent milestone or phase is complete. If verification finds a defect, correct the affected design or implementation and rerun impacted tests. Merge only when required checks pass on the exact PR head. External release requires approval of the exact tested revision. Milestones M86–M97 remain sequential gates; increments must not bypass their acceptance criteria.

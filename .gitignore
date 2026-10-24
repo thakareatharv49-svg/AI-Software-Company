@@ -49,3 +49,6 @@ data/
 
 # Local AI generation checkpoints (may contain generated project source)
 .factory-checkpoints/
+
+# Local benchmark evidence (review before committing a baseline)
+artifacts/m86-large-project-benchmark-results.json
