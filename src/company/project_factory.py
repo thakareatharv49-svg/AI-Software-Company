@@ -1135,28 +1135,6 @@ class ProjectFactory:
         # stages. Failed/in-flight stages are reset, and any completed downstream
         # stage whose prerequisites are no longer complete is invalidated.
         plan = resume_failed_plan(queued.plan)
-        # Rebuild only the unfinished suffix of the engineering DAG. Completed
-        # prerequisites remain durable; descendants of a reset prerequisite are
-        # invalidated so stale completion cannot bypass the dependency scheduler.
-        try:
-            for task in plan.engineering_task_order():
-                if task.status in {"failed", "running"}:
-                    task.status = "planned"
-                    task.detail = None
-                if task.status == "completed" and any(
-                    next(
-                        dependency.status
-                        for dependency in plan.engineering_tasks
-                        if dependency.id == dependency_id
-                    ) != "completed"
-                    for dependency_id in task.depends_on
-                ):
-                    task.status = "planned"
-                    task.detail = None
-        except ValueError:
-            # Invalid graphs are rejected by the execution preflight; preserve
-            # the original diagnostic rather than guessing at recovery order.
-            pass
         queued = queued.model_copy(update={"plan": plan})
         self._save_job(queued)
         project = FactoryProject(
