@@ -84,6 +84,11 @@ def build_architecture_plan(
             ArchitectureDependency(name="html", purpose="Browser document structure", kind="runtime", available="html" in available_languages),
             ArchitectureDependency(name="javascript", purpose="Client behavior", kind="runtime", available="javascript" in available_languages),
             ArchitectureDependency(name="css", purpose="Responsive presentation", kind="runtime", available="css" in available_languages),
+            ArchitectureDependency(
+                name="node", purpose="Run JavaScript static and smoke checks", kind="tool",
+                available="node" in available_tools,
+                reason=None if "node" in available_tools else "Node.js is not listed in the configured tool capabilities.",
+            ),
         ])
     elif project_type == "api_service":
         framework = "fastapi" if "fastapi" in available_frameworks and "fastapi" in available_packages else None
@@ -132,6 +137,11 @@ def build_architecture_plan(
         validation = ["Frontend static checks", "API contract tests", "End-to-end UI/API smoke test", "Persistence test"]
         if framework:
             dependencies.append(ArchitectureDependency(name="fastapi", purpose="API routing and request validation", available=True))
+        dependencies.append(ArchitectureDependency(
+            name="node", purpose="Run browser JavaScript static and smoke checks", kind="tool",
+            available="node" in available_tools,
+            reason=None if "node" in available_tools else "Node.js is not listed in the configured tool capabilities.",
+        ))
     else:
         language = "python"
         runtime = "python"
