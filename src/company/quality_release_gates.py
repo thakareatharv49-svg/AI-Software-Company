@@ -29,6 +29,7 @@ class QualityEvidence:
     responsive_checks_passed: bool
     accessibility_checks_passed: bool
     findings: tuple[ReviewFinding, ...] = ()
+    candidate_revision: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +64,7 @@ class SoakEvidence:
     cross_mission_state_leak: bool = False
     false_success_detected: bool = False
     unrelated_work_starved: bool = False
+    candidate_revision: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +73,7 @@ class ImprovementMetrics:
     safety_score: float
     latency_seconds: float
     cost_units: float
+    candidate_revision: str | None = None
 
 
 def evaluate_product_quality(evidence: QualityEvidence) -> GateDecision:
@@ -189,12 +192,21 @@ def evaluate_integrated_acceptance(
         ("soak", evaluate_soak(soak)),
         ("improvement", evaluate_improvement(baseline, candidate)),
     )
-    reasons = tuple(
+    reasons = [
         f"{gate}: {reason}"
         for gate, decision in decisions
         for reason in decision.reasons
-    )
-    return GateDecision("blocked" if reasons else "passed", reasons)
+    ]
+    expected_revision = release.candidate_revision.strip()
+    if not expected_revision:
+        reasons.append("integrity: candidate revision is missing")
+    if quality.candidate_revision != expected_revision:
+        reasons.append("integrity: quality evidence does not match candidate revision")
+    if soak.candidate_revision != expected_revision:
+        reasons.append("integrity: soak evidence does not match candidate revision")
+    if candidate.candidate_revision != expected_revision:
+        reasons.append("integrity: improvement metrics do not match candidate revision")
+    return GateDecision("blocked" if reasons else "passed", tuple(reasons))
 
 
 def evaluate_factory_plan_quality(
