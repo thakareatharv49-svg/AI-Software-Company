@@ -2181,23 +2181,39 @@ class ProjectFactory:
             )
 
     def _save(self, project: FactoryProject) -> None:
-        # Enforce the same trust boundary on every write, not just when older
-        # snapshots are restored. Plans can accumulate model-generated evidence
-        # and stage diagnostics during execution.
-        project.mission = self._safe_mission(project.mission)
-        project.plan = self._safe_plan(project.plan)
-        project.last_error = (
+        # Enforce the trust boundary on persisted data without replacing the
+        # live plan object. Progress callbacks run inside the task scheduler;
+        # swapping project.plan for a deep sanitized copy would detach the
+        # scheduler's task reference and lose the completion transition that
+        # follows the callback.
+        safe_mission = self._safe_mission(project.mission)
+        safe_plan = self._safe_plan(project.plan)
+        safe_error = (
             self._safe_error_detail(project.last_error)
             if project.last_error
             else None
         )
-        project.retry_feedback = (
+        safe_feedback = (
             self._safe_error_detail(project.retry_feedback)
             if project.retry_feedback
             else None
         )
         if self.store is not None:
-            self.store.save(project)
+            self.store.save(
+                FactoryProject(
+                    mission=safe_mission,
+                    plan=safe_plan,
+                    status=project.status,
+                    stages_executed=project.stages_executed,
+                    attempts=project.attempts,
+                    last_error=safe_error,
+                    retry_feedback=safe_feedback,
+                    worker_started_at=project.worker_started_at,
+                    last_progress_at=project.last_progress_at,
+                    progress_updates=project.progress_updates,
+                    retry_not_before_epoch=project.retry_not_before_epoch,
+                )
+            )
 
     def _load_job(self, mission_id: str) -> MissionJob | None:
         if self.job_store is None:
