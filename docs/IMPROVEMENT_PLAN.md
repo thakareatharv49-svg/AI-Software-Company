@@ -181,9 +181,9 @@ Every milestone must include:
 Review this plan after each major track exit gate, after any production incident, and when user-reported failures contradict the current architecture. Keep the plan ambitious but evidence-driven: the goal is a useful software company, not a large count of merged milestones.
 
 
-## Waterfall phase gates
+## Lifecycle phase gates
 
-This project follows the Waterfall Model. Apply these gates to the M86–M97 program and future work:
+This project uses the Waterfall + Incremental hybrid model. Waterfall governs lifecycle approval gates; Incremental delivery divides approved work into small, testable, dependency-ordered slices. Apply these gates to the M86–M97 program and future work:
 
 1. **Requirements exit:** scope, non-goals, constraints, risks, and measurable acceptance criteria are documented.
 2. **Design exit:** architecture/interfaces, data contracts, stack/toolchain assumptions, security boundaries, and verification plan are reviewed.
