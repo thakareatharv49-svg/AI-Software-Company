@@ -1151,14 +1151,15 @@ Status: IN PROGRESS
 Acceptance: baseline results are reproducible and identify exactly which stage or acceptance check fails for each fixture. M86 remains IN PROGRESS until the runner has captured real factory-path outcomes for all three cases.
 
 ### M87 — Mission Requirements and Acceptance Contract
-Status: PLANNED
+Status: IN PROGRESS
 
-- Convert each mission into explicit user-visible requirements, non-goals, deliverables, and testable acceptance criteria before coding.
-- Persist the contract with the mission so retries and restarts use the same agreed requirements.
-- Detect ambiguous or contradictory requirements and ask for clarification when they materially affect implementation rather than silently inventing scope.
-- Track each requirement as planned, implemented, verified, or blocked with evidence.
+- Added versioned Pydantic contract models for requirement items and mission contracts, with optional plan attachment for backward compatibility with previously persisted plans.
+- Integrated deterministic contract construction into mission planning. Requirements retain stable IDs, source statements, acceptance checks, constraints, and open clarification questions.
+- Generic requests such as “Build an app” are marked `needs_clarification`; plan validation reports the blocking question rather than silently inventing product scope.
+- Contract identity/objective consistency and the presence of functional requirements are checked by mission-plan validation.
+- Added focused contract tests and an M87 implementation note. Full factory-path proof and required CI checks remain gates; this PR does not mark M87 complete or waive the outstanding M86 real-run gate.
 
-Acceptance: every benchmark mission has a durable requirements contract and no requirement is marked verified without linked test or review evidence.
+Acceptance: representative missions produce durable, versioned contracts; vague missions are explicitly flagged; existing persisted plans without a contract remain loadable; contract/plan mismatches are rejected; all requirements remain traceable to their source and acceptance check. M87 remains IN PROGRESS until checks pass and the capability is verified through the real factory path.
 
 ### M88 — Architecture and Project-Type Planning
 Status: PLANNED

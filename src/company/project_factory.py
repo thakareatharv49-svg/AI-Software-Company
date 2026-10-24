@@ -720,6 +720,29 @@ class ProjectFactory:
         safe.acceptance_criteria = [
             safe_text(value, 4000) for value in safe.acceptance_criteria
         ]
+        # Requirements contracts were added after legacy snapshots already
+        # existed. Sanitize every user-derived contract field during restore,
+        # just like the legacy plan fields above, before agents can reuse it.
+        contract = safe.requirements_contract
+        if contract is not None:
+            contract.mission_name = safe_text(contract.mission_name, 500)
+            contract.objective = safe_text(contract.objective, 8000)
+            contract.status = safe_text(contract.status, 120)
+            contract.constraints = [
+                safe_text(value, 2000) for value in contract.constraints
+            ]
+            contract.acceptance_criteria = [
+                safe_text(value, 4000) for value in contract.acceptance_criteria
+            ]
+            contract.open_questions = [
+                safe_text(value, 2000) for value in contract.open_questions
+            ]
+            for requirement in contract.functional_requirements:
+                requirement.statement = safe_text(requirement.statement, 4000)
+                requirement.acceptance_check = safe_text(
+                    requirement.acceptance_check, 2000
+                )
+                requirement.source = safe_text(requirement.source, 120)
         safe.qa_command = [safe_text(value, 500) for value in safe.qa_command]
         for step in safe.steps:
             step.objective = safe_text(step.objective, 2000)
