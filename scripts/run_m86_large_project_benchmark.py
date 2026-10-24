@@ -324,6 +324,7 @@ def main(argv: list[str] | None = None) -> int:
             if unknown:
                 parser.error(f"Unknown case id(s): {', '.join(sorted(unknown))}")
             cases = [case for case in cases if case["id"] in requested]
+        run_started_at = datetime.now(UTC).isoformat()
         api = FactoryApi(args.base_url, timeout=args.timeout + 30.0)
         results = []
         for case in cases:
@@ -332,7 +333,8 @@ def main(argv: list[str] | None = None) -> int:
                                         deadline_seconds=args.timeout))
         summary = {
             "schema_version": 1,
-            "started_at": datetime.now(UTC).isoformat(),
+            "started_at": run_started_at,
+            "finished_at": datetime.now(UTC).isoformat(),
             "base_url": args.base_url.rstrip("/"),
             "case_count": len(results),
             "passed_cases": sum(item["status"] == "completed" and all(check.get("passed") for check in item["checks"]) for item in results),
