@@ -459,3 +459,51 @@ def test_factory_pause_and_resume_api() -> None:
         assert client.get("/api/factory/status").json()["paused"] is False
     finally:
         app.dependency_overrides.clear()
+
+
+
+@pytest.mark.asyncio
+async def test_continuous_factory_skips_one_queue_sync_failure_and_processes_next() -> None:
+    center = CompanyControlCenter(CompanyOrchestrator())
+    center._factory.queue.clear()
+    first = center.submit_mission(
+        MissionSubmission(name="Queue failure", objective="First mission")
+    )
+    second = center.submit_mission(
+        MissionSubmission(name="Queue continues", objective="Second mission")
+    )
+    first_job = center.mission_job(first.mission.id)
+    second_job = center.mission_job(second.mission.id)
+    assert first_job is not None and second_job is not None
+    center.mission_jobs = lambda: [first_job, second_job]
+
+    original_enqueue = center._factory.enqueue
+    enqueued: list[str] = []
+
+    def enqueue_with_one_failure(mission):
+        if mission.id == first.mission.id:
+            raise OSError("sensitive-storage-detail")
+        enqueued.append(mission.id)
+        return original_enqueue(mission)
+
+    center._factory.enqueue = enqueue_with_one_failure
+
+    async def fake_run(*, max_projects=None, max_stages=None, max_retries=2):
+        assert max_projects == 1
+        assert [item.mission.id for item in center._factory.queue] == [second.mission.id]
+        center._continuous_mode = False
+
+    center._factory.run = fake_run
+    await center.start_continuous_factory()
+    assert center._factory_task is not None
+    await center._factory_task
+
+    assert enqueued == [second.mission.id]
+    queue_errors = [
+        event for event in center._orchestrator.events.list_events()
+        if event.event_type == "FACTORY_QUEUE_SYNC_ERROR"
+    ]
+    assert len(queue_errors) == 1
+    assert queue_errors[0].project_id == first.mission.id
+    assert "OSError" in queue_errors[0].message
+    assert "sensitive-storage-detail" not in queue_errors[0].message
