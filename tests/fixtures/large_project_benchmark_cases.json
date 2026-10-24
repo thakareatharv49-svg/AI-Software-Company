@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "description": "Deterministic, credential-free acceptance contracts for the large-project delivery baseline. These are benchmark specifications, not claims that the current factory passes them.",
+  "cases": [
+    {
+      "id": "browser-persistence",
+      "project_type": "web_application",
+      "mission": "Build a responsive personal expense tracker with transaction CRUD, category filtering, monthly budgets, spending summaries, input validation, and persistent local storage.",
+      "expected_files": [
+        "index.html",
+        "style.css",
+        "app.js",
+        "tests/test_app.py"
+      ],
+      "required_features": [
+        "create transaction",
+        "edit transaction",
+        "delete transaction",
+        "category filter",
+        "monthly budget",
+        "local storage",
+        "input validation"
+      ],
+      "test_command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "acceptance_checks": [
+        "artifact_safety",
+        "required_files",
+        "required_features",
+        "test_command_exit_code"
+      ]
+    },
+    {
+      "id": "api-backed-service",
+      "project_type": "api_application",
+      "mission": "Build a small inventory API with create/read/update/delete operations, input validation, persistence abstraction, and automated endpoint tests.",
+      "expected_files": [
+        "README.md",
+        "pyproject.toml",
+        "src/app.py",
+        "tests/test_api.py"
+      ],
+      "required_features": [
+        "create",
+        "read",
+        "update",
+        "delete",
+        "validation",
+        "test"
+      ],
+      "test_command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "acceptance_checks": [
+        "artifact_safety",
+        "required_files",
+        "required_features",
+        "test_command_exit_code"
+      ]
+    },
+    {
+      "id": "cli-utility",
+      "project_type": "cli_utility",
+      "mission": "Build a command-line task utility with add/list/complete/remove commands, argument validation, helpful usage output, and automated tests.",
+      "expected_files": [
+        "README.md",
+        "src/cli.py",
+        "tests/test_cli.py"
+      ],
+      "required_features": [
+        "add",
+        "list",
+        "complete",
+        "remove",
+        "usage",
+        "validation"
+      ],
+      "test_command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q"
+      ],
+      "acceptance_checks": [
+        "artifact_safety",
+        "required_files",
+        "required_features",
+        "test_command_exit_code"
+      ]
+    }
+  ]
+}
