@@ -68,6 +68,48 @@ class RequirementsContract(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
 
 
+class ArchitectureDependency(BaseModel):
+    """A runtime/package prerequisite checked before implementation starts."""
+
+    name: str
+    purpose: str
+    kind: str = "package"
+    required: bool = True
+    available: bool = True
+    reason: str | None = None
+
+
+class ArchitecturePlan(BaseModel):
+    """Persisted, reviewable architecture selected before engineering work."""
+
+    schema_version: int = 1
+    mission_id: str
+    project_type: str
+    confidence: float = 1.0
+    rationale: list[str] = Field(default_factory=list)
+    language: str
+    framework: str | None = None
+    runtime: str
+    repository_layout: list[str] = Field(default_factory=list)
+    components: list[str] = Field(default_factory=list)
+    interfaces: list[str] = Field(default_factory=list)
+    data_model: list[str] = Field(default_factory=list)
+    validation_strategy: list[str] = Field(default_factory=list)
+    dependencies: list[ArchitectureDependency] = Field(default_factory=list)
+    unsupported_dependencies: list[str] = Field(default_factory=list)
+    status: str = "ready"
+
+
+class RuntimeCapabilities(BaseModel):
+    """Capabilities actually available to a planner; callers may override defaults."""
+
+    languages: list[str] = Field(default_factory=lambda: ["python", "javascript", "html", "css"])
+    frameworks: list[str] = Field(default_factory=lambda: ["fastapi"])
+    tools: list[str] = Field(default_factory=lambda: ["python", "pytest", "node", "npm"])
+    packages: list[str] = Field(default_factory=lambda: ["fastapi", "uvicorn", "pytest"])
+    database_engines: list[str] = Field(default_factory=lambda: ["sqlite"])
+
+
 class MissionPlan(BaseModel):
     mission_id: str
     name: str
@@ -75,6 +117,8 @@ class MissionPlan(BaseModel):
     constraints: list[str] = Field(default_factory=list)
     # Optional for backward compatibility with previously persisted mission plans.
     requirements_contract: RequirementsContract | None = None
+    # Persisted architecture decisions are optional for legacy plan compatibility.
+    architecture_plan: ArchitecturePlan | None = None
     # Requirements remain attached to the durable plan so QA and review can
     # trace a finished product back to the user's original request.
     acceptance_criteria: list[str] = Field(default_factory=list)
