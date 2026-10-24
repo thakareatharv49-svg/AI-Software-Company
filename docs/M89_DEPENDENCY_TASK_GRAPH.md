@@ -16,17 +16,16 @@ Detailed design and implementation increment. This milestone strengthens the eng
 
 ## Current implementation
 
-The mission execution pipeline validates the engineering graph before registering or invoking agents. The execution request receives tasks in validated dependency-first order and an explicit `ready_engineering_task_ids` list. Tests cover ordering, ready filtering, duplicate IDs, missing dependencies, self-dependencies, and cycles.
+The mission execution pipeline validates the engineering DAG before agent work begins. During the execution stage it chooses only a currently ready task, executes that task as a bounded agent request, and checkpoints each `running/completed/failed` transition through the factory progress callback. The next task is not eligible until every prerequisite is `completed`.
+
+A failed task stops the execution stage and leaves its descendants planned. Restore recovery converts interrupted `running` tasks back to planned and invalidates stale completed descendants whose prerequisites are no longer complete. Manual retry resets failed/in-flight tasks while retaining valid completed prerequisites. Task attempts and bounded diagnostic details are stored on the mission plan.
 
 ## Remaining acceptance work
 
-This increment does not yet provide individually executed engineering tasks or durable task-transition checkpoints. Those are required before M89 can be marked complete:
-
-1. Execute each task as a separate bounded worker unit.
-2. Persist `running/completed/failed` task transitions alongside the mission plan/job.
-3. On restore, normalize interrupted task states without resetting verified completed tasks.
-4. Prove through the real factory worker that downstream tasks stay blocked until dependencies complete, and that restart resumes safely.
-5. Run targeted tests, full CI/security checks, and a deterministic interruption/recovery integration test.
+1. Run the targeted tests and full CI/security suite on the exact PR head.
+2. Exercise a representative mission through the real factory worker, not just the pipeline unit fixture.
+3. Verify durable-store checkpoint writes and a simulated interruption/restart against the configured factory store.
+4. Confirm QA blocks delivery when task work is incomplete or acceptance evidence fails.
 
 ## Safety invariant
 
