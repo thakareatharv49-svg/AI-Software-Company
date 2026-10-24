@@ -1,6 +1,6 @@
 # Nexora / AI Software Company — Revised Improvement Plan
 
-> Research review: 2026-10-15  
+> Research and repository-state review: 2026-10-24  
 > Status: Proposed execution plan; milestones become complete only after implementation and verification.  
 > Source of truth: this plan defines strategic sequencing; `docs/MILESTONES.md` tracks individual acceptance criteria and status.
 
@@ -8,7 +8,7 @@
 
 Turn the current factory into a dependable software-production system: accept a substantial mission, research and plan it, build it in a restricted environment, prove it works, show the user a reviewable product, publish only an approved and verified artifact, observe it in operation, learn from outcomes, and then move to the next mission.
 
-The near-term bottleneck is not adding more agents. It is proving that the existing mission lifecycle is reliable end to end. The recent M67–M81 sequence has hardened durable recovery identity checks, but unit-level persistence correctness alone does not prove a large mission can run from submission to usable product and approval.
+The near-term bottleneck is not adding more agents. It is proving that the existing mission lifecycle can reliably deliver a useful, multi-file product end to end. The M82–M85 work addressed lifecycle/restore isolation and queue liveness, but unit-level persistence correctness alone does not prove that distinct web, API, and CLI missions can be built, executed, repaired, reviewed, and released with evidence.
 
 ## Research basis
 
@@ -146,24 +146,24 @@ This plan incorporates the following primary guidance reviewed on 2026-10-15:
 
 **Exit gate for Track F:** every release can be traced to source and test evidence, rollback is documented and rehearsed, and post-release maintenance is bounded and auditable.
 
-## First implementation milestones to schedule
+## Current implementation program: M86–M97
 
-These are planned, not complete. Keep each implementation in its own focused PR and update `docs/MILESTONES.md` as work starts and finishes.
+The authoritative sequence is in `docs/MILESTONES.md`. This section must stay aligned with it; do not maintain a second, conflicting M86–M93 schedule. All items below are planned unless the master roadmap explicitly records an evidence-backed status.
 
-1. **M82 — Defensive Snapshot Record Decoding:** safely validate record and nested-object shapes before recovery dereferences; skip corrupt records without losing healthy records.
-2. **M83 — Mixed-Record Restore Isolation:** prove one malformed record, storage exception, or write-back failure cannot abort or poison unrelated healthy restore candidates.
-3. **M84 — Real-Path Mission Lifecycle Harness (COMPLETE):** deterministic public HTTP submission and factory execution with the real generated-product pipeline, executed pytest QA, independent review, durable output manifest, audit history, and structured failure trace; exact-head CI/security checks passed and PR #372 was merged.
-4. **M85 — Queue Liveness and Stuck-Stage Diagnostics (COMPLETE):** bounded heartbeat thresholds tied to execution deadlines, explicit liveness metadata, and actionable queued/running/blocked diagnoses.
-5. **M86 — Idempotent Lifecycle Operations:** cover duplicate submission, retry, cancellation, revision, restart, and concurrent operations.
-6. **M87 — Generated Product QA Evidence:** run build/startup smoke tests and browser critical-path checks for supported web products.
-7. **M88 — Independent Review and Approval Binding:** enforce review findings and approval tied to exact source/artifact identity.
-8. **M89 — Tool Policy and Adversarial Safety Tests:** test untrusted repository content, tool boundaries, destructive-action approval, and sandbox limits.
-9. **M90 — Customer Auth/Workspace End-to-End Acceptance:** prove OAuth, workspace membership, tenant isolation, and HQ/customer separation on a fresh database.
-10. **M91 — Mission Observability and Budget Enforcement:** structured event timeline, cost/resource ceilings, and bounded autonomous scheduling.
-11. **M92 — Release Provenance and Rollback Readiness:** verifiable artifact provenance, SBOM where feasible, and rehearsed rollback.
-12. **M93 — Continuous Improvement Evaluation Loop:** curated evaluations and regression gates based on measured quality, safety, latency, and cost.
+1. **M86 — Large-Project Benchmark and Baseline (IN PROGRESS):** define distinct web/API/CLI benchmark cases and capture reproducible real-factory results with stage/check evidence, duration, retries, and command outputs. The initial fixture catalog and contract tests are in PR #421; the real benchmark runner and first measured baseline are still required.
+2. **M87 — Mission Requirements and Acceptance Contract:** persist user-visible requirements, non-goals, deliverables, and evidence-linked acceptance criteria.
+3. **M88 — Architecture and Project-Type Planning:** choose compatible stacks from mission requirements and environment capabilities; persist architecture and toolchain decisions.
+4. **M89 — Executable Dependency-Aware Task Graph:** enforce prerequisites in the actual worker path, including cycle/missing-dependency rejection and restart safety.
+5. **M90 — Multi-File Implementation and Incremental Resume:** verify cross-module coherence and resume safely without duplicate or contradictory output.
+6. **M91 — Project Bootstrap and Runtime Compatibility:** generate project manifests/configuration, check runtimes early, and report unsupported capabilities precisely.
+7. **M92 — Real Build and Test Execution:** run bounded sandbox commands and preserve actual exit-code/test evidence.
+8. **M93 — Application-Level Acceptance Testing:** validate real API/database/browser/user flows; process health alone is not product acceptance.
+9. **M94 — Evidence-Driven Repair Loop:** convert failures into bounded repair tasks, classify retryability, and re-run regressions.
+10. **M95 — Product Quality Review and Revision:** capture objective and subjective findings, require verified fixes, and prevent self-approval over failed gates.
+11. **M96 — Release Readiness and Artifact Integrity:** bind approval to the exact tested artifact/revision and block unsafe or unverified publication.
+12. **M97 — Continuous Multi-Mission Delivery Soak Test:** measure fairness, progress, failure/recovery, isolation, and safe progression through multiple missions.
 
-After M93, re-evaluate priorities from real telemetry and user acceptance rather than extending the milestone number without evidence.
+After M97, reprioritize using benchmark results, actual factory telemetry, and user acceptance—not milestone count alone.
 
 ## Milestone definition of done
 
