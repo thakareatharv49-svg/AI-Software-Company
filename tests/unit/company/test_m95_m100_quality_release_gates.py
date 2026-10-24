@@ -245,6 +245,7 @@ def test_factory_records_acceptance_and_blocks_changed_revision():
         project,
         candidate_revision="new-sha",
         tested_revision="old-sha",
+        evidence_revision="new-sha",
         decision=decision,
     )
     assert record["status"] == "blocked"
@@ -276,6 +277,7 @@ def test_factory_acceptance_audit_records_only_same_tested_revision():
         project,
         candidate_revision="same-sha",
         tested_revision="same-sha",
+        evidence_revision="same-sha",
         decision=decision,
     )
     assert record["status"] == "passed"
@@ -310,3 +312,33 @@ def test_improvement_gate_rejects_non_finite_or_out_of_range_scores(candidate):
     decision = evaluate_improvement(baseline, candidate)
     assert decision.status == "blocked"
     assert decision.reasons
+
+
+def test_factory_acceptance_audit_blocks_stale_evidence_revision():
+    from types import SimpleNamespace
+
+    saved = []
+
+    class AuditStore:
+        def append(self, entry):
+            saved.append(entry)
+
+    factory = ProjectFactory(
+        orchestrator=SimpleNamespace(),
+        controller=SimpleNamespace(),
+        pipeline=SimpleNamespace(),
+        audit_store=AuditStore(),
+    )
+    project = SimpleNamespace(
+        mission=SimpleNamespace(id="mission-3", name="stale evidence")
+    )
+    decision = evaluate_product_quality(good_quality())
+    record = factory.record_delivery_acceptance(
+        project,
+        candidate_revision="new-sha",
+        tested_revision="new-sha",
+        evidence_revision="old-sha",
+        decision=decision,
+    )
+    assert record["status"] == "blocked"
+    assert any("evidence revision differs" in reason for reason in record["reasons"])
