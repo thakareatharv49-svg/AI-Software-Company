@@ -491,7 +491,12 @@ class MissionExecutionPipeline:
         while self.orchestrator.state.status.value == "running":
             if max_stages is not None and completed >= max_stages:
                 break
-            result = await self.execute_next(mission, plan, on_progress=on_progress)
+            if on_progress is None:
+                result = await self.execute_next(mission, plan)
+            else:
+                result = await self.execute_next(
+                    mission, plan, on_progress=on_progress
+                )
             results.append(result)
             if not result.success:
                 break
