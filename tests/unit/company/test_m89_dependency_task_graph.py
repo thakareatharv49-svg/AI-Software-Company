@@ -1,5 +1,14 @@
+import pytest
+
+from runtime.models.messages import ModelResponse
+from src.agents.execution.executor import AgentExecutor
+from src.agents.registry.registry import AgentRegistry
+from src.company.mission_controller.controller import MissionController
+from src.company.mission_controller.execution import MissionExecutionPipeline
 from src.company.mission_controller.models import EngineeringTask, MissionPlan, MissionStage, PlannedStep
 from src.company.mission_controller.planner import validate_mission_plan
+from src.company.models.contracts import CompanyMission
+from src.company.orchestration.orchestrator import CompanyOrchestrator
 
 
 def task(task_id: str, dependencies: list[str] | None = None, status: str = "planned") -> EngineeringTask:
@@ -50,7 +59,7 @@ def test_only_tasks_with_completed_prerequisites_are_ready():
     ])
 
     assert [item.id for item in mission_plan.ready_engineering_tasks()] == [
-        "feature", "independent"
+        "independent", "feature"
     ]
 
 
@@ -76,9 +85,124 @@ def test_task_graph_rejects_self_dependency_and_cycles():
         raise AssertionError("cyclic task graph must not be scheduled")
 
 
-def test_invalid_task_graph_is_blocked_before_agent_execution():
-    mission_plan = plan([task("feature", ["missing"])])
-    issues = validate_mission_plan(mission_plan)
+class FakeProvider:
+    name = "fake"
 
-    assert issues
-    assert any("unknown task" in issue for issue in issues)
+    async def generate(self, request):
+        return ModelResponse(
+            content=f"completed: {request.prompt[:30]}",
+            model="fake",
+            provider=self.name,
+        )
+
+
+class FakeRuntime:
+    def __init__(self, fail_on_call: int | None = None):
+        self.provider = FakeProvider()
+        self.calls = 0
+        self.fail_on_call = fail_on_call
+
+    async def generate(self, request):
+        self.calls += 1
+        if self.calls == self.fail_on_call:
+            raise RuntimeError("controlled task failure")
+        return await self.provider.generate(request)
+
+
+def execution_fixture(objective: str = "Create a small utility"):
+    orchestrator = CompanyOrchestrator()
+    mission = CompanyMission(name="M89 task graph", objective=objective)
+    controller = MissionController(orchestrator)
+    mission_plan, _ = controller.start(mission)
+    for step in mission_plan.steps:
+        if step.stage in {
+            MissionStage.RESEARCH,
+            MissionStage.PRODUCT,
+            MissionStage.ARCHITECTURE,
+            MissionStage.TASKS,
+            MissionStage.AGENTS,
+        }:
+            step.status = "completed"
+    runtime = FakeRuntime()
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(runtime),
+        AgentRegistry(),
+    )
+    return mission, mission_plan, orchestrator, runtime, pipeline
+
+
+@pytest.mark.asyncio
+async def test_invalid_task_graph_is_blocked_before_agent_execution():
+    mission, mission_plan, orchestrator, runtime, pipeline = execution_fixture()
+    mission_plan.engineering_tasks = [task("feature", ["missing"])]
+
+    result = await pipeline.execute_next(mission, mission_plan)
+
+    assert result.success is False
+    assert "invalid" in (result.error or "").lower()
+    assert runtime.calls == 0
+    assert orchestrator.state.status.value == "blocked"
+
+
+@pytest.mark.asyncio
+async def test_execution_stage_runs_each_task_and_checkpoints_every_transition():
+    mission, mission_plan, _orchestrator, runtime, pipeline = execution_fixture()
+    checkpoints = []
+
+    result = await pipeline.execute_next(
+        mission,
+        mission_plan,
+        on_progress=lambda current: checkpoints.append(
+            [(item.id, item.status) for item in current.engineering_tasks]
+        ),
+    )
+
+    assert result.success is True
+    assert runtime.calls == len(mission_plan.engineering_tasks)
+    assert all(item.status == "completed" for item in mission_plan.engineering_tasks)
+    assert len(checkpoints) >= 2 * len(mission_plan.engineering_tasks)
+    assert any(
+        any(status == "running" for _, status in snapshot)
+        for snapshot in checkpoints
+    )
+    assert any(
+        all(status == "completed" for _, status in snapshot)
+        for snapshot in checkpoints
+    )
+
+
+@pytest.mark.asyncio
+async def test_failed_task_stops_dependents_and_preserves_checkpointed_prerequisites():
+    mission, mission_plan, orchestrator, _runtime, _pipeline = execution_fixture()
+    runtime = FakeRuntime(fail_on_call=1)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(runtime),
+        AgentRegistry(),
+    )
+    mission_plan.engineering_tasks = [
+        task("foundation"),
+        task("feature", ["foundation"]),
+        task("release", ["feature"]),
+    ]
+    checkpoints = []
+
+    result = await pipeline.execute_next(
+        mission,
+        mission_plan,
+        on_progress=lambda current: checkpoints.append(
+            [(item.id, item.status) for item in current.engineering_tasks]
+        ),
+    )
+
+    assert result.success is False
+    assert mission_plan.engineering_tasks[0].status == "failed"
+    assert mission_plan.engineering_tasks[1].status == "planned"
+    assert mission_plan.engineering_tasks[2].status == "planned"
+    assert orchestrator.state.status.value == "blocked"
+    assert any(
+        snapshot[0] == ("foundation", "failed")
+        and snapshot[1] == ("feature", "planned")
+        for snapshot in checkpoints
+    )
