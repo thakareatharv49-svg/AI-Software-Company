@@ -194,3 +194,7 @@ This project follows the Waterfall Model. Apply these gates to the M86–M97 pro
 
 If a gate fails, return to the earliest phase affected by the evidence, correct the issue, and repeat downstream gates that the change impacts. Do not silently skip a phase or mark a phase complete based on documentation alone.
 
+
+## Combined Waterfall + Incremental execution
+
+Waterfall phase gates control approval; incremental slices control implementation size. First review requirements and measurable acceptance criteria, then approve the design and verification plan. Split approved work into dependency-ordered increments, each with focused implementation, tests, and regression checks. At each phase gate, verify all required increment and end-to-end acceptance evidence. A passing increment is not proof that its parent milestone or phase is complete. If verification fails, correct the affected design/implementation and rerun impacted checks. Merge only with required checks green on the exact PR head; release only the exact tested revision with required approval. Apply this policy to M86–M97.
