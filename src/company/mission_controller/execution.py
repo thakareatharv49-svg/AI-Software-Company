@@ -4,6 +4,7 @@ from src.agents.models.contracts import AgentDefinition, AgentRequest, AgentResu
 from src.agents.registry.registry import AgentRegistry
 from src.company.events.events import CompanyEvent
 from src.company.mission_controller.models import MissionPlan, MissionStage
+from src.company.mission_controller.planner import validate_mission_plan
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.mission_controller.failure_policy import (
@@ -74,6 +75,18 @@ class MissionExecutionPipeline:
                 agent_name="mission-controller",
                 success=False,
                 error="Company must be running before executing a stage",
+            )
+
+        # Reject malformed stage/task graphs before any agent or tool work starts.
+        plan_issues = validate_mission_plan(plan)
+        if plan_issues:
+            error = "Mission plan validation failed before execution: " + "; ".join(plan_issues)
+            self.orchestrator.block(error)
+            return AgentResult(
+                task_id=self.orchestrator.state.current_task_id or "",
+                agent_name="mission-controller",
+                success=False,
+                error=error,
             )
 
         self.register_default_agents(plan)
