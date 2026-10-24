@@ -94,3 +94,7 @@ GitHub delivery can be enabled with a GitHub token:
 GitHub publishing is gated by the review workflow: required tests and security checks must pass, and the user must approve the exact artifact before publication. If the artifact changes after approval, publishing is rejected. Configure GitHub writes only when you are ready to enable this integration.
 
 GitHub and deployment integrations remain optional and are protected by the existing gates.
+
+## Development approach: Waterfall + Incremental
+
+Nexora uses Waterfall for ordered lifecycle phases and approval gates, combined with Incremental development to deliver each approved scope in small, testable additions. Requirements and design are reviewed before implementation. Each increment is dependency-ordered, tied to acceptance criteria, and verified with focused and regression tests. An increment passing does not mark its parent milestone or phase complete. Defects return to the affected design/implementation step, and impacted checks are rerun. Merge only when required checks pass on the exact PR head; external release requires approval of the exact tested revision. Milestones M86–M97 remain sequential gates.
