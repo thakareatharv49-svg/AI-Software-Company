@@ -8,6 +8,7 @@ from src.company.quality_release_gates import (
     ReviewFinding,
     SoakEvidence,
     evaluate_improvement,
+    evaluate_integrated_acceptance,
     evaluate_product_quality,
     evaluate_release_readiness,
     evaluate_soak,
@@ -131,3 +132,28 @@ def test_improvement_gate_passes_when_all_metrics_are_within_bounds():
     baseline = ImprovementMetrics(0.8, 0.9, 10, 100)
     candidate = ImprovementMetrics(0.85, 0.92, 10.5, 105)
     assert evaluate_improvement(baseline, candidate).status == "passed"
+
+
+def test_integrated_acceptance_blocks_when_any_required_gate_fails():
+    quality = good_quality()
+    release = ReleaseEvidence("candidate", "old-tested", "passed", "passed", False, False)
+    soak = SoakEvidence((MissionOutcome("one", "completed"),), ("one",))
+    baseline = ImprovementMetrics(0.8, 0.9, 10, 100)
+    candidate = ImprovementMetrics(0.9, 0.95, 10, 100)
+    decision = evaluate_integrated_acceptance(quality, release, soak, baseline, candidate)
+    assert decision.status == "blocked"
+    assert any("release:" in reason and "differs" in reason for reason in decision.reasons)
+
+
+def test_integrated_acceptance_passes_only_when_all_gates_pass():
+    quality = good_quality()
+    release = ReleaseEvidence("candidate", "candidate", "passed", "passed", True, True)
+    soak = SoakEvidence(
+        (MissionOutcome("one", "completed"), MissionOutcome("two", "blocked", "cancelled by policy")),
+        ("one", "two"),
+    )
+    baseline = ImprovementMetrics(0.8, 0.9, 10, 100)
+    candidate = ImprovementMetrics(0.85, 0.92, 10.5, 105)
+    decision = evaluate_integrated_acceptance(quality, release, soak, baseline, candidate)
+    assert decision.status == "passed"
+    assert decision.reasons == ()
