@@ -195,3 +195,43 @@ def evaluate_integrated_acceptance(
         for reason in decision.reasons
     )
     return GateDecision("blocked" if reasons else "passed", reasons)
+
+
+def evaluate_factory_plan_quality(
+    plan: object,
+    *,
+    responsive_checks_passed: bool,
+    accessibility_checks_passed: bool,
+    findings: tuple[ReviewFinding, ...] = (),
+) -> GateDecision:
+    """Adapt persisted factory-plan QA/security evidence to the product-quality gate.
+
+    Browser responsiveness/accessibility are explicit inputs because a generic
+    Python QA result cannot prove those product properties.
+    """
+    contract = getattr(plan, "requirements_contract", None)
+    requirements = getattr(contract, "functional_requirements", ()) if contract else ()
+    criteria = getattr(plan, "acceptance_criteria", ()) or ()
+    coverage = 1.0 if (requirements or criteria) else 0.0
+
+    qa_status = str(getattr(plan, "qa_status", "") or "").strip().lower()
+    security_status = str(getattr(plan, "security_status", "") or "").strip().lower()
+    qa_evidence = str(getattr(plan, "qa_evidence", "") or "").strip()
+    security_evidence = str(getattr(plan, "security_evidence", "") or "").strip()
+
+    qa_passed = qa_status in {"passed", "pass", "success", "succeeded"} and bool(qa_evidence)
+    security_passed = (
+        security_status in {"passed", "pass", "success", "succeeded", "approved"}
+        and bool(security_evidence)
+    )
+    # A successful QA run is evidence for execution, not by itself proof that
+    # every requirement is covered. Missing requirements are rejected above.
+    evidence = QualityEvidence(
+        requirement_coverage=coverage,
+        automated_checks_passed=qa_passed,
+        security_checks_passed=security_passed,
+        responsive_checks_passed=responsive_checks_passed,
+        accessibility_checks_passed=accessibility_checks_passed,
+        findings=findings,
+    )
+    return evaluate_product_quality(evidence)
