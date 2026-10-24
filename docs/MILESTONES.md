@@ -1270,9 +1270,9 @@ Acceptance: a deterministic multi-mission soak test completes or safely blocks e
 6. Do not start the next milestone while the current milestone has unresolved correctness or security failures.
 
 
-## Project development methodology — Waterfall
+## Lifecycle methodology — Waterfall + Incremental
 
-**Method: Waterfall, with evidence-based phase gates.** Development proceeds through ordered phases. A later phase does not begin until the current phase's deliverables are reviewed and its exit criteria are satisfied. Milestones are implementation slices inside the relevant phase, not permission to skip earlier phases.
+**Method: Waterfall + Incremental.** Waterfall governs ordered lifecycle phases and evidence-based approval gates; Incremental development delivers approved scope in small, coherent, dependency-ordered capabilities. A later phase does not begin until the current phase's deliverables are reviewed and its exit criteria are satisfied. Passing an increment does not complete its parent milestone or phase.
 
 1. **Requirements analysis:** document scope, user stories, non-goals, constraints, risks, and measurable acceptance criteria.
 2. **System and detailed design:** document architecture, interfaces, data model, project-type/toolchain decisions, security boundaries, and verification strategy.
