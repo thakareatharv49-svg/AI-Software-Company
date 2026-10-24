@@ -2163,6 +2163,7 @@ class ProjectFactory:
         *,
         candidate_revision: str,
         tested_revision: str,
+        evidence_revision: str,
         decision: Any,
     ) -> dict[str, Any]:
         """Persist an auditable acceptance decision tied to the tested revision.
@@ -2172,6 +2173,7 @@ class ProjectFactory:
         """
         candidate = str(candidate_revision or "").strip()
         tested = str(tested_revision or "").strip()
+        evidence = str(evidence_revision or "").strip()
         status = str(getattr(decision, "status", "blocked")).strip().lower()
         reasons = list(getattr(decision, "reasons", ()) or ())
         if not candidate:
@@ -2180,6 +2182,10 @@ class ProjectFactory:
             reasons.append("tested revision is missing")
         elif candidate != tested:
             reasons.append("candidate revision differs from tested revision")
+        if not evidence:
+            reasons.append("evidence revision is missing")
+        elif candidate != evidence:
+            reasons.append("acceptance evidence revision differs from candidate revision")
         if status != "passed":
             status = "blocked"
             if not reasons:
@@ -2189,6 +2195,7 @@ class ProjectFactory:
         payload = {
             "candidate_revision": candidate or None,
             "tested_revision": tested or None,
+            "evidence_revision": evidence or None,
             "status": status,
             "reasons": list(dict.fromkeys(str(reason)[:500] for reason in reasons))[:50],
             "milestone_group": "M95-M100",
