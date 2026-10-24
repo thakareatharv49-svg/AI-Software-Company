@@ -5,7 +5,7 @@ from src.agents.registry.registry import AgentRegistry
 from src.company.events.events import CompanyEvent
 from collections.abc import Callable
 
-from src.company.mission_controller.models import EngineeringTask, MissionPlan, MissionStage
+from src.company.mission_controller.models import MissionPlan, MissionStage
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
 from src.company.mission_controller.failure_policy import (
@@ -294,29 +294,29 @@ class MissionExecutionPipeline:
             repair_limit = bounded_repair_attempts(self.max_repair_attempts)
             max_attempts = repair_limit + 1
             for attempt in range(1, max_attempts + 1):
-            step.attempts += 1
-            repair_instruction = step.objective
-            if attempt > 1:
-                previous_kind = classify_failure(last_error)
-                if previous_kind == FailureKind.TRANSIENT:
-                    retry_guidance = (
-                        "TRANSIENT FAILURE RETRY: The previous attempt appears "
-                        "to have failed due to a temporary service or network issue. "
-                        "Retry the same task without changing unrelated code. "
+                step.attempts += 1
+                repair_instruction = step.objective
+                if attempt > 1:
+                    previous_kind = classify_failure(last_error)
+                    if previous_kind == FailureKind.TRANSIENT:
+                        retry_guidance = (
+                            "TRANSIENT FAILURE RETRY: The previous attempt appears "
+                            "to have failed due to a temporary service or network issue. "
+                            "Retry the same task without changing unrelated code. "
+                        )
+                    else:
+                        retry_guidance = (
+                            "AUTOMATED REPAIR RETRY: Diagnose the specific failure, "
+                            "make the smallest safe correction, and verify the correction. "
+                        )
+                    repair_instruction = (
+                        f"{step.objective}\n\n"
+                        + retry_guidance
+                        + "Do not claim a check passed unless you actually verified it.\n"
+                        + f"Previous failure: {last_error}\n"
+                        + f"Failure category: {previous_kind.value}\n"
+                        + f"Repair attempt: {attempt - 1} of {repair_limit}"
                     )
-                else:
-                    retry_guidance = (
-                        "AUTOMATED REPAIR RETRY: Diagnose the specific failure, "
-                        "make the smallest safe correction, and verify the correction. "
-                    )
-                repair_instruction = (
-                    f"{step.objective}\n\n"
-                    + retry_guidance
-                    + "Do not claim a check passed unless you actually verified it.\n"
-                    + f"Previous failure: {last_error}\n"
-                    + f"Failure category: {previous_kind.value}\n"
-                    + f"Repair attempt: {attempt - 1} of {repair_limit}"
-                )
 
                 try:
                     result = await self.executor.execute(
