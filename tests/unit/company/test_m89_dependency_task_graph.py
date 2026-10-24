@@ -10,6 +10,7 @@ from src.company.mission_controller.planner import validate_mission_plan
 from src.company.mission_jobs import recover_running_plan, resume_failed_plan
 from src.company.models.contracts import CompanyMission
 from src.company.orchestration.orchestrator import CompanyOrchestrator
+from src.company.project_factory import ProjectFactory
 
 
 def task(task_id: str, dependencies: list[str] | None = None, status: str = "planned") -> EngineeringTask:
@@ -238,3 +239,56 @@ def test_retry_resets_failed_task_and_completed_descendants_but_keeps_valid_prer
     assert recovered.engineering_tasks[1].status == "planned"
     assert recovered.engineering_tasks[2].status == "planned"
     assert [item.id for item in recovered.ready_engineering_tasks()] == ["feature"]
+
+
+
+@pytest.mark.asyncio
+async def test_real_factory_worker_persists_engineering_task_checkpoints():
+    class JobStore:
+        def __init__(self):
+            self.jobs = {}
+            self.history = []
+
+        def get(self, job_id):
+            return self.jobs.get(job_id)
+
+        def save(self, job):
+            snapshot = job.model_copy(deep=True)
+            self.jobs[job.id] = snapshot
+            self.history.append(snapshot)
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    runtime = FakeRuntime()
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(runtime),
+        AgentRegistry(),
+    )
+    job_store = JobStore()
+    factory = ProjectFactory(
+        orchestrator,
+        controller,
+        pipeline,
+        job_store=job_store,
+    )
+    mission = CompanyMission(
+        name="Factory task graph acceptance",
+        objective="Build a small local utility with a test",
+    )
+    project = factory.enqueue(mission)
+
+    results = await factory.run(max_projects=1, max_stages=12, max_retries=0)
+
+    assert results == [project]
+    assert project.status == "completed"
+    assert all(task.status == "completed" for task in project.plan.engineering_tasks)
+    persisted_task_states = [
+        [task.status for task in snapshot.plan.engineering_tasks]
+        for snapshot in job_store.history
+    ]
+    assert any("running" in statuses for statuses in persisted_task_states)
+    assert any(
+        statuses and all(status == "completed" for status in statuses)
+        for statuses in persisted_task_states
+    )
