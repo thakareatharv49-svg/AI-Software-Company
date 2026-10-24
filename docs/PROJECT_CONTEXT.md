@@ -1,421 +1,118 @@
 # Persistent Project Context — AI Software Company
 
-> Last reviewed: 2026-10-14 (UTC). This document is the handoff record for future engineering sessions. Read it before planning or changing the project. Keep it updated when architecture, priorities, milestone status, or working agreements change.
-
-## 1. Source of truth and working agreement
-
-- GitHub repository: https://github.com/thakareatharv49-svg/AI-Software-Company
-- Default branch: `main`
-- Local Windows checkout reported by the user: `C:\\Users\\TestUser123\\Documents\\Projects\\AI-Software-Company`
-- GitHub is the durable engineering source of truth. Do not rely on chat memory alone; review this document, `docs/MILESTONES.md`, architecture/security docs, current code, and recent PRs before resuming.
-- The user wants implementation, tests, PR creation, CI/security inspection, and merge handled directly by the assistant. **Do not tell the user to merge their own PR.**
-- Work in one active implementation milestone/PR at a time. Base each branch on latest `main`; check the exact PR head SHA; inspect failures and fix the same PR rather than leaving a failed check behind.
-- Merge only after all required workflows are completed successfully on the exact latest PR head: `CI`, `Secret and Credential Scan`, `Dependency Vulnerability Audit`, and `CodeQL Security Analysis`. Use squash merge with expected head SHA and verify GitHub reports `merged: true`.
-- Report only what was actually implemented and verified. A merged PR or a roadmap label alone does not prove a real end-to-end capability works.
-
-## 2. Product vision
-
-Build a real AI-operated software company/project factory, not just a code-generation demo. The user should provide a mission; the company should plan, research, design, implement, test, repair, secure, package, publish/release under policy, observe, learn, and then continue to the next project. Human approval and safety/governance controls remain in force.
-
-Product/branding decisions:
-- The overall company and HQ system is **Nexora**; Nexora HQ tracks the company/ventures.
-- The GitHub repository name stays `AI-Software-Company` to preserve links.
-- The user explicitly moved away from the old “owner app” concept as the primary company tracker; Nexora is the HQ concept. Legacy owner/auth routes still exist in code and must not be mistaken for the desired product identity.
-- The AI Software Company should let the user review generated product quality, ask for missing details/fixes, and approve before final GitHub publication.
-- **Branding correction reported by the user on 2026-10-13:** “AI Software Developer” branding has now been fixed everywhere. Treat this as resolved unless a fresh repository-wide search or UI check finds a remaining occurrence; do not reopen it based on stale prior findings.
-- Generated products should become substantial, useful applications—not only calculator, Tic-Tac-Toe, or notes demos—and the factory should eventually progress through projects continuously under configured policy.
-
-## 3. High-level architecture/capabilities represented in the repository
-
-The system is a Python/FastAPI application with a browser control center at `/app`. Its architecture and roadmap cover:
-
-- Model abstraction/runtime (local Ollama is used in the user's setup), agent contracts/registry/execution, tools and permissions.
-- Mission/project factory, planning, execution stages, queue/retry scheduling, progress events, task/project lifecycle.
-- Durable project snapshots and durable mission jobs, audit entries, execution history, restore/recovery after cancellation/restart, and stage progress.
-- Generated project workspace/materialization, isolated generated-code execution via Docker sandbox, QA/testing, security checks, review/approval and gated publication.
-- Persistent organizational memory/context, research, multi-agent handoffs, learning, observability, costs/budgets, operations and reliability.
-- GitHub automation and controlled artifact/repository publishing.
-- Nexora HQ integration via an optional read-only aggregate status endpoint `GET /api/hq/status`, protected by a dedicated bearer token. This boundary should expose aggregate counts/status only—not mission contents or execution controls.
-- Web/dashboard, customer/authentication routes, OAuth integration and legacy owner routes. Authentication/workspace integration needs end-to-end verification before calling customer access production-ready.
-
-Useful code areas (confirm current paths before editing):
-- `src/main.py`: FastAPI assembly and routers.
-- `src/company/project_factory.py`: sequential factory, queue, mission lifecycle, persistence and recovery.
-- `src/company/mission_jobs.py`: durable mission job model/status/transitions/recovery helpers.
-- `src/company/autonomous_factory_runner.py`: autonomous runner.
-- `src/company/events/events.py`: progress/event representation.
-- `src/security/redaction.py`: text/value redaction.
-- `src/company/control_center/`, `src/web/`, `dashboard/`: control center/web experience.
-- `docs/architecture.md`, `docs/MILESTONES.md`, `docs/security.md`, `docs/security/SECURE_EXECUTION_POLICY.md`, `docs/security/SECURITY_OPERATIONS_RUNBOOK.md`: architecture, roadmap, security and incident response.
-
-## 4. Roadmap state: two different numbering tracks
-
-Do not conflate the permanent product roadmap milestones with the recent sequential factory-reliability/security-hardening PRs.
-
-### Permanent roadmap (`docs/MILESTONES.md`)
-- M0–M46 are marked COMPLETE in the current roadmap document, including foundation, runtime/agents/tasks, memory, project factory, engineering/QA, security/governance, recovery, operations/economics, lifecycle/reliability/red-team, and M46 company web application/productization.
-- **Important qualification:** these are the current roadmap labels, not a blanket guarantee that every feature has passed live production acceptance. Validate concrete end-to-end paths and retain known gaps below.
-- M47 — True One-Mission Autonomous Company: currently marked NOT STARTED. Required contract is one human mission, with the company deriving research, requirements, architecture, task graph, agent assignments, QA/security/release/deployment/monitoring plans internally rather than requiring pre-prepared execution inputs.
-- M48 — Autonomous Company Operations & GitHub Control: currently marked NOT STARTED. Routine branch/commit/PR/review/merge/release/deploy/rollback operations should be automated only within enforced policy.
-- M49 — Production Launch & Final Company Acceptance: currently marked NOT STARTED; final integrated acceptance gate.
-- M50+ is the future continuous-evolution loop.
-- Keep `docs/MILESTONES.md` authoritative for the main product roadmap. Update its statuses only when the milestone acceptance criteria are genuinely met.
-
-### Recent factory reliability and trust-boundary hardening sequence
-The recent “Milestone 1, 2, ...” PR series is a separate short-term hardening sequence, not a renumbering of the permanent M1–M49 roadmap. The following PRs are reported merged on GitHub:
-
-| Hardening milestone | PR | Result |
-|---|---:|---|
-| 1 | #272 | Recover factory missions on cancellation; preserve completed stages and requeue interrupted work. |
-| 2 | #273 | Preserve actionable QA evidence while redacting credentials and bounding output. |
-| 3 | #274 | Protect durable factory-stage failure diagnostics from secrets/unbounded text. |
-| 4 | #275 | Sanitize persisted factory worker/runner errors. |
-| 5 | #276 | Show/persist execution progress for legacy runners without detailed callbacks. |
-| 6 | #277 | Prevent retries from starving queued missions. |
-| 7 | #278 | Protect active missions from queue cleanup. |
-| 8 | #279 | Synchronize removed mission lifecycle state. |
-| 9 | #280 | Reconcile durable jobs after factory restart. |
-| 10 | #281 | Prevent terminal missions from reappearing after restart. |
-| 11 | #282 | Reconcile stale queued snapshots against running jobs. |
-| 12 | #283 | Make queued mission recovery idempotent. |
-| 13 | #284 | Preserve durable progress when re-enqueueing missions. |
-| 14 | #285 | Guard durable running missions against duplicate enqueue. |
-| 15 | #286 | Redact recovered retry feedback before model reuse. |
-| 16 | #287 | Sanitize retry feedback at use. |
-| 17 | #288 | Redact manual retry feedback. |
-| 18 | #289 | Redact mission revision feedback. |
-| 19 | #290 | Redact legacy objective context during revision. |
-| 20 | #291 | Redact mission inputs before planning. |
-| 21 | #292 | Redact legacy mission data during restore. |
-| 22 | #293 | Redact persisted audit messages and metadata. |
-| 23 | #294 | Sanitize progress events before exposure. |
-| 24 | #295 | Sanitize durable mission job messages. |
-| 25 | #296 | Bound restored mission plan text. |
-| 26 | #297 | Sanitize mission plans at write boundaries. |
-| 27 | #298 | Bound/redact mission input text before persistence/planning. |
-| 28 | #299 | Sanitize restored mission jobs at read time; rewrite unsafe legacy records. |
-| 29 | #302 | Sanitize durable mission and project snapshot reads. |
-| 30 | #303 | Redact and bound persistent runtime-run results and errors. |
-| 31 | #304 | Redact and bound durable project-output manifests on write and read. |
-| 32 | #305 | Redact and bound durable audit entries on write and legacy reads. |
-| 33 | #306 | Cap durable audit-history reads and return a chronological page of newest entries. |
-| 34 | #307 | Sanitize mission and plan fields before durable factory snapshot writes; clamp snapshot counters. |
-| 35 | In progress | Normalize mission-job mission/plan text, diagnostics, and retry counters at the durable write boundary. |
-
-Most recent confirmed merged PR at this review: [#307 — Milestone 34: sanitize factory snapshot writes](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/307), merge commit `e84ab9c538a6f7ba66ce83cd3a053c4b9c11c433`. All required CI, secret scanning, dependency audit, and CodeQL checks passed on the exact PR head before merge. Milestone 35 is hardening durable mission-job writes.
-
-## 5. Latest hardening details
-
-- M31 (#304) sanitizes durable project-output manifests on writes and reconstructed reads, redacting credential-bearing repository/product URLs and bounding publication messages.
-- M32 (#305) redacts and bounds durable audit entries before writes and after legacy reads, including nested metadata.
-- M33 (#306) caps audit-history reads at 500 records by default and returns the newest page in chronological order.
-- M34 (#307) sanitizes factory snapshot mission/plan text before writes and clamps persisted counters.
-- M35 hardens the remaining durable mission-job write boundary by reusing read-time normalization for mission/plan content, redacting/bounding diagnostics, and clamping negative retry counters.
-
-The reliability/security sequence has been strengthening the mission lifecycle and the durable-data trust boundaries:
-- Cancellation, restart, retries, stale project snapshots, and durable job state are reconciled so interrupted work can resume without duplicating or resurrecting terminal work.
-- Queue fairness and active-mission protections prevent one failing mission or cleanup path from starving/removing unrelated work.
-- Progress, QA evidence, failure details, audit messages, retry feedback, mission inputs, plans, and durable job messages are redacted and bounded at various boundaries.
-- M28 added sanitization on durable job load: mission fields, nested plan free text, and job messages are normalized immediately when read, and changed legacy records are rewritten.
-- Regression tests have been added to cover the specific cases in each PR. Do not assume all other persistence/restore entry points are now covered; inspect remaining trust boundaries next.
-
-## 6. User-reported environment and operating details
-
-- Windows + PowerShell + VS Code.
-- Local checkout path: `C:\\Users\\TestUser123\\Documents\\Projects\\AI-Software-Company`.
-- Python 3.13.7 in `.venv`; Git for Windows; 12-core CPU and about 15.7 GB RAM reported previously.
-- Ollama has `llama3.2:latest` installed; an earlier basic generation test succeeded.
-- PostgreSQL and Docker are required for the documented durable database and container-isolated execution paths.
-- README documents the default local port `8000`; the user recently used `http://127.0.0.1:8011/app` after a port conflict. Confirm the running process/port rather than assuming either port is always active.
-- `LOCAL_ACCESS_ENABLED=true` was reported enabled in development settings, and is intended only for loopback development; never enable this bypass in shared/production environments.
-- Do not assume the local service is currently running just because it ran in an earlier conversation.
-
-## 7. Known issues / gaps to re-check before declaring the factory reliable
-
-These are user-reported symptoms and open investigation items, not claims that the latest code still definitely has each bug:
-1. Large missions (e.g. Notes/Expense Tracker) repeatedly became blocked; at one point every stage remained `planned`.
-2. The factory queue appeared to sit for hours / queued projects did not start.
-3. The user wanted a way to delete queued or blocked missions, plus less scrolling and a larger/new-mission submission area.
-4. The user wants a meaningful review loop: inspect generated product, request missing features/fixes, then approve final publication.
-5. **Branding:** user reports that “AI Software Developer” branding has now been fixed everywhere. The previous inconsistent-branding finding is resolved; only reopen if a fresh repository-wide search or UI check finds a regression.
-6. Customer Google/GitHub sign-in and workspace creation previously encountered database/schema and missing-workspace/foreign-key errors. Re-test current migrations and full auth-to-workspace flow before claiming production-ready customer onboarding.
-7. The permanent roadmap's M47–M49 one-mission autonomy and launch acceptance remain open in `docs/MILESTONES.md`.
-
-## 8. Security and release constraints
-
-- Generated code should run in the restricted container by default; host mode is an explicit development exception and is not OS isolation.
-- Never expose real tokens or credentials in code, logs, audit messages, issue/PR text, or this document.
-- Keep authorization server-side; do not trust client-supplied workspace IDs without membership/ownership checks.
-- GitHub publication/release must remain gated by quality/security checks and approval of the exact artifact; changes to an approved artifact require re-approval.
-- The Nexora HQ status integration is read-only and aggregate-only.
-- Follow `docs/security.md`, `docs/security/SECURE_EXECUTION_POLICY.md`, and `docs/security/SECURITY_OPERATIONS_RUNBOOK.md` for detailed rules.
-
-## 9. Recommended next work sequence
-
-1. After this context document is merged, inspect all durable restore/read boundaries beyond `ProjectFactory._load_job` and add focused regression tests for malformed/legacy state. Keep this as one small PR and validate all four required workflows.
-2. Reproduce the user's blocked/queued mission problem through the actual factory path (not just isolated unit tests); identify the earliest stage that fails to transition, and make failure/progress visible and actionable.
-3. Verify the queue starts the next healthy mission after a blocked/timed-out one and preserves FIFO/fairness.
-4. Verify delete/cancel controls for queued/blocked missions, including durable job, project snapshot, audit/event, and UI state consistency.
-5. Continue M47 one-mission autonomy only after reliability and review gates are demonstrated; then M48, and finally M49 acceptance. Branding is no longer an active task unless regression evidence appears.
-
-## 10. Required handoff checklist for every new session
-
-1. Read this document and `docs/MILESTONES.md`.
-2. Inspect current `main`, the last several merged PRs, and any open PRs/check failures.
-3. Verify which milestone/PR is actually latest; do not trust a stale conversation summary over GitHub.
-4. State the current objective briefly, implement one milestone, add regression tests, and open a PR.
-5. Wait for the four required checks on the exact head SHA; inspect/fix any failure.
-6. Merge only after all four pass, verify merged status, and update this context/roadmap when the durable project state materially changes.
-
-
----
-
-## 11. Verified handoff update — 2026-10-14 (supersedes older hardening status above)
-
-This section is the newest verified state. If older sections above conflict with this update or the live GitHub PR state, use the newest merged commits, live PR state, and current `docs/MILESTONES.md`.
-
-### Latest factory-recovery hardening milestones
-
-- **M67 — COMPLETE**, PR #352, merge commit `b1b3486c81ff7316a2b3c338bf1f086f794eb583`: malformed duplicate recovery snapshots cannot shadow later valid snapshots.
-- **M68 — COMPLETE**, PR #353, merge commit `67812bfd74b4669906f15dc248c8b942bc5f1429`: restored snapshot counters are bounded and non-finite values normalize safely.
-- **M69 — COMPLETE**, PR #354, merge commit `4cc42ebd1956a9b7ea1ba61db27ffc1397fba425`: durable mission-job attempt counters are bounded and normalized during validation/recovery.
-- **M70 — COMPLETE**, PR #355, merge commit `5adcffdb599044ddef27b22474a326d35970646d`: normalized attempt counters are persisted for snapshot-backed and orphaned queued jobs; recovery skips affected items if required writes fail. All four required workflows passed on PR head `e2a98adee9a37a8c35fafdb97e497451ef6b54ec`.
-- **M71 — IN PROGRESS**, PR #356: `Persist Sanitized Orphan Recovery State`. It persists sanitized mission/plan data for queued orphan jobs even when counters were already valid, and fails closed when required durable normalization cannot be saved. Current PR head before this context update was `7106e79c3b8fc439da3b0011b5585ace6df446b8`; all four required workflows passed on that exact head. Adding this context update changes the PR head, so re-check workflows on the new head before merging.
-
-### M71 implementation and tests
-
-- Code: `src/company/project_factory.py` — queued orphan recovery detects changes to sanitized mission/plan state as well as attempt counters, persists the normalized durable job, and skips queueing if that write fails.
-- Tests: `tests/unit/company/test_factory_orphaned_job_recovery.py` — verifies legacy credential-bearing mission text is redacted in durable storage and an unsaved sanitized job is not queued.
-- Roadmap: `docs/MILESTONES.md` — M70 marked COMPLETE and M71 marked IN PROGRESS in PR #356. Keep the main roadmap and this context aligned after merge.
-
-### Immediate next actions
-
-1. Verify PR #356's current head and all four required workflows after any new commit.
-2. Inspect failed steps and fix failures on the same PR; do not merge with pending/failed required checks.
-3. Merge PR #356 by squash only after CI, secret scan, dependency audit, and both CodeQL languages pass on its exact head; verify `merged: true`.
-4. Update this context and roadmap to reflect the verified merge, then continue with M72 when requested.
-5. Continue to treat this recovery-hardening sequence as distinct from permanent product milestones M47–M49. Those remain open until their actual end-to-end acceptance criteria pass.
-
-### Working agreement reaffirmed
-
-The user explicitly requires the assistant to do all PR checks, failure fixes, and merges. Never ask the user to merge. Be fast by batching status checks, but never report a merge or test success that GitHub has not verified.
-
-
----
-
-## 12. Verified handoff update — 2026-10-14 (M71 merged; M72 active)
-
-- **M71 — COMPLETE**, PR #356, merge commit `eaeb2030e08e424a15e7b322c62e0788b766f8ed`. The exact PR head `d34132be1a2e92c641bbabd72f31f7a9b07dca12` passed CI, Secret and Credential Scan, Dependency Vulnerability Audit, and both CodeQL language jobs before squash merge.
-- M71 persists sanitized mission/plan content for queued orphan durable jobs and skips queueing when required durable normalization cannot be saved.
-- **M72 — IN PROGRESS**, branch `milestone-72-fail-closed-snapshot-sanitization`: fail-closed sanitization for legacy project snapshots. It tracks whether recovery had to change sensitive mission/plan/diagnostic text or normalize counters, and will refuse to queue that snapshot if its repair cannot be persisted. Mission IDs are reserved only after the item is terminally handled or safely restored.
-- M72 regression test covers a credential-bearing legacy snapshot with an oversized counter when the snapshot store refuses writes.
-- Next: inspect current PR head; require all four workflows on that exact SHA, fix any failure on the same branch, merge only after all checks pass, and verify the merged result. Keep permanent product milestones M47–M49 distinct and open until end-to-end acceptance passes.
-
-
----
-
-## 13. Verified handoff update — 2026-10-14 (M72 merged; M73 active)
-
-- **M72 — COMPLETE**, PR #357, merge commit `d73582eaf1952a15ca7f026b4bc9be767fcb3833`. Exact head `a8231838ede0eff08b176ab34139eaba350c9d61` passed CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL Security Analysis before merge.
-- M72 makes restored snapshots fail closed when security/counter repairs cannot be persisted; roadmap/context status must stay aligned with the merged implementation.
-- **M73 — IN PROGRESS**, branch `milestone-73-fail-closed-durable-identity-scan`: durable identity reconciliation must fail closed when the durable store's full identity scan errors. A failed scan is not an empty index; otherwise a stale project snapshot could be resurrected without proving there is no conflicting durable row.
-- Regression test covers a durable identity index outage and verifies the snapshot is not queued.
-- Next: verify all four required workflows on the exact M73 PR head, repair failures on the same branch, merge only after all pass, then verify merge status. Continue one implementation milestone at a time; never ask the user to merge.
-
-
----
-
-## 14. Verified handoff update — 2026-10-14 (M73 merged; M74 active)
-
-- **M73 — COMPLETE**, PR #358, merge commit `e5dfbee11d2ff5e41a730270dcf4976107cdc650`. The exact head `57635da4803ff739115945f1412ea4d044c72c17` passed CI, Secret and Credential Scan, Dependency Vulnerability Audit, and both CodeQL language checks before squash merge.
-- M73 fails closed when durable identity enumeration throws; a failed scan is not treated as an empty index.
-- **M74 — IN PROGRESS**, branch `milestone-74-fail-closed-without-identity-enumeration`: the same invariant must hold when a durable store has no `list_all()` capability. A direct lookup returning no row cannot establish absence of conflicting embedded mission IDs without enumeration.
-- Regression test uses a lookup-only durable store and asserts the stale snapshot is not queued.
-- Next: validate M74 on its exact latest PR head, repair any failed workflow, merge only after all required checks pass, verify the merge, and keep the roadmap/handoff synchronized. Do not conflate this reliability-hardening sequence with permanent product milestones M47–M49.
-
-
----
-
-## 15. Verified handoff update — 2026-10-14 (M74 merged; M75 active)
-
-- **M74 — COMPLETE**, PR #359, merge commit `e38ee143d3a7b0fd919e2d526571fdd58bdc29ba`. User confirmed merge at 2026-10-14T20:32:44Z. M74 prevents stale snapshot recovery when a durable store does not implement full identity enumeration.
-- **M75 — IN PROGRESS**, branch `milestone-75-fail-closed-on-malformed-identity-index`: fail closed when an enumerated durable identity index contains unreadable or empty identities. Ignoring malformed rows could let an old snapshot be treated as orphaned without proving the durable index is conflict-free.
-- Regression coverage verifies a malformed durable row causes the affected snapshot to be skipped.
-- Next: run the full CI, secret scan, dependency audit, and both CodeQL language checks on the exact latest PR head; fix any failures, merge only when all required checks pass, verify merge, and synchronize this handoff. Keep permanent product milestones M47–M49 open until their real end-to-end acceptance criteria pass.
-
-### Working agreement
-
-The user expects autonomous milestone execution, including code review, CI repair, required security checks, merging, and persistent roadmap updates. Never ask the user to merge. Work on one implementation milestone at a time and verify every merge.
-
-
----
-
-## 16. Verified handoff update — 2026-10-14 (M75 merged; M76 active)
-
-- **M75 — COMPLETE**, PR #360, merge commit `54e08597241cafa4acac4ed4a4b5306ef6c8ceb0`. All required checks passed on exact head `364be1b56a2430d37daf97303aac6f2d1653dca4`: CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL Python plus JavaScript/TypeScript.
-- M75 fails closed when durable identity enumeration contains unreadable or empty identity records, rather than silently treating the index as conflict-free.
-- **M76 — IN PROGRESS**, branch `milestone-76-bidirectional-durable-identity-reconciliation`: enforce both sides of the durable key/embedded mission identity mapping. A row whose durable key equals the snapshot ID but embeds another mission must block recovery even if direct lookup returns no row.
-- Regression test simulates a corrupt indexed row hidden by direct lookup and verifies the snapshot is not queued.
-- Next: validate the exact PR head through CI, secret scan, dependency audit, and both CodeQL language jobs; fix failures, merge only after all checks pass, verify the merge, and keep roadmap/handoff aligned. Product milestones M47–M49 remain open pending true end-to-end acceptance.
-
-
-
----
-
-## 17. Verified handoff update — 2026-10-14 (M76 merged; M77 active)
-
-- **M76 — COMPLETE**, PR #361, merge commit `b98e6f5cec823478e914c444b7a30c6b7c3dce1b`. CI, secret scan, dependency audit, and both CodeQL language checks passed on exact head `eafaea5c1da7007a008a26f3544576ba7b2fdc96`.
-- M76 validates durable key and embedded mission ID symmetrically, preventing a corrupt key-to-mission mapping from allowing stale snapshot resurrection when direct lookup misses it.
-- **M77 — IN PROGRESS**, branch `milestone-77-reject-duplicate-durable-identities`: reject ambiguous durable identity indexes containing duplicate durable keys or duplicate embedded mission IDs.
-- Regression test covers duplicate durable keys in the enumerated index. Continue to run all required workflows on the exact PR head and merge only when all pass; verify merge status and keep permanent product milestones M47–M49 open until true end-to-end acceptance.
-
-
-## 18. Verified handoff update — 2026-10-14 (M77 merged; M78 active)
-
-- **M77 — COMPLETE**, PR #362, merge commit `14af781ce99276ac347e9ce4675ffe9270a31936`. CI, secret scan, dependency audit, and both CodeQL language checks passed on exact head `85d2a86c88881279f15a36ae3c9dbc35bfcd4729`.
-- M77 rejects duplicate durable keys or embedded mission IDs in the enumerated index during snapshot reconciliation and orphan recovery.
-- **M78 — IN PROGRESS**, branch `milestone-78-preflight-durable-identity-index`: validate the entire enumerable durable identity index before any snapshot is restored, including when direct lookup appears to succeed. Fail closed if the index cannot be fully enumerated or is inconsistent.
-- New regression tests cover a duplicate identity hidden behind a successful direct lookup and an unavailable identity index. Validate the exact latest PR head through CI, secret scan, dependency audit, and both CodeQL checks before merging. Verify main after merge; keep M47–M49 open pending real end-to-end acceptance.
-
-## Latest engineering handoff — 2026-10-14 UTC
-
-- M78 merged and verified on `main`: merge commit `259cc80a99a25a6f1ad583361faabaa4fbb89a24`. All six checks on the exact PR head passed: quality CI, secret-history scan, dependency audit, Python CodeQL, and JavaScript/TypeScript CodeQL (the six check runs include the separate security/code scanning entries).
-- M79 is in progress on branch `milestone-79-strict-durable-identity-types`. It introduces strict normalization for durable identity values and regression tests for null/numeric identity corruption. Do not mark M79 complete or merge until all required checks pass on its exact latest head.
-
-
-## Latest engineering handoff — 2026-10-14 UTC (M79 merged; M80 active)
-
-- **M79 — COMPLETE**, PR #364, merge commit `3f15a39b9cfae71caed83d6933c9965284fceb3a`. CI, secret scan, dependency audit, and Python plus JavaScript/TypeScript CodeQL passed on exact head `bc88e43c99b8b5a98cf3b7eff4b9ea97b5514f87` before merge.
-- M79 adds strict non-empty string identity parsing for the enumerable durable identity index and reconciliation scans, preventing null/numeric IDs from being coerced into trusted identifiers.
-- **M80 — IN PROGRESS**, branch `milestone-80-strict-snapshot-job-identities`: apply that same strict identity parsing to the direct durable-job lookup used during snapshot recovery. Regression coverage makes the enumerated index valid while the direct lookup returns a corrupted numeric ID.
-- Next: validate every required workflow on the exact M80 PR head, repair any failures, merge only after all required checks pass, verify main, and keep the roadmap and handoff current. Permanent product milestones M47–M49 remain open pending end-to-end acceptance.
-
-
-## Latest engineering handoff — 2026-10-15 UTC (M80 merged; M81 active)
-
-- **M80 — COMPLETE**, PR #365, merge commit `938a8068e3a25e76b7d89043fae36711f479c654`. All required checks passed on exact head `dac948e062c83925acce0a1756063842d5caa241`: quality CI, secret-history scan, dependency audit, and Python plus JavaScript/TypeScript CodeQL.
-- M80 applies strict non-empty string validation to snapshot-backed direct job lookup results; the corrected regression proves a malformed numeric key cannot override a blocked durable lifecycle and resurrect a stale snapshot.
-- **M81 — IN PROGRESS**, branch `milestone-81-strict-snapshot-mission-identities`: validate the snapshot mission ID itself before duplicate detection or durable lookup. Null, numeric, blank, and non-canonical whitespace-padded IDs must fail closed.
-- Next: validate all required workflows on the exact latest M81 PR head, fix failures, merge only after success, verify main, and update this handoff. Permanent product milestones M47–M49 remain open pending end-to-end acceptance.
-
-
----
-
-## Latest engineering handoff — 2026-10-15 UTC (M81 merged; improvement plan revised)
-
-- **M81 — COMPLETE**, PR #366, merge commit `aaf6f5456cec9b0f80763709d6540c2ece1941df`. The exact PR head `f38a3e65b1dcd9174daf3c966f5e02b5bf6d1bc1` passed CI/quality, secret scan, dependency audit, and CodeQL checks for Python and JavaScript/TypeScript before squash merge.
-- M81 validates a snapshot's mission identity as a canonical non-empty string before duplicate checks, durable lookup, or restoration; regressions cover null, numeric, blank, and noncanonical values.
-- **Research-backed plan added:** `docs/IMPROVEMENT_PLAN.md` is the strategic source for prioritized reliability, QA, security, customer onboarding, observability/economics, and release-integrity work. It is informed by OWASP GenAI security guidance, NIST AI RMF/Generative AI Profile, and GitHub Actions supply-chain guidance.
-- `docs/MILESTONES.md` now marks M81 complete and lists planned M82–M93. Planned does not mean implemented or verified.
-- **Next implementation:** M82, defensive snapshot record decoding. Inspect actual restore boundaries, validate nested record shape before dereferencing, and prove malformed records do not abort healthy recovery. Keep the current strict durable identity preflight and fail-closed invariants.
-- **Important product acceptance gaps remain open:** end-to-end large-mission execution and recovery, queue liveness/fairness, preview → revise → approve → publish, and clean-database OAuth/workspace/tenant isolation. Do not claim production readiness until their real-path acceptance criteria pass.
-- Continue the working agreement: inspect live GitHub state, use one implementation PR at a time, add regressions, require all required checks on the exact latest PR head, fix failures, merge only after success, verify main, and keep this handoff current. Never ask the user to merge.
-
-
----
-
-## Latest engineering handoff — 2026-10-15 UTC (M81 and revised plan merged; M82 active)
-
-- **M81 — COMPLETE**, PR #366, merge commit `aaf6f5456cec9b0f80763709d6540c2ece1941df`. All required CI, secret scan, dependency audit, and CodeQL checks passed on exact PR head `f38a3e65b1dcd9174daf3c966f5e02b5bf6d1bc1`.
-- **Research-backed improvement plan merged**, PR #367, merge commit `b0566360f76b75066c5cc5d864a0f422742104e8`. `docs/IMPROVEMENT_PLAN.md` defines priority tracks and measurable exit gates; roadmap milestones M82–M93 are planned capabilities, not claims of implementation.
-- **M82 — IN PROGRESS**, branch `milestone-82-defensive-snapshot-record-decoding`: validate snapshot mapping shape and explicit `CompanyMission`/`MissionPlan` nested types before dereferencing. Isolate malformed record parsing and sanitization exceptions to each record.
-- Regression coverage mixes null/scalar/list/empty records and wrong nested types with a valid snapshot, and covers a malformed nested plan model followed by an independent healthy record.
-- Next: inspect the exact PR head; require quality CI, secret scan, dependency audit, and both CodeQL language analyses to pass; repair any failures on the same branch; merge only after success; verify main and keep this handoff current.
-- End-to-end product gaps remain open until evidence-based acceptance: large-mission execution/recovery, queue liveness/fairness, preview/revise/approve/publish, and fresh-database OAuth/workspace/tenant isolation.
-
-
----
-
-## Verified handoff — 2026-10-15 UTC (M82 merged)
-
-- **M82 — COMPLETE**, PR #368, merge commit `e1d637a5366e8136668858ee2109e2a71f645702`. The exact PR head `b6ad0a8b7e4ee141cc8dbb233a5388eb28015ce2` passed quality CI, secret-history scan, dependency audit, and both CodeQL language checks before merge.
-- Snapshot restoration now validates record mappings and explicit `CompanyMission`/`MissionPlan` nested model types before dereferencing. Parsing and sanitization errors are contained to the affected snapshot record.
-- Regression tests mix malformed null/scalar/list/empty entries and wrong nested types with healthy snapshots; a malformed nested plan does not prevent a later healthy snapshot from restoring.
-- **Next planned milestone M83 — Mixed-Record Restore Isolation:** extend the same failure-isolation guarantee to storage read/write failures and malformed durable records; preserve fail-closed recovery when durable identity cannot be verified. Do not mark M83 active until implementation begins.
-- The research-backed plan is in `docs/IMPROVEMENT_PLAN.md`; product-level end-to-end acceptance gaps remain open until exercised through the real application path.
-
-
-## Verified engineering handoff — 2026-10-15 UTC (M83 implementation in progress)
-
-- Main baseline before M83: `491701122f87d15bb0f0c78336dffe7951a9ccaa` (M82 complete).
-- M83 focuses on the orphaned durable-job recovery pass: enforce the same canonical string identity invariant used by snapshot recovery and contain arbitrary exceptions from malformed nested legacy job data to that record.
-- Identity-index corruption remains fail-closed globally; per-record isolation must not weaken uniqueness guarantees or permit ambiguous work to be resurrected.
-- Verification and merge status must be updated only after exact-head CI, secret scan, dependency audit, and both CodeQL checks pass.
-
-
-## Verified engineering handoff — 2026-10-15 UTC (M83 merged)
-
-- **M83 — COMPLETE**, implementation PR [#370](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/370), merge commit `e6d781a8df95a6a84a4036860bc8e5d6b3652e08`. Exact implementation head `f418194f202de747604764c81c155531069533bf` passed CI/quality, secret-history scan, dependency audit, and both Python and JavaScript/TypeScript CodeQL analyses before merge.
-- Orphaned durable-job recovery now requires canonical non-empty string IDs and matching durable/embedded mission IDs during index preflight. An unreadable or ambiguous identity index remains fail-closed.
-- Arbitrary exceptions caused by malformed nested legacy job payloads are contained to the affected orphan record, so later independent healthy jobs can still recover. Added regressions for a malformed nested plan followed by a healthy job and non-string durable identity.
-- **Next planned milestone: M84 — Real-Path Mission Lifecycle Harness.** Exercise the actual public submission-to-queue/worker/QA/review path with deterministic providers and structured evidence. Do not treat unit recovery coverage as end-to-end product acceptance.
-- Remaining major acceptance gaps: large-mission execution/recovery, queue liveness/fairness, preview/revise/approve/publish, and fresh-database OAuth/workspace/tenant isolation.
-
-
-## Engineering handoff — 2026-10-15 UTC (M84 implementation in progress)
-
-- Main baseline: `aa36504c51c6950792609b2a82750796da0fb6c8` (M83 complete).
-- M84 adds a deterministic acceptance harness through the public mission submission and factory-run HTTP routes. It keeps the real factory, generated-product execution pipeline, pytest QA runner, reviewer, durable job/output manifest, and audit history in the path while replacing only model/agent nondeterminism.
-- The harness must retain a machine-readable failure trace and prove the mission reaches a completed durable state with all stages complete, QA exit code 0, review approved, generated files present, and output/audit evidence.
-- Do not mark complete until exact-head CI, secret scan, dependency audit, and both CodeQL checks pass and the PR is merged. The separate existing real-model large-product test may require Ollama; M84's default acceptance harness must not.
-
-
-## Verified engineering handoff — 2026-10-15 UTC (M84 merged)
-
-- **M84 — COMPLETE**, implementation PR [#372](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/372), merge commit 0cc935e7d36409dbb2eb748c2a9d81938abf3fbc. Exact tested PR head 768f7d7809a0bbad3765fe8ef34f2a15f3baf544 passed CI/quality, secret-history scan, dependency audit, and both Python and JavaScript/TypeScript CodeQL checks before merge.
-- Added a deterministic acceptance test using the public HTTP submission and factory-run endpoints and the real factory worker. Only nondeterministic agent/model calls are replaced; product execution, pytest QA, security review, durable job/output manifest, and audit history remain real.
-- Test assertions include a structured JSON trace on failure and verify all 12 stages complete, the durable job is completed, QA actually runs with exit code 0 and output, review is approved, generated files exist, an output manifest is saved, and FACTORY_PROJECT_COMPLETED is audited.
-- **Next planned milestone: M85 — Queue Liveness and Stuck-Stage Diagnostics.** Add bounded progress/deadline/lease checks and actionable stuck/blocked diagnosis without relying on model-generated claims.
-- Larger product gaps remain open: large-mission execution/recovery under realistic workload, queue fairness/liveness beyond the deterministic acceptance slice, preview/revise/approve/publish tied to exact artifacts, and fresh-database OAuth/workspace/tenant isolation.
-
-
-## Engineering handoff — 2026-10-15 UTC (M85 implementation)
-
-- Mission diagnostics report heartbeat age/staleness, the effective execution timeout, and queue-wait threshold. Running-mission stale detection is bounded by the configured execution deadline, with a short noise floor and hard ceiling; malformed timeout configuration falls back to a safe default.
-- Diagnostics distinguish a suspected stall from a confirmed failure and advise inspecting worker/audit state before retrying, because long model calls and external processes can delay progress updates.
-- Focused tests cover stale/recent heartbeat behavior, configured deadlines, invalid timeout fallback, queued wait thresholds, and existing failure-state reporting. Exact-head CI/security checks and merge are required before treating this handoff as verified.
-
-
----
-
-## Verified handoff — 2026-10-15 12:09 UTC
-
-This section was checked against live GitHub state on 2026-10-15. It supersedes any older milestone/status notes above where they conflict.
-
-### Repository identity and latest main
-- Confirmed project for this conversation: [AI-Software-Company](https://github.com/thakareatharv49-svg/AI-Software-Company), default branch `main`, description “Autonomous AI Software Company”.
-- Do not use the separate `AI-OpenSource-Engineer-` repository's milestones or context for this project.
-- Latest verified commit on `main`: `e2eb11973875d0e8664e0bf0f95944a4d0fce399`, “M85: expose bounded queue liveness diagnostics”, dated 2026-10-15 11:44:32 UTC.
-- Previous verified milestone record: M84 handoff commit `046a63ce402125841022ead054d19affb5dea55b`; M84 real-path lifecycle harness commit `0cc935e7d36409dbb2eb748c2a9d81938abf3fbc`.
-- The master roadmap is `docs/MILESTONES.md`; improvement priorities are in `docs/IMPROVEMENT_PLAN.md`. The repo uses `docs/PROJECT_CONTEXT.md` as the durable session handoff.
-
-### Open pull requests — not merged
-- [PR #313 — Milestone 40: recover orphaned continuous factory missions](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/313)
-  - Head branch: `fix/recover-orphaned-continuous-missions`
-  - Head SHA: `d4c4095872c955a1f77c4442029b9985056cb8d1`
-  - Base: `main`
-  - Current `quality` check was cancelled. CodeQL, Python analysis, JavaScript/TypeScript analysis, dependency audit, and secret-history scan showed success on the inspected SHA, but a cancelled required quality check means this PR is not merge-ready.
-- [PR #314 — Milestone 41: isolate factory queue from mission persistence failures](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/314)
-  - Head branch: `test/factory-continues-after-persistence-error`
-  - Head SHA: `b09ae478f2708db8a8bdac7583b4e72d1ad3c14e`
-  - Base: `fix/recover-orphaned-continuous-missions` (PR #313's branch), not `main`.
-  - Current `quality` check was cancelled. Do not merge before verifying/re-running the required checks and resolving the stacked-PR dependency. Prefer to land #313 first, then retarget/rebase #314 onto latest `main`, re-run checks, inspect exact-head results, and merge only if all required checks succeed.
-- At verification time, these were the two open PRs. Do not report either as merged.
-
-### Next actions
-1. Inspect PR #313 and #314 changed files and workflow logs to determine why `quality` was cancelled; do not infer a code failure from cancellation alone.
-2. Restore a valid CI run on the current exact PR head(s). Re-run or push a harmless workflow-triggering fix only when appropriate; avoid merging while required checks are cancelled/pending.
-3. Resolve the stacked PR dependency so each PR has a clear, reviewable base and changes are not accidentally duplicated.
-4. Merge only after required CI, CodeQL, secret scanning, and dependency audit checks are successful on the exact latest head SHA; verify the merge response and resulting `main` commit.
-5. After PR cleanup, resume the next sequential milestone from verified `main`, using the acceptance criteria in `docs/MILESTONES.md`. Prioritize real-path reliability of large/continuous missions over narrow test-only milestones.
-
-### Working agreements reconfirmed
-- The user asked to verify repository identity before continuing; this is the AI Software Company repository.
-- User expects the assistant to handle implementation, tests, CI troubleshooting, PR creation, and merging where connector permissions allow. Do not ask the user to merge.
-- Never claim a merge, successful CI, completed milestone, or saved file without checking GitHub's actual result.
-- Keep the company/factory branding **AI Software Company** and HQ branding **Nexora**.
-
-
-## Next major program: large-project delivery (M86–M97)
-
-The next broad problem is reliable end-to-end delivery of useful, multi-file applications rather than small demos or unverified completion claims. The 12-step breakdown and acceptance criteria are recorded in `docs/MILESTONES.md` under **Large-Project Delivery Program — M86–M97**. All twelve are PLANNED, not completed. Start with M86 (a reproducible benchmark baseline), implement one milestone per PR from verified latest `main`, add tests and evidence, resolve all required CI/security failures, and merge only after the exact PR head is green. Prioritize real factory-path integration tests and honest completion gates over adding disconnected helper modules.
+> Last reviewed: 2026-10-24 (UTC). This is the durable engineering handoff. Re-check live GitHub state before relying on branch, PR, or CI details.
+
+## 1. Repository and working agreement
+
+- Repository: https://github.com/thakareatharv49-svg/AI-Software-Company
+- Default branch: `main`; latest verified main commit at this review: `4bdc9634aec5a56bc417c08cd8c77b31dcc66536` (merged planning PR #420).
+- Local checkout reported by the user: `C:\\Users\\TestUser123\\Documents\\Projects\\AI-Software-Company`.
+- GitHub is the durable engineering source of truth. Read this file, `docs/MILESTONES.md`, relevant architecture/security docs, current code, and recent PRs before resuming.
+- The user expects the assistant to inspect the implementation, make changes in GitHub, add tests, inspect CI/security results, fix failures, open PRs, and handle merges where appropriate. Do not ask the user to merge their own PR.
+- Work one implementation milestone at a time from the latest verified main. Avoid broad rewrites or duplicate subsystems when a focused change will solve the issue.
+- Merge only after all required checks succeed on the exact latest PR head: CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL Security Analysis. Use expected-head SHA and verify GitHub confirms the merge.
+- The user has also asked to accumulate batches of PRs at times. Before merging unrelated open PRs, inspect current PR state and preserve an explicit batch-hold instruction if it is still in force.
+- A merged PR, green isolated test, roadmap label, or generated files alone do not prove an end-to-end capability works. Report only verified outcomes.
+
+## 2. Product goal and identity
+
+Build a real autonomous AI software company/project factory, not a code-generation demo. Given one human mission, the company should plan, research, design, implement, validate, repair, secure, review, package, and release software under explicit governance. It should be able to recover from interruption and move to the next eligible mission without hiding failures.
+
+Branding and product decisions:
+- Company/HQ identity: **Nexora**.
+- Repository name remains **AI-Software-Company** to preserve existing links.
+- Generated products should be substantial, coherent, multi-file applications—not repetitive calculator, Tic-Tac-Toe, or generic notes demos.
+- The user expects to inspect a generated product, request missing features/fixes, and approve before final external GitHub publication.
+- The dashboard should use AI Software Company/Nexora branding consistently. A previous “AI Software Developer” branding issue was reported fixed; reopen only if a fresh search or UI check finds a regression.
+- Human approval and safety gates must remain in force for external publication and other irreversible actions.
+
+## 3. Architecture map
+
+The application is Python/FastAPI with a browser control center at `/app`. Major areas include:
+
+- Model runtime and local Ollama integration; agent contracts, registry, execution, tools, and permissions.
+- Mission planning/controller, project generation, multi-file checkpoints, factory queue/worker, retries, cancellation, durable mission jobs, and recovery.
+- Generated artifact/workspace validation, restricted execution/sandbox, QA/test command execution, security review, product review, and gated publication.
+- Persistent memory, audit/event history, costs/budgets, operational diagnostics, and dashboard APIs.
+- GitHub automation and Nexora's optional read-only aggregate HQ status endpoint. Do not expose mission contents or execution controls through aggregate status.
+- Customer/authentication/OAuth/workspace routes and legacy owner routes. Customer onboarding is not production-ready until migrations, workspace membership, authorization, and OAuth flows pass an end-to-end test.
+
+Useful paths to verify before edits:
+- `src/main.py` — FastAPI assembly and routers.
+- `src/company/project_factory.py`, `src/company/autonomous_factory_runner.py`, `src/company/mission_jobs.py` — factory execution and durable lifecycle.
+- `src/company/mission_controller/` — mission plan models, planner, execution, and failure policy.
+- `src/company/project_generator.py`, `src/company/artifact_validation.py` — generated products and artifact checks.
+- `tests/integration/`, `tests/unit/company/`, `tests/fixtures/` — real-path integration coverage, regression tests, and fixtures.
+- `docs/MILESTONES.md` — authoritative milestone roadmap; `docs/IMPROVEMENT_PLAN.md` — improvement program; `docs/security.md` and `docs/security/` — security policy/runbooks.
+
+## 4. Current roadmap and next major problem
+
+The master roadmap contains milestones through M85, followed by the new large-project delivery program M86–M97. Do not rely on stale M47–M49 or old hardening tables from earlier handoff notes; read the current `docs/MILESTONES.md` for exact statuses.
+
+### Large-project delivery program — M86–M97
+
+The core unresolved problem is reliable end-to-end delivery of useful multi-file products, including proof that they run and satisfy the mission. PR #420, “Plan M86–M97: Large-project delivery program,” was merged on 2026-10-24 as commit `4bdc9634aec5a56bc417c08cd8c77b31dcc66536`. CI, secret scan, dependency audit, and CodeQL all reported success on its exact head SHA before merge. The PR changed planning documentation only; it did not change runtime behavior.
+
+Milestones, to be implemented sequentially:
+- **M86 — Benchmark baseline:** reproducible cases, machine-readable results, exact stage/check failures.
+- **M87 — Requirements contract:** persist requirements, non-goals, deliverables, and evidence-linked acceptance criteria.
+- **M88 — Architecture/project-type planning:** select compatible stacks and define boundaries before implementation.
+- **M89 — Executable dependency graph:** enforce prerequisite ordering and persist graph state.
+- **M90 — Multi-file implementation/resume:** validate cross-file coherence and safely resume interrupted work.
+- **M91 — Bootstrap/runtime compatibility:** manifests, toolchain checks, capability adapters, actionable blockers.
+- **M92 — Real build/test execution:** bounded sandbox commands and exit-code-backed evidence.
+- **M93 — Application-level acceptance:** verify actual routes, persistence, user flows, and runtime behavior.
+- **M94 — Evidence-driven repair:** bounded, classified repair attempts and regression checks.
+- **M95 — Product quality review/revision:** close findings and prevent self-approval over failed gates.
+- **M96 — Release readiness/integrity:** ensure the approved revision is the exact tested revision.
+- **M97 — Multi-mission soak test:** verify queue fairness, recovery, isolation, and evidence-backed outcomes.
+
+### Active implementation slice at this review: M86
+
+Branch: `m86-large-project-benchmark-baseline` (a PR is to be opened after the changes are complete).
+
+Changes currently prepared on that branch:
+- `tests/fixtures/large_project_benchmark_cases.json` defines three distinct project cases: a persistent browser app, an API-backed service, and a CLI utility.
+- `tests/unit/company/test_large_project_benchmark_contract.py` validates catalog structure, distinct project types, safe expected paths, complete test contracts, and precise artifact-validator failure diagnostics.
+- `docs/MILESTONES.md` marks M86 IN PROGRESS and explicitly states that the catalog is not proof of benchmark success.
+
+M86 is **not complete**. The next implementation task is a real benchmark runner that runs each fixture through the actual factory path, records per-stage/per-check status, command evidence, duration and retries, and preserves the first baseline. Keep provider-dependent model calls opt-in; default CI must be deterministic and credential-free. Do not mark a case passed solely because its catalog is valid.
+
+## 5. Known risks and symptoms to re-validate
+
+These were reported or investigated earlier and are not assertions that each bug still exists:
+1. Large missions (such as Notes/Expense Tracker) could remain blocked with stages still planned.
+2. Queued missions could appear to wait indefinitely or fail to start.
+3. The user requested clear deletion/cancellation for queued or blocked missions and a less cumbersome mission-composer UI.
+4. Product review must allow requested revisions before approval/publication.
+5. Google/GitHub OAuth and workspace setup previously encountered missing-table and missing-workspace/foreign-key failures. Verify current migrations and the complete login-to-workspace path before claiming onboarding is production-ready.
+6. The factory must not confuse “files generated” or “process alive” with product acceptance; use real command and application-level evidence.
+7. Verify that failures, retries, cancellation, restart, and one mission's persistence error do not starve or corrupt other queued missions.
+
+## 6. Environment notes
+
+- User development environment: Windows + PowerShell + VS Code.
+- Python 3.13.7 in `.venv`; local Ollama model `llama3.2:latest` was previously available.
+- PostgreSQL and Docker are needed for the documented durable database and container-isolated execution paths.
+- The default local port was documented as 8000; 8011 was used during a port conflict. Check the active process/port rather than assuming either.
+- `LOCAL_ACCESS_ENABLED=true` was previously reported in development settings and must never be used as a shared/production auth bypass.
+- Do not assume the local application is running based on prior sessions.
+
+## 7. Security and release constraints
+
+- Run generated code in the restricted sandbox by default; host execution is a development exception, not OS isolation.
+- Never commit or disclose real credentials in code, generated artifacts, logs, audit messages, issues/PRs, or this context file.
+- Enforce workspace membership and ownership server-side; do not trust client-supplied workspace IDs.
+- Keep generated artifact paths scoped to the mission workspace and validate them before writing or release.
+- External publication/release must be gated by quality/security checks and approval of the exact artifact revision. A changed revision requires renewed review.
+- Nexora HQ status integration should remain read-only and aggregate-only.
+
+## 8. Working sequence
+
+1. Check latest main, relevant open PRs, and current workflow results.
+2. Inspect existing implementation and reuse it; work one milestone per PR.
+3. Add focused unit tests and real factory-path integration tests.
+4. Run relevant tests, full CI, secret scan, dependency audit, and CodeQL; fix failures in the same PR.
+5. Merge only after all required checks pass on the exact latest PR head, unless an explicit batch-hold instruction still applies.
+6. Verify the merge SHA and update milestone/context documents based on evidence.
+7. Never claim a milestone complete until its stated acceptance criteria are met on the real factory path.
