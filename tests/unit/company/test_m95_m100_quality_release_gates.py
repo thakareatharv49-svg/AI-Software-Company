@@ -295,3 +295,18 @@ def test_external_release_requires_matching_artifact_digests():
     decision = evaluate_release_readiness(mismatched)
     assert decision.status == "blocked"
     assert any("digest differs" in reason for reason in decision.reasons)
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        ImprovementMetrics(float("nan"), 0.9, 10, 100),
+        ImprovementMetrics(0.9, float("inf"), 10, 100),
+        ImprovementMetrics(1.1, 0.9, 10, 100),
+    ],
+)
+def test_improvement_gate_rejects_non_finite_or_out_of_range_scores(candidate):
+    baseline = ImprovementMetrics(0.8, 0.9, 10, 100)
+    decision = evaluate_improvement(baseline, candidate)
+    assert decision.status == "blocked"
+    assert decision.reasons
