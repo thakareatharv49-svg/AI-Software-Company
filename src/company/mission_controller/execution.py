@@ -179,9 +179,15 @@ class MissionExecutionPipeline:
                             "mission_objective": mission.objective,
                             "constraints": mission.constraints,
                             "acceptance_criteria": plan.acceptance_criteria,
+                            # Send tasks in validated dependency-first order. The
+                            # explicit ready IDs prevent the execution agent from
+                            # treating blocked descendants as immediately executable.
                             "engineering_tasks": [
                                 task.model_dump(mode="json")
-                                for task in plan.engineering_tasks
+                                for task in plan.engineering_task_order()
+                            ],
+                            "ready_engineering_task_ids": [
+                                task.id for task in plan.ready_engineering_tasks()
                             ],
                             "assigned_specialist": step.agent_role,
                             "dependencies": step.depends_on,
