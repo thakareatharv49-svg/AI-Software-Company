@@ -117,3 +117,26 @@ These were reported or investigated earlier and are not assertions that each bug
 5. Merge only after all required checks pass on the exact latest PR head, unless an explicit batch-hold instruction still applies.
 6. Verify the merge SHA and update milestone/context documents based on evidence.
 7. Never claim a milestone complete until its stated acceptance criteria are met on the real factory path.
+
+
+## 9. Mandatory development methodology — Waterfall
+
+The user has selected the **Waterfall Model** for this project. Apply it to new development and roadmap execution.
+
+Ordered phases:
+1. Requirements analysis — scope, use cases, non-goals, constraints, and testable acceptance criteria.
+2. System/detail design — architecture, data contracts, interfaces, project-type decisions, threat boundaries, and test plan.
+3. Implementation — approved design delivered in focused milestones.
+4. Verification/validation — automated and real-path tests, security checks, product acceptance, and traceable evidence.
+5. Deployment/release — package the exact tested revision and require appropriate approval before external publication.
+6. Maintenance — controlled defect fixes and change requests with impact analysis and regression verification.
+
+Phase-gate policy:
+- Record requirements and design decisions in GitHub before implementation begins for that scope.
+- A milestone cannot pass its gate on code generation, a successful process start, or a model's own assertion alone; use reproducible test evidence.
+- Defects found in verification go back to the relevant implementation/design step, then the affected tests are rerun.
+- Keep the master roadmap, improvement plan, and project context consistent.
+- No phase/milestone is marked complete while required CI/security checks are pending or failing, critical defects are open, or acceptance evidence is absent.
+- Every PR should identify the Waterfall phase, approved requirement/design references, acceptance criteria, tests, known limitations, and phase-exit evidence.
+- External publication remains subject to user approval of the exact tested revision.
+
