@@ -220,6 +220,8 @@ def evaluate_integrated_acceptance(
 def evaluate_factory_plan_quality(
     plan: object,
     *,
+    candidate_revision: str,
+    requirement_coverage: float,
     responsive_checks_passed: bool,
     accessibility_checks_passed: bool,
     findings: tuple[ReviewFinding, ...] = (),
@@ -232,7 +234,9 @@ def evaluate_factory_plan_quality(
     contract = getattr(plan, "requirements_contract", None)
     requirements = getattr(contract, "functional_requirements", ()) if contract else ()
     criteria = getattr(plan, "acceptance_criteria", ()) or ()
-    coverage = 1.0 if (requirements or criteria) else 0.0
+    # Coverage is supplied by a requirement-by-requirement review; the mere
+    # existence of requirements must never be mistaken for complete coverage.
+    coverage = requirement_coverage if (requirements or criteria) else 0.0
 
     qa_status = str(getattr(plan, "qa_status", "") or "").strip().lower()
     security_status = str(getattr(plan, "security_status", "") or "").strip().lower()
@@ -253,5 +257,6 @@ def evaluate_factory_plan_quality(
         responsive_checks_passed=responsive_checks_passed,
         accessibility_checks_passed=accessibility_checks_passed,
         findings=findings,
+        candidate_revision=candidate_revision,
     )
     return evaluate_product_quality(evidence)
