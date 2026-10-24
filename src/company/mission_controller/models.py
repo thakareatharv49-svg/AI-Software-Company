@@ -43,6 +43,8 @@ class EngineeringTask(BaseModel):
     agent_role: str
     acceptance_check: str
     status: str = "planned"
+    attempts: int = 0
+    detail: str | None = None
 
 
 class RequirementItem(BaseModel):

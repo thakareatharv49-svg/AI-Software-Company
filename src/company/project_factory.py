@@ -743,6 +743,44 @@ class ProjectFactory:
                     requirement.acceptance_check, 2000
                 )
                 requirement.source = safe_text(requirement.source, 120)
+        architecture = safe.architecture_plan
+        if architecture is not None:
+            architecture.project_type = safe_text(architecture.project_type, 120)
+            architecture.language = safe_text(architecture.language, 120)
+            architecture.framework = (
+                safe_text(architecture.framework, 120)
+                if architecture.framework is not None
+                else None
+            )
+            architecture.runtime = safe_text(architecture.runtime, 200)
+            architecture.status = safe_text(architecture.status, 120)
+            architecture.rationale = [
+                safe_text(value, 2000) for value in architecture.rationale
+            ]
+            architecture.repository_layout = [
+                safe_text(value, 500) for value in architecture.repository_layout
+            ]
+            architecture.components = [
+                safe_text(value, 1000) for value in architecture.components
+            ]
+            architecture.interfaces = [
+                safe_text(value, 1000) for value in architecture.interfaces
+            ]
+            architecture.data_model = [
+                safe_text(value, 1000) for value in architecture.data_model
+            ]
+            architecture.validation_strategy = [
+                safe_text(value, 1000) for value in architecture.validation_strategy
+            ]
+            architecture.unsupported_dependencies = [
+                safe_text(value, 200) for value in architecture.unsupported_dependencies
+            ]
+            for dependency in architecture.dependencies:
+                dependency.name = safe_text(dependency.name, 200)
+                dependency.purpose = safe_text(dependency.purpose, 1000)
+                dependency.kind = safe_text(dependency.kind, 120)
+                if dependency.reason is not None:
+                    dependency.reason = safe_text(dependency.reason, 1000)
         safe.qa_command = [safe_text(value, 500) for value in safe.qa_command]
         for step in safe.steps:
             step.objective = safe_text(step.objective, 2000)
@@ -757,6 +795,8 @@ class ProjectFactory:
             task.agent_role = safe_text(task.agent_role, 120)
             task.acceptance_check = safe_text(task.acceptance_check, 2000)
             task.status = safe_text(task.status, 120)
+            task.attempts = _bounded_job_attempts(task.attempts)
+            task.detail = safe_text(task.detail, 2000) if task.detail else None
         return safe
 
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
@@ -1277,6 +1317,11 @@ class ProjectFactory:
                 step.status = "planned"
                 step.detail = None
 
+        for task in project.plan.engineering_tasks:
+            if reset_completed or task.status in {"failed", "running"}:
+                task.status = "planned"
+                task.detail = None
+
         if project.last_error:
             # Give the next generation attempt the concrete reason the previous
             # attempt failed, instead of repeating the same prompt unchanged.
@@ -1531,12 +1576,26 @@ class ProjectFactory:
                 # Ignore telemetry errors once the authoritative pipeline exists.
                 project.last_error = None
             else:
-                results = await asyncio.wait_for(
-                    self.pipeline.execute_mission(
+                pipeline_run = self.pipeline.execute_mission
+                try:
+                    supports_progress = "on_progress" in signature(pipeline_run).parameters
+                except (TypeError, ValueError):
+                    supports_progress = False
+                if supports_progress:
+                    pipeline_execution = pipeline_run(
                         attempt_mission,
                         project.plan,
                         max_stages=max_stages,
-                    ),
+                        on_progress=lambda _plan: self._persist_plan_progress(project),
+                    )
+                else:
+                    pipeline_execution = pipeline_run(
+                        attempt_mission,
+                        project.plan,
+                        max_stages=max_stages,
+                    )
+                results = await asyncio.wait_for(
+                    pipeline_execution,
                     timeout=self.execution_timeout_seconds,
                 )
         except asyncio.CancelledError:
@@ -2098,6 +2157,58 @@ class ProjectFactory:
             )
         )
 
+    def record_delivery_acceptance(
+        self,
+        project: FactoryProject,
+        *,
+        candidate_revision: str,
+        tested_revision: str,
+        evidence_revision: str,
+        decision: Any,
+    ) -> dict[str, Any]:
+        """Persist an auditable acceptance decision tied to the tested revision.
+
+        This is intentionally a recording/preflight boundary, not a deployment
+        action. A caller cannot record a passed decision for a changed revision.
+        """
+        candidate = str(candidate_revision or "").strip()
+        tested = str(tested_revision or "").strip()
+        evidence = str(evidence_revision or "").strip()
+        status = str(getattr(decision, "status", "blocked")).strip().lower()
+        reasons = list(getattr(decision, "reasons", ()) or ())
+        if not candidate:
+            reasons.append("candidate revision is missing")
+        if not tested:
+            reasons.append("tested revision is missing")
+        elif candidate != tested:
+            reasons.append("candidate revision differs from tested revision")
+        if not evidence:
+            reasons.append("evidence revision is missing")
+        elif candidate != evidence:
+            reasons.append("acceptance evidence revision differs from candidate revision")
+        if status != "passed":
+            status = "blocked"
+            if not reasons:
+                reasons.append("acceptance gate did not pass")
+        if reasons:
+            status = "blocked"
+        payload = {
+            "candidate_revision": candidate or None,
+            "tested_revision": tested or None,
+            "evidence_revision": evidence or None,
+            "status": status,
+            "reasons": list(dict.fromkeys(str(reason)[:500] for reason in reasons))[:50],
+            "milestone_group": "M95-M100",
+        }
+        self._audit(
+            project.mission.id,
+            "DELIVERY_ACCEPTANCE_DECISION",
+            f"Delivery acceptance {status} for {project.mission.name}",
+            status,
+            payload,
+        )
+        return payload
+
     def _audit(
         self,
         mission_id: str,
@@ -2122,23 +2233,45 @@ class ProjectFactory:
             )
 
     def _save(self, project: FactoryProject) -> None:
-        # Enforce the same trust boundary on every write, not just when older
-        # snapshots are restored. Plans can accumulate model-generated evidence
-        # and stage diagnostics during execution.
-        project.mission = self._safe_mission(project.mission)
-        project.plan = self._safe_plan(project.plan)
-        project.last_error = (
+        # Enforce the trust boundary on persisted data without replacing the
+        # live plan object. Progress callbacks run inside the task scheduler;
+        # swapping project.plan for a deep sanitized copy would detach the
+        # scheduler's task reference and lose the completion transition that
+        # follows the callback.
+        safe_mission = self._safe_mission(project.mission)
+        safe_plan = self._safe_plan(project.plan)
+        safe_error = (
             self._safe_error_detail(project.last_error)
             if project.last_error
             else None
         )
-        project.retry_feedback = (
+        safe_feedback = (
             self._safe_error_detail(project.retry_feedback)
             if project.retry_feedback
             else None
         )
+        # Keep non-plan fields sanitized in memory as before. Only the plan
+        # stays in place because the active scheduler holds references to its
+        # task objects across progress callbacks.
+        project.mission = safe_mission
+        project.last_error = safe_error
+        project.retry_feedback = safe_feedback
         if self.store is not None:
-            self.store.save(project)
+            self.store.save(
+                FactoryProject(
+                    mission=project.mission,
+                    plan=safe_plan,
+                    status=project.status,
+                    stages_executed=project.stages_executed,
+                    attempts=project.attempts,
+                    last_error=project.last_error,
+                    retry_feedback=project.retry_feedback,
+                    worker_started_at=project.worker_started_at,
+                    last_progress_at=project.last_progress_at,
+                    progress_updates=project.progress_updates,
+                    retry_not_before_epoch=project.retry_not_before_epoch,
+                )
+            )
 
     def _load_job(self, mission_id: str) -> MissionJob | None:
         if self.job_store is None:
