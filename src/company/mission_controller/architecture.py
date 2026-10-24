@@ -18,7 +18,7 @@ from src.company.models.contracts import CompanyMission
 
 
 def _has(text: str, *terms: str) -> bool:
-    return any(re.search(rf"\\b{re.escape(term)}\\b", text) for term in terms)
+    return any(re.search(rf"\b{re.escape(term)}\b", text) for term in terms)
 
 
 def build_architecture_plan(
