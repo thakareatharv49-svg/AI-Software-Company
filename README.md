@@ -6,7 +6,7 @@ AI Software Company is an autonomous software factory with a browser control cen
 
 ## Development methodology
 
-This project follows the **Waterfall Model**: requirements and acceptance criteria → system design → implementation → verification and validation → release → maintenance. Each phase has an explicit exit gate. If verification finds a defect, fix it in the relevant earlier phase and rerun affected checks. See `docs/MILESTONES.md` for the phase-gate policy and current milestone sequence.
+This project uses a **Waterfall + Incremental hybrid model**. Waterfall governs ordered lifecycle phases and explicit approval gates; Incremental development delivers approved scope as small, dependency-ordered, testable capabilities. Each increment needs acceptance criteria and focused plus regression tests, while the parent phase remains open until all phase-exit evidence is satisfied. If verification finds a defect, fix the relevant design/implementation and rerun affected checks. See `docs/MILESTONES.md` for the policy and milestone sequence.
 
 ## Company structure
 
