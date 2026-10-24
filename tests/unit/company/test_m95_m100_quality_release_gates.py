@@ -1,5 +1,6 @@
 import pytest
 
+from src.company.project_factory import ProjectFactory
 from src.company.quality_release_gates import (
     ImprovementMetrics,
     MissionOutcome,
@@ -216,3 +217,63 @@ def test_integrated_acceptance_blocks_stale_soak_or_improvement_evidence():
     assert decision.status == "blocked"
     assert any("soak evidence does not match" in reason for reason in decision.reasons)
     assert any("improvement metrics do not match" in reason for reason in decision.reasons)
+
+
+def test_factory_records_acceptance_and_blocks_changed_revision():
+    from types import SimpleNamespace
+
+    saved = []
+
+    class AuditStore:
+        def append(self, entry):
+            saved.append(entry)
+
+    factory = ProjectFactory(
+        orchestrator=SimpleNamespace(),
+        controller=SimpleNamespace(),
+        pipeline=SimpleNamespace(),
+        audit_store=AuditStore(),
+    )
+    project = SimpleNamespace(
+        mission=SimpleNamespace(id="mission-1", name="release candidate")
+    )
+    decision = evaluate_product_quality(good_quality())
+    record = factory.record_delivery_acceptance(
+        project,
+        candidate_revision="new-sha",
+        tested_revision="old-sha",
+        decision=decision,
+    )
+    assert record["status"] == "blocked"
+    assert any("differs" in reason for reason in record["reasons"])
+    assert saved[-1].event_type == "DELIVERY_ACCEPTANCE_DECISION"
+    assert saved[-1].status == "blocked"
+
+
+def test_factory_acceptance_audit_records_only_same_tested_revision():
+    from types import SimpleNamespace
+
+    saved = []
+
+    class AuditStore:
+        def append(self, entry):
+            saved.append(entry)
+
+    factory = ProjectFactory(
+        orchestrator=SimpleNamespace(),
+        controller=SimpleNamespace(),
+        pipeline=SimpleNamespace(),
+        audit_store=AuditStore(),
+    )
+    project = SimpleNamespace(
+        mission=SimpleNamespace(id="mission-2", name="approved candidate")
+    )
+    decision = evaluate_product_quality(good_quality())
+    record = factory.record_delivery_acceptance(
+        project,
+        candidate_revision="same-sha",
+        tested_revision="same-sha",
+        decision=decision,
+    )
+    assert record["status"] == "passed"
+    assert saved[-1].metadata["candidate_revision"] == "same-sha"
