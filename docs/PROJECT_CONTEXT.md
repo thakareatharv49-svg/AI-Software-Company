@@ -69,12 +69,13 @@ Milestones, to be implemented sequentially:
 
 ### Active implementation slice at this review: M86
 
-Branch: `m86-large-project-benchmark-baseline` (a PR is to be opened after the changes are complete).
+Branch: `m86-large-project-benchmark-baseline`; [PR #421](https://github.com/thakareatharv49-svg/AI-Software-Company/pull/421) is open and awaiting exact-head CI/security results.
 
 Changes currently prepared on that branch:
 - `tests/fixtures/large_project_benchmark_cases.json` defines three distinct project cases: a persistent browser app, an API-backed service, and a CLI utility.
 - `tests/unit/company/test_large_project_benchmark_contract.py` validates catalog structure, distinct project types, safe expected paths, complete test contracts, and precise artifact-validator failure diagnostics.
 - `docs/MILESTONES.md` marks M86 IN PROGRESS and explicitly states that the catalog is not proof of benchmark success.
+- `docs/IMPROVEMENT_PLAN.md` has been aligned to the same M86–M97 sequence to remove the older conflicting M86–M93 schedule.
 
 M86 is **not complete**. The next implementation task is a real benchmark runner that runs each fixture through the actual factory path, records per-stage/per-check status, command evidence, duration and retries, and preserves the first baseline. Keep provider-dependent model calls opt-in; default CI must be deterministic and credential-free. Do not mark a case passed solely because its catalog is valid.
 
