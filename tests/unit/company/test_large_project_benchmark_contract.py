@@ -63,7 +63,7 @@ def test_benchmark_expected_paths_are_safe_relative_paths(catalog: dict) -> None
             pure_path = PurePosixPath(path)
             assert not pure_path.is_absolute(), (case["id"], path)
             assert ".." not in pure_path.parts, (case["id"], path)
-            assert "\\\\" not in path, (case["id"], path)
+            assert chr(92) not in path, (case["id"], path)
 
 
 def test_artifact_safety_check_reports_a_precise_failure() -> None:
