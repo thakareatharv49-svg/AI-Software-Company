@@ -284,7 +284,7 @@ def _test_exit_code(plan: dict[str, Any]) -> int | None:
             return value
     evidence = plan.get("quality_evidence") or plan.get("qa_evidence")
     if isinstance(evidence, str):
-        match = re.search(r"\\bexit_code=(-?\\d+)\\b", evidence)
+        match = re.search(r"\bexit_code=(-?\d+)\b", evidence)
         if match:
             return int(match.group(1))
     if isinstance(evidence, dict):
