@@ -500,7 +500,7 @@ async def test_continuous_factory_skips_one_queue_sync_failure_and_processes_nex
 
     assert enqueued == [second.mission.id]
     queue_errors = [
-        event for event in center._orchestrator.events.published
+        event for event in center._orchestrator.events.list_events()
         if event.event_type == "FACTORY_QUEUE_SYNC_ERROR"
     ]
     assert len(queue_errors) == 1
