@@ -795,6 +795,14 @@ class ProjectFactory:
             task.agent_role = safe_text(task.agent_role, 120)
             task.acceptance_check = safe_text(task.acceptance_check, 2000)
             task.status = safe_text(task.status, 120)
+            task.attempts = _bounded_job_attempts(task.attempts)
+            task.detail = safe_text(task.detail, 2000) if task.detail else None
+            # A process crash can leave a task marked running in the last
+            # durable plan. Requeue only that task; retain verified completed
+            # prerequisites so descendants remain dependency-gated on resume.
+            if task.status == "running":
+                task.status = "planned"
+                task.detail = "Recovered after interruption; task will resume after prerequisite checks."
         return safe
 
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
@@ -1127,6 +1135,28 @@ class ProjectFactory:
         # stages. Failed/in-flight stages are reset, and any completed downstream
         # stage whose prerequisites are no longer complete is invalidated.
         plan = resume_failed_plan(queued.plan)
+        # Rebuild only the unfinished suffix of the engineering DAG. Completed
+        # prerequisites remain durable; descendants of a reset prerequisite are
+        # invalidated so stale completion cannot bypass the dependency scheduler.
+        try:
+            for task in plan.engineering_task_order():
+                if task.status in {"failed", "running"}:
+                    task.status = "planned"
+                    task.detail = None
+                if task.status == "completed" and any(
+                    next(
+                        dependency.status
+                        for dependency in plan.engineering_tasks
+                        if dependency.id == dependency_id
+                    ) != "completed"
+                    for dependency_id in task.depends_on
+                ):
+                    task.status = "planned"
+                    task.detail = None
+        except ValueError:
+            # Invalid graphs are rejected by the execution preflight; preserve
+            # the original diagnostic rather than guessing at recovery order.
+            pass
         queued = queued.model_copy(update={"plan": plan})
         self._save_job(queued)
         project = FactoryProject(
@@ -1314,6 +1344,11 @@ class ProjectFactory:
             if should_reset:
                 step.status = "planned"
                 step.detail = None
+
+        for task in project.plan.engineering_tasks:
+            if reset_completed or task.status in {"failed", "running"}:
+                task.status = "planned"
+                task.detail = None
 
         if project.last_error:
             # Give the next generation attempt the concrete reason the previous
@@ -1569,12 +1604,26 @@ class ProjectFactory:
                 # Ignore telemetry errors once the authoritative pipeline exists.
                 project.last_error = None
             else:
-                results = await asyncio.wait_for(
-                    self.pipeline.execute_mission(
+                pipeline_run = self.pipeline.execute_mission
+                try:
+                    supports_progress = "on_progress" in signature(pipeline_run).parameters
+                except (TypeError, ValueError):
+                    supports_progress = False
+                if supports_progress:
+                    pipeline_execution = pipeline_run(
                         attempt_mission,
                         project.plan,
                         max_stages=max_stages,
-                    ),
+                        on_progress=lambda _plan: self._persist_plan_progress(project),
+                    )
+                else:
+                    pipeline_execution = pipeline_run(
+                        attempt_mission,
+                        project.plan,
+                        max_stages=max_stages,
+                    )
+                results = await asyncio.wait_for(
+                    pipeline_execution,
                     timeout=self.execution_timeout_seconds,
                 )
         except asyncio.CancelledError:
