@@ -45,10 +45,10 @@ The legacy owner console remains at **http://127.0.0.1:8000/owner** for deployme
 ## What AI Software Company does
 
 1. You give the company a software mission from the web control center.
-2. The local Ollama model turns the mission into a small runnable project.
+2. The configured model and factory plan a mission-specific, multi-file product. Supported project types include browser applications, API services, CLI tools, libraries, and other explicitly supported stacks; unsupported toolchains must be reported rather than silently replaced.
 3. The company materializes the project in an isolated workspace and executes generated code in a restricted Docker container by default.
 4. Automated tests run inside the workspace.
-5. QA and security gates run before completion.
+5. QA and security gates run before completion; generated files or a healthy process alone are not proof that the requested product works.
 6. The exact reviewed artifact is held behind approval and publication gates; publishing is blocked if its digest changes or required checks fail.
 7. The result is recorded in the company dashboard.
 
