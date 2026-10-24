@@ -91,3 +91,14 @@ def test_evaluator_checks_workspace_feature_markers_and_zero_exit_code(tmp_path:
     checks = evaluate_case(case, ["app.py"], {"qa_exit_code": 0}, "completed", workspace=tmp_path)
     by_id = {item["id"]: item for item in checks}
     assert all(item["passed"] for item in by_id.values())
+
+
+def test_exit_code_can_be_recovered_from_persisted_qa_evidence() -> None:
+    checks = evaluate_case(
+        {"expected_files": [], "required_features": []},
+        [],
+        {"qa_evidence": "Factory QA runner result: status=passed; exit_code=0; duration_ms=12"},
+        "completed",
+    )
+    by_id = {item["id"]: item for item in checks}
+    assert by_id["test_command_exit_code"]["passed"] is True
