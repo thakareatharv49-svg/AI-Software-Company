@@ -179,3 +179,18 @@ Every milestone must include:
 ## Review cadence
 
 Review this plan after each major track exit gate, after any production incident, and when user-reported failures contradict the current architecture. Keep the plan ambitious but evidence-driven: the goal is a useful software company, not a large count of merged milestones.
+
+
+## Waterfall phase gates
+
+This project follows the Waterfall Model. Apply these gates to the M86–M97 program and future work:
+
+1. **Requirements exit:** scope, non-goals, constraints, risks, and measurable acceptance criteria are documented.
+2. **Design exit:** architecture/interfaces, data contracts, stack/toolchain assumptions, security boundaries, and verification plan are reviewed.
+3. **Implementation exit:** planned deliverables are present, code review is complete, and focused tests cover expected and failure paths.
+4. **Verification exit:** real application/factory-path tests and required security workflows pass; acceptance criteria link to evidence; unresolved blockers are explicit.
+5. **Release exit:** the candidate artifact matches the tested revision and required human approval is recorded.
+6. **Maintenance/change exit:** defect/change impact is documented and regression verification is complete.
+
+If a gate fails, return to the earliest phase affected by the evidence, correct the issue, and repeat downstream gates that the change impacts. Do not silently skip a phase or mark a phase complete based on documentation alone.
+
