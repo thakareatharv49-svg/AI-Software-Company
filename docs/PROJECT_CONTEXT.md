@@ -119,9 +119,9 @@ These were reported or investigated earlier and are not assertions that each bug
 7. Never claim a milestone complete until its stated acceptance criteria are met on the real factory path.
 
 
-## 9. Mandatory development methodology — Waterfall
+## 9. Mandatory development methodology — Waterfall + Incremental
 
-The user has selected the **Waterfall Model** for this project. Apply it to new development and roadmap execution.
+The user has selected a **Waterfall + Incremental hybrid model**. Waterfall governs lifecycle order and phase gates; Incremental development delivers approved scope in small, testable additions. Apply both rules to new development and roadmap execution.
 
 Ordered phases:
 1. Requirements analysis — scope, use cases, non-goals, constraints, and testable acceptance criteria.
@@ -137,7 +137,7 @@ Phase-gate policy:
 - Defects found in verification go back to the relevant implementation/design step, then the affected tests are rerun.
 - Keep the master roadmap, improvement plan, and project context consistent.
 - No phase/milestone is marked complete while required CI/security checks are pending or failing, critical defects are open, or acceptance evidence is absent.
-- Every PR should identify the Waterfall phase, approved requirement/design references, acceptance criteria, tests, known limitations, and phase-exit evidence.
+- Every PR should identify the Waterfall phase and increment, approved requirement/design references, acceptance criteria, tests, known limitations, and relevant phase-exit evidence.
 - External publication remains subject to user approval of the exact tested revision.
 
 
