@@ -47,6 +47,8 @@ class ReleaseEvidence:
     approval_required: bool
     approval_granted: bool
     external_publish: bool = False
+    candidate_artifact_digest: str | None = None
+    tested_artifact_digest: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +122,12 @@ def evaluate_release_readiness(evidence: ReleaseEvidence) -> GateDecision:
         reasons.append("required human approval is missing")
     if evidence.external_publish and not evidence.approval_granted:
         reasons.append("external publication requires explicit approval")
+    candidate_digest = (evidence.candidate_artifact_digest or "").strip()
+    tested_digest = (evidence.tested_artifact_digest or "").strip()
+    if evidence.external_publish and (not candidate_digest or not tested_digest):
+        reasons.append("external publication requires candidate and tested artifact digests")
+    if candidate_digest and tested_digest and candidate_digest != tested_digest:
+        reasons.append("candidate artifact digest differs from tested artifact digest")
     return GateDecision("blocked" if reasons else "passed", tuple(dict.fromkeys(reasons)))
 
 
