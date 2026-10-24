@@ -173,3 +173,25 @@ def evaluate_improvement(
     elif baseline.cost_units > 0 and candidate.cost_units > baseline.cost_units * (1 + maximum_cost_regression):
         reasons.append("cost regression exceeds the allowed threshold")
     return GateDecision("blocked" if reasons else "passed", tuple(reasons))
+
+
+def evaluate_integrated_acceptance(
+    quality: QualityEvidence,
+    release: ReleaseEvidence,
+    soak: SoakEvidence,
+    baseline: ImprovementMetrics,
+    candidate: ImprovementMetrics,
+) -> GateDecision:
+    """Combine required delivery gates without discarding individual failure reasons."""
+    decisions = (
+        ("quality", evaluate_product_quality(quality)),
+        ("release", evaluate_release_readiness(release)),
+        ("soak", evaluate_soak(soak)),
+        ("improvement", evaluate_improvement(baseline, candidate)),
+    )
+    reasons = tuple(
+        f"{gate}: {reason}"
+        for gate, decision in decisions
+        for reason in decision.reasons
+    )
+    return GateDecision("blocked" if reasons else "passed", reasons)
