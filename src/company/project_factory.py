@@ -797,12 +797,6 @@ class ProjectFactory:
             task.status = safe_text(task.status, 120)
             task.attempts = _bounded_job_attempts(task.attempts)
             task.detail = safe_text(task.detail, 2000) if task.detail else None
-            # A process crash can leave a task marked running in the last
-            # durable plan. Requeue only that task; retain verified completed
-            # prerequisites so descendants remain dependency-gated on resume.
-            if task.status == "running":
-                task.status = "planned"
-                task.detail = "Recovered after interruption; task will resume after prerequisite checks."
         return safe
 
     def enqueue(self, mission: CompanyMission) -> FactoryProject:
