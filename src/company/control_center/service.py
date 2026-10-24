@@ -317,11 +317,27 @@ class CompanyControlCenter:
                         # Durable jobs are the source of truth. Polling also picks up
                         # missions submitted while the factory is idle.
                         for job in sorted(self.mission_jobs(), key=lambda item: item.created_at):
-                            if (
-                                job.status == MissionJobStatus.QUEUED
-                                and not self._factory.has_queued_mission(job.id)
-                            ):
-                                self._factory.enqueue(job.mission)
+                            if job.status != MissionJobStatus.QUEUED:
+                                continue
+                            try:
+                                if not self._factory.has_queued_mission(job.id):
+                                    self._factory.enqueue(job.mission)
+                            except asyncio.CancelledError:
+                                raise
+                            except Exception as exc:
+                                # One bad queue write must not starve unrelated missions.
+                                # Avoid logging exception text, which may contain credentials.
+                                self._orchestrator.events.publish(
+                                    CompanyEvent(
+                                        event_type="FACTORY_QUEUE_SYNC_ERROR",
+                                        message=(
+                                            f"Could not synchronize queued mission {job.id}: "
+                                            f"{type(exc).__name__}"
+                                        ),
+                                        project_id=job.id,
+                                    )
+                                )
+                                continue
 
                         if self._factory.queue:
                             await self._factory.run(max_projects=1, max_retries=max_retries)
