@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from datetime import UTC, datetime
@@ -223,14 +224,21 @@ def evaluate_case(case: dict[str, Any], files: list[str], plan: dict[str, Any],
     # Only inspect bounded, ordinary text files under the mission workspace.
     if workspace:
         chunks = []
+        total_bytes = 0
+        root = workspace.resolve()
         for relative in files:
             path = workspace / relative
             try:
-                if path.stat().st_size <= 250_000:
+                if path.is_symlink():
+                    continue
+                path.resolve().relative_to(root)
+                size = path.stat().st_size
+                if size <= 250_000 and total_bytes + size <= 2_000_000:
                     chunks.append(path.read_text(encoding="utf-8", errors="replace"))
-            except OSError:
+                    total_bytes += size
+            except (OSError, ValueError):
                 continue
-        all_text = "\n".join(chunks).casefold()
+        all_text = "\\n".join(chunks).casefold()
     artifact_issues: list[str] = ["Workspace not found; artifact safety could not be verified."]
     if workspace:
         try:
@@ -248,7 +256,7 @@ def evaluate_case(case: dict[str, Any], files: list[str], plan: dict[str, Any],
                     if size <= 250_000 and total_bytes + size <= 2_000_000:
                         artifact_map[relative] = artifact_path.read_text(encoding="utf-8", errors="replace")
                         total_bytes += size
-                except OSError:
+                except (OSError, ValueError):
                     continue
             artifact_issues = validate_generated_artifacts(artifact_map)
         except Exception as exc:
@@ -276,7 +284,6 @@ def _test_exit_code(plan: dict[str, Any]) -> int | None:
             return value
     evidence = plan.get("quality_evidence")
     if isinstance(evidence, str):
-        import re
         match = re.search(r"\\bexit_code=(-?\\d+)\\b", evidence)
         if match:
             return int(match.group(1))
