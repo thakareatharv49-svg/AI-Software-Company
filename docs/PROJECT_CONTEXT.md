@@ -140,3 +140,7 @@ Phase-gate policy:
 - Every PR should identify the Waterfall phase, approved requirement/design references, acceptance criteria, tests, known limitations, and phase-exit evidence.
 - External publication remains subject to user approval of the exact tested revision.
 
+
+## Development methodology: Waterfall + Incremental
+
+The selected approach is a hybrid model. Waterfall controls lifecycle order and approval gates: requirements, design, implementation, verification/validation, release, and maintenance. Incremental development controls delivery within approved scope: small, coherent, dependency-ordered capabilities, each with requirement/design references, measurable acceptance criteria, focused tests, regression checks, risks, and limitations. A passing increment does not complete its parent milestone or phase. Defects return to the affected design/implementation step and impacted tests must rerun. Required CI/security checks must pass on the exact PR head before merge. External release requires approval of the exact tested revision. M86–M97 remain sequential milestone gates; increments cannot bypass their criteria.
