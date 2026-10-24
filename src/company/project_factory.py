@@ -2198,16 +2198,22 @@ class ProjectFactory:
             if project.retry_feedback
             else None
         )
+        # Keep non-plan fields sanitized in memory as before. Only the plan
+        # stays in place because the active scheduler holds references to its
+        # task objects across progress callbacks.
+        project.mission = safe_mission
+        project.last_error = safe_error
+        project.retry_feedback = safe_feedback
         if self.store is not None:
             self.store.save(
                 FactoryProject(
-                    mission=safe_mission,
+                    mission=project.mission,
                     plan=safe_plan,
                     status=project.status,
                     stages_executed=project.stages_executed,
                     attempts=project.attempts,
-                    last_error=safe_error,
-                    retry_feedback=safe_feedback,
+                    last_error=project.last_error,
+                    retry_feedback=project.retry_feedback,
                     worker_started_at=project.worker_started_at,
                     last_progress_at=project.last_progress_at,
                     progress_updates=project.progress_updates,
