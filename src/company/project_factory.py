@@ -2157,6 +2157,51 @@ class ProjectFactory:
             )
         )
 
+    def record_delivery_acceptance(
+        self,
+        project: FactoryProject,
+        *,
+        candidate_revision: str,
+        tested_revision: str,
+        decision: Any,
+    ) -> dict[str, Any]:
+        """Persist an auditable acceptance decision tied to the tested revision.
+
+        This is intentionally a recording/preflight boundary, not a deployment
+        action. A caller cannot record a passed decision for a changed revision.
+        """
+        candidate = str(candidate_revision or "").strip()
+        tested = str(tested_revision or "").strip()
+        status = str(getattr(decision, "status", "blocked")).strip().lower()
+        reasons = list(getattr(decision, "reasons", ()) or ())
+        if not candidate:
+            reasons.append("candidate revision is missing")
+        if not tested:
+            reasons.append("tested revision is missing")
+        elif candidate != tested:
+            reasons.append("candidate revision differs from tested revision")
+        if status != "passed":
+            status = "blocked"
+            if not reasons:
+                reasons.append("acceptance gate did not pass")
+        if reasons:
+            status = "blocked"
+        payload = {
+            "candidate_revision": candidate or None,
+            "tested_revision": tested or None,
+            "status": status,
+            "reasons": list(dict.fromkeys(str(reason)[:500] for reason in reasons))[:50],
+            "milestone_group": "M95-M100",
+        }
+        self._audit(
+            project.mission.id,
+            "DELIVERY_ACCEPTANCE_DECISION",
+            f"Delivery acceptance {status} for {project.mission.name}",
+            status,
+            payload,
+        )
+        return payload
+
     def _audit(
         self,
         mission_id: str,
