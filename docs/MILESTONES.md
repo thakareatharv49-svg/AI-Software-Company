@@ -1174,14 +1174,16 @@ Status: IN PROGRESS
 Acceptance: representative missions receive valid, environment-compatible plans and unsupported dependencies are identified before implementation. M88 remains IN PROGRESS until required exact-head CI/security checks pass and representative missions are verified through the running factory path. M86 and M87 real-path gates remain outstanding.
 
 ### M89 — Executable Dependency-Aware Task Graph
-Status: PLANNED
+Status: IN PROGRESS — implementation staged; acceptance verification pending
 
-- Wire dependency ordering into the actual factory execution path, not only planning helpers.
-- Prevent a task from starting until its required predecessors have verified completion.
-- Detect cycles, missing dependencies, and impossible plans before consuming execution time.
-- Persist task state and dependency outcomes so restart/resume cannot skip prerequisites.
+- The mission execution pipeline rejects malformed engineering DAGs before agent work, then executes one ready engineering task at a time during the execution stage.
+- Task `running`, `completed`, and `failed` transitions, attempts, and bounded diagnostics are checkpointed through the factory progress callback.
+- A failed task halts its descendants. Restart recovery resets interrupted task leases and invalidates completed descendants when a prerequisite is no longer complete.
+- Manual retry resets failed/in-flight tasks while retaining valid completed prerequisites.
+- Tests cover deterministic topological order, readiness, malformed graphs, serial task execution, checkpoint callbacks, blocked descendants, and restart/retry recovery.
+- Remaining gate: exact-head CI, real factory-worker acceptance, and security/integration checks must pass before marking the milestone complete.
 
-Acceptance: integration tests prove correct ordering, blocked downstream tasks, cycle rejection, and correct behavior after restart.
+Acceptance: integration tests prove correct ordering, blocked downstream tasks, cycle rejection, and correct behavior after restart. M89 remains IN PROGRESS until exact-head CI and real factory-path evidence pass.
 
 ### M90 — Multi-File Implementation and Incremental Resume
 Status: PLANNED
