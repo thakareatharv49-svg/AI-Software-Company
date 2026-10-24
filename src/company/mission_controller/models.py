@@ -45,11 +45,36 @@ class EngineeringTask(BaseModel):
     status: str = "planned"
 
 
+class RequirementItem(BaseModel):
+    """One traceable, reviewable requirement with a verifiable outcome."""
+
+    id: str
+    statement: str
+    acceptance_check: str
+    source: str = "objective"
+
+
+class RequirementsContract(BaseModel):
+    """Versioned, deterministic requirements contract created before engineering."""
+
+    schema_version: int = 1
+    mission_id: str
+    mission_name: str
+    objective: str
+    status: str = "ready"
+    functional_requirements: list[RequirementItem] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+
+
 class MissionPlan(BaseModel):
     mission_id: str
     name: str
     objective: str
     constraints: list[str] = Field(default_factory=list)
+    # Optional for backward compatibility with previously persisted mission plans.
+    requirements_contract: RequirementsContract | None = None
     # Requirements remain attached to the durable plan so QA and review can
     # trace a finished product back to the user's original request.
     acceptance_criteria: list[str] = Field(default_factory=list)
@@ -117,4 +142,3 @@ class MissionPlan(BaseModel):
             if task.status == "planned"
             and all(by_id[dep].status == "completed" for dep in task.depends_on)
         ]
-
