@@ -196,8 +196,17 @@ def _find_workspace(mission_id: str) -> Path | None:
 
 def _workspace_files(workspace: Path) -> list[str]:
     files: list[str] = []
+    root = workspace.resolve()
     for path in workspace.rglob("*"):
-        if path.is_file() and not any(part in {".git", "__pycache__", ".venv", "node_modules"} for part in path.parts):
+        if len(files) >= 5000:
+            break
+        if path.is_symlink() or not path.is_file():
+            continue
+        try:
+            path.resolve().relative_to(root)
+        except (OSError, ValueError):
+            continue
+        if not any(part in {".git", "__pycache__", ".venv", "node_modules"} for part in path.parts):
             relative = path.relative_to(workspace).as_posix()
             safe = PurePosixPath(relative)
             if not safe.is_absolute() and ".." not in safe.parts:
@@ -227,11 +236,18 @@ def evaluate_case(case: dict[str, Any], files: list[str], plan: dict[str, Any],
         try:
             from src.company.artifact_validation import validate_generated_artifacts
             artifact_map: dict[str, str] = {}
+            total_bytes = 0
+            root = workspace.resolve()
             for relative in files:
                 artifact_path = workspace / relative
                 try:
-                    if artifact_path.stat().st_size <= 250_000:
+                    if artifact_path.is_symlink():
+                        continue
+                    artifact_path.resolve().relative_to(root)
+                    size = artifact_path.stat().st_size
+                    if size <= 250_000 and total_bytes + size <= 2_000_000:
                         artifact_map[relative] = artifact_path.read_text(encoding="utf-8", errors="replace")
+                        total_bytes += size
                 except OSError:
                     continue
             artifact_issues = validate_generated_artifacts(artifact_map)
