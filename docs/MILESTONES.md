@@ -1291,3 +1291,11 @@ Acceptance: a deterministic multi-mission soak test completes or safely blocks e
 - Merge only after required CI/security checks pass on the exact PR head. Release approval must refer to the exact artifact/revision that was tested.
 - M86–M97 form the current large-project delivery program. Complete them in order; do not claim that planning or benchmark-contract tests prove real product delivery.
 
+
+## Combined development model: Waterfall + Incremental
+
+The project uses a hybrid model. Waterfall controls lifecycle phases and approval gates; Incremental development controls how approved scope is delivered.
+
+Waterfall phases are ordered: requirements analysis, system/detail design, implementation, verification and validation, release/deployment, and maintenance. Review requirements, architecture, risks, and measurable acceptance criteria before implementing that scope.
+
+Within each approved phase or milestone, divide work into small, coherent, dependency-ordered increments. Each increment must state requirement IDs, design references, acceptance criteria, tests, and known limitations. Use focused pull requests, keep main releasable, and run targeted and regression tests. A passing increment does not prove its parent milestone or phase is complete. If verification finds a defect, correct the affected design or implementation and rerun impacted tests. Merge only when required checks pass on the exact PR head. External release requires approval of the exact tested revision. Milestones M86–M97 remain sequential gates; increments must not bypass their acceptance criteria.
