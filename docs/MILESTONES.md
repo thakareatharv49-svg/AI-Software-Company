@@ -1236,7 +1236,7 @@ Status: PLANNED
 Acceptance: known-broken fixtures are repaired when the fix is in scope, unresolved failures remain blocked, and retry limits are demonstrably enforced.
 
 ### M95 — Product Quality Review and Revision
-Status: PLANNED
+Status: IMPLEMENTATION STAGED — exact-head verification and factory integration acceptance pending
 
 - Produce a review report covering requirements coverage, usability, accessibility basics, error states, responsive behavior, security checks, and known limitations.
 - Separate objective automated evidence from subjective reviewer feedback.
@@ -1246,7 +1246,7 @@ Status: PLANNED
 Acceptance: a deliberately incomplete product is not approved; revisions must pass the relevant checks and close or explicitly disclose each finding.
 
 ### M96 — Release Readiness and Artifact Integrity
-Status: PLANNED
+Status: IMPLEMENTATION STAGED — exact-head verification and factory integration acceptance pending
 
 - Package source, run instructions, configuration examples, test evidence, limitations, and a concise release summary.
 - Verify the exact artifact/repository revision being approved matches the revision that passed QA and review.
@@ -1256,7 +1256,7 @@ Status: PLANNED
 Acceptance: a release candidate has traceable source revision and evidence; a failed or changed revision cannot reuse stale approval.
 
 ### M97 — Continuous Multi-Mission Delivery Soak Test
-Status: PLANNED
+Status: IMPLEMENTATION STAGED — exact-head verification and factory integration acceptance pending
 
 - Exercise several different missions through the real queue and worker, including a failure, cancellation, restart, and recovery scenario.
 - Verify one mission's retry or failure does not starve unrelated ready work or corrupt another mission's state.
@@ -1265,7 +1265,38 @@ Status: PLANNED
 
 Acceptance: a deterministic multi-mission soak test completes or safely blocks every mission with a traceable reason, no cross-mission state leakage, and no false success.
 
-## Execution rules for M86–M97
+### M98 — Continuous Improvement Regression Gate
+Status: IMPLEMENTATION STAGED — exact-head verification and factory integration acceptance pending
+
+- Compare candidate quality, safety, latency, and cost against a recorded baseline.
+- Reject changes that regress quality or safety, or exceed configured latency/cost budgets.
+- Keep evaluation deterministic and report explicit reasons for a blocked candidate.
+- Treat missing/invalid baselines as a blocked evaluation rather than assuming success.
+
+Acceptance: regression fixtures prove both passing improvements and blocked regressions; candidate promotion is tied to the evaluated metrics. The current implementation consumes caller-supplied metrics; production baseline storage and evaluation scheduling still require integration.
+
+### M99 — Controlled Improvement Rollout
+Status: IMPLEMENTATION STAGED — real multi-mission soak evidence pending
+
+- Require quality, security, release-integrity, and applicable human-approval gates before external rollout.
+- Bind rollout approval to the exact tested candidate revision.
+- Record an explicit blocked decision when the candidate differs from the tested revision or required approval is missing.
+- Keep rollback and rollout execution under the existing deployment policy; this milestone supplies deterministic preflight decisions, not a deployment executor.
+
+Acceptance: changed revisions, failed gates, missing approvals, and mismatched/missing external artifact digests are blocked; an unchanged, fully approved candidate passes preflight.
+
+### M100 — Integrated Delivery Acceptance Gate
+Status: IMPLEMENTATION STAGED — real-factory verification pending
+
+- Combine product review, exact-revision release readiness, multi-mission soak evidence, and improvement regression checks into an auditable acceptance decision.
+- Preserve the individual gate reasons so the operator can diagnose a blocked release.
+- Never infer successful real-world execution from unit-test results alone.
+- Require the real factory-path soak and artifact evidence before this milestone can be marked complete.
+
+Acceptance: the integrated gate blocks any failed sub-gate and passes only when quality, soak, and improvement evidence all identify the same candidate revision. Factory audit recording is wired, but real factory soak, authenticated evidence provenance, and rollout integration remain required before completion.
+
+
+## Execution rules for M86–M100
 
 1. Work on one milestone at a time, branching from the latest verified main.
 2. Inspect the current implementation before changing it; reuse existing capabilities and avoid duplicate subsystems.
@@ -1294,7 +1325,7 @@ Acceptance: a deterministic multi-mission soak test completes or safely blocks e
 - If verification finds a defect, return to the relevant implementation or design step, fix it, and repeat the affected verification. This is controlled defect correction, not skipping the sequence.
 - Do not label a phase or milestone complete while required evidence is missing, checks are failing/pending, or critical findings remain unresolved.
 - Merge only after required CI/security checks pass on the exact PR head. Release approval must refer to the exact artifact/revision that was tested.
-- M86–M97 form the current large-project delivery program. Complete them in order; do not claim that planning or benchmark-contract tests prove real product delivery.
+- M86–M100 form the current large-project delivery program. Complete them in order; do not claim that planning or benchmark-contract tests prove real product delivery.
 
 
 ## Combined development model: Waterfall + Incremental
@@ -1303,4 +1334,4 @@ The project uses a hybrid model. Waterfall controls lifecycle phases and approva
 
 Waterfall phases are ordered: requirements analysis, system/detail design, implementation, verification and validation, release/deployment, and maintenance. Review requirements, architecture, risks, and measurable acceptance criteria before implementing that scope.
 
-Within each approved phase or milestone, divide work into small, coherent, dependency-ordered increments. Each increment must state requirement IDs, design references, acceptance criteria, tests, and known limitations. Use focused pull requests, keep main releasable, and run targeted and regression tests. A passing increment does not prove its parent milestone or phase is complete. If verification finds a defect, correct the affected design or implementation and rerun impacted tests. Merge only when required checks pass on the exact PR head. External release requires approval of the exact tested revision. Milestones M86–M97 remain sequential gates; increments must not bypass their acceptance criteria.
+Within each approved phase or milestone, divide work into small, coherent, dependency-ordered increments. Each increment must state requirement IDs, design references, acceptance criteria, tests, and known limitations. Use focused pull requests, keep main releasable, and run targeted and regression tests. A passing increment does not prove its parent milestone or phase is complete. If verification finds a defect, correct the affected design or implementation and rerun impacted tests. Merge only when required checks pass on the exact PR head. External release requires approval of the exact tested revision. Milestones M86–M100 remain sequential gates; increments must not bypass their acceptance criteria.
