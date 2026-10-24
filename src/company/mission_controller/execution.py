@@ -73,7 +73,7 @@ class MissionExecutionPipeline:
         on_progress: Callable[[MissionPlan], None] | None = None,
     ) -> AgentResult:
         """Execute ready engineering tasks one at a time with durable checkpoints."""
-        task_agent = self.registry.get(_STAGE_AGENTS[MissionStage.EXECUTION])
+        execution_agent = self.registry.get(_STAGE_AGENTS[MissionStage.EXECUTION])
         while True:
             try:
                 ready = plan.ready_engineering_tasks()
@@ -102,11 +102,20 @@ class MissionExecutionPipeline:
                     )
                 return AgentResult(
                     task_id=f"task:{mission.id}:execution",
-                    agent_name=task_agent.name,
+                    agent_name=execution_agent.name,
                     success=True,
                 )
 
             task = ready[0]
+            # Preserve the runtime permissions of the registered execution
+            # agent while binding the request to the specialist role in the DAG.
+            task_agent = AgentDefinition(
+                name=f"{task.agent_role}-agent",
+                role=task.agent_role,
+                description=f"Executes engineering task {task.id}: {task.title}",
+                capabilities=[task.workstream],
+                permissions=execution_agent.permissions,
+            )
             task_id = f"task:{mission.id}:engineering:{task.id}"
             task.status = "running"
             task.attempts += 1
