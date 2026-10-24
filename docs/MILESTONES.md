@@ -1236,7 +1236,7 @@ Status: PLANNED
 Acceptance: known-broken fixtures are repaired when the fix is in scope, unresolved failures remain blocked, and retry limits are demonstrably enforced.
 
 ### M95 — Product Quality Review and Revision
-Status: PLANNED
+Status: IMPLEMENTATION STAGED — exact-head verification pending
 
 - Produce a review report covering requirements coverage, usability, accessibility basics, error states, responsive behavior, security checks, and known limitations.
 - Separate objective automated evidence from subjective reviewer feedback.
@@ -1246,7 +1246,7 @@ Status: PLANNED
 Acceptance: a deliberately incomplete product is not approved; revisions must pass the relevant checks and close or explicitly disclose each finding.
 
 ### M96 — Release Readiness and Artifact Integrity
-Status: PLANNED
+Status: IMPLEMENTATION STAGED — exact-head verification pending
 
 - Package source, run instructions, configuration examples, test evidence, limitations, and a concise release summary.
 - Verify the exact artifact/repository revision being approved matches the revision that passed QA and review.
@@ -1256,7 +1256,7 @@ Status: PLANNED
 Acceptance: a release candidate has traceable source revision and evidence; a failed or changed revision cannot reuse stale approval.
 
 ### M97 — Continuous Multi-Mission Delivery Soak Test
-Status: PLANNED
+Status: IMPLEMENTATION STAGED — exact-head verification pending
 
 - Exercise several different missions through the real queue and worker, including a failure, cancellation, restart, and recovery scenario.
 - Verify one mission's retry or failure does not starve unrelated ready work or corrupt another mission's state.
@@ -1265,7 +1265,38 @@ Status: PLANNED
 
 Acceptance: a deterministic multi-mission soak test completes or safely blocks every mission with a traceable reason, no cross-mission state leakage, and no false success.
 
-## Execution rules for M86–M97
+### M98 — Continuous Improvement Regression Gate
+Status: IMPLEMENTATION STAGED — exact-head verification pending
+
+- Compare candidate quality, safety, latency, and cost against a recorded baseline.
+- Reject changes that regress quality or safety, or exceed configured latency/cost budgets.
+- Keep evaluation deterministic and report explicit reasons for a blocked candidate.
+- Treat missing/invalid baselines as a blocked evaluation rather than assuming success.
+
+Acceptance: regression fixtures prove both passing improvements and blocked regressions; candidate promotion is tied to the evaluated metrics.
+
+### M99 — Controlled Improvement Rollout
+Status: IMPLEMENTATION STAGED — acceptance integration pending
+
+- Require quality, security, release-integrity, and applicable human-approval gates before external rollout.
+- Bind rollout approval to the exact tested candidate revision.
+- Record an explicit blocked decision when the candidate differs from the tested revision or required approval is missing.
+- Keep rollback and rollout execution under the existing deployment policy; this milestone supplies deterministic preflight decisions, not a deployment executor.
+
+Acceptance: changed revisions, failed gates, and missing approvals are blocked; an unchanged, fully approved candidate passes preflight.
+
+### M100 — Integrated Delivery Acceptance Gate
+Status: IMPLEMENTATION STAGED — real-factory verification pending
+
+- Combine product review, exact-revision release readiness, multi-mission soak evidence, and improvement regression checks into an auditable acceptance decision.
+- Preserve the individual gate reasons so the operator can diagnose a blocked release.
+- Never infer successful real-world execution from unit-test results alone.
+- Require the real factory-path soak and artifact evidence before this milestone can be marked complete.
+
+Acceptance: the integrated gate blocks any failed sub-gate and passes only when all required evidence is present for the same candidate revision.
+
+
+## Execution rules for M86–M100
 
 1. Work on one milestone at a time, branching from the latest verified main.
 2. Inspect the current implementation before changing it; reuse existing capabilities and avoid duplicate subsystems.
