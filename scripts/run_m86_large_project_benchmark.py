@@ -156,7 +156,7 @@ def _stage_evidence(plan: dict[str, Any]) -> list[dict[str, Any]]:
             "name": step.get("name") or step.get("title") or step.get("id"),
             "status": _status(step.get("status")) or "unknown",
             "attempts": _nonnegative_int(step.get("attempts", 0)),
-            "error": str(step.get("error") or step.get("last_error") or "")[:1000] or None,
+            "error": str(step.get("error") or step.get("last_error") or step.get("detail") or "")[:1000] or None,
         })
     return evidence
 
@@ -324,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
             if unknown:
                 parser.error(f"Unknown case id(s): {', '.join(sorted(unknown))}")
             cases = [case for case in cases if case["id"] in requested]
-        api = FactoryApi(args.base_url, timeout=min(60.0, args.timeout))
+        api = FactoryApi(args.base_url, timeout=args.timeout + 30.0)
         results = []
         for case in cases:
             results.append(api.run_case(case, max_retries=args.max_retries,
