@@ -174,7 +174,8 @@ def test_factory_plan_adapter_requires_real_qa_and_security_evidence():
         security_evidence="scanner: no findings",
     )
     decision = evaluate_factory_plan_quality(
-        plan, responsive_checks_passed=True, accessibility_checks_passed=True
+        plan, candidate_revision="rev-a", requirement_coverage=1.0,
+        responsive_checks_passed=True, accessibility_checks_passed=True
     )
     assert decision.status == "passed"
 
@@ -198,7 +199,8 @@ def test_factory_plan_adapter_does_not_infer_responsive_or_accessibility():
         security_evidence="security scan succeeded",
     )
     decision = evaluate_factory_plan_quality(
-        plan, responsive_checks_passed=False, accessibility_checks_passed=False
+        plan, candidate_revision="rev-a", requirement_coverage=1.0,
+        responsive_checks_passed=False, accessibility_checks_passed=False
     )
     assert decision.status == "blocked"
     assert any("responsive" in reason for reason in decision.reasons)
