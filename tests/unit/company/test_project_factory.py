@@ -1649,3 +1649,36 @@ async def test_factory_processes_each_queued_mission_once_when_all_workers_fail(
     assert factory.queue == []
     assert orchestrator.state.status.value == "blocked"
 
+@pytest.mark.asyncio
+async def test_cancelling_running_mission_recovers_checkpoint_without_duplicate_queue_entry() -> None:
+    import asyncio
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    started = asyncio.Event()
+
+    class BlockingPipeline:
+        async def execute_mission(self, mission, plan, max_stages=None, on_progress=None):
+            plan.steps[0].status = "running"
+            plan.steps[0].detail = "interrupted while executing"
+            started.set()
+            await asyncio.Event().wait()
+
+    factory = ProjectFactory(orchestrator, controller, BlockingPipeline())
+    project = factory.enqueue(
+        CompanyMission(name="Cancelled running mission", objective="Resume safely after stop")
+    )
+    worker = asyncio.create_task(factory.run_next(max_retries=0))
+    await asyncio.wait_for(started.wait(), timeout=2)
+
+    worker.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await worker
+
+    assert project.status == "queued"
+    assert project.plan.steps[0].status == "planned"
+    assert project.plan.steps[0].detail is None
+    assert sum(item.mission.id == project.mission.id for item in factory.queue) == 1
+    assert factory._active_project is None
+    assert orchestrator.state.status.value != "running"
+
