@@ -1,3 +1,6 @@
+import math
+from urllib.parse import urlsplit
+
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -68,6 +71,50 @@ class Settings(BaseSettings):
 
     # Dedicated read-only status endpoint for Nexora HQ; never grants mission access.
     nexora_hq_status_token: str = ""
+
+    @field_validator("factory_model_provider")
+    @classmethod
+    def validate_factory_model_provider(cls, value: str) -> str:
+        normalized = value.strip().casefold()
+        if normalized not in {"ollama", "openai-compatible", "openai_compatible"}:
+            raise ValueError(
+                "FACTORY_MODEL_PROVIDER must be 'ollama' or 'openai-compatible'"
+            )
+        return normalized
+
+    @field_validator("ollama_timeout", "openai_compatible_timeout")
+    @classmethod
+    def validate_model_provider_timeout(cls, value: float) -> float:
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError("Model provider timeout must be a finite positive number")
+        return value
+
+    @field_validator("ollama_model", "openai_compatible_model")
+    @classmethod
+    def validate_model_provider_model(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Model provider model name cannot be empty")
+        return value.strip()
+
+    @field_validator("ollama_base_url", "openai_compatible_base_url")
+    @classmethod
+    def validate_model_provider_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        try:
+            parsed = urlsplit(normalized)
+            valid = (
+                parsed.scheme in {"http", "https"}
+                and bool(parsed.hostname)
+                and parsed.username is None
+                and parsed.password is None
+            )
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError(
+                "Model provider URL must be an HTTP(S) URL without embedded credentials"
+            )
+        return normalized
 
     @field_validator("nexora_hq_status_token")
     @classmethod
