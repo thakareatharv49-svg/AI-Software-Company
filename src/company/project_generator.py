@@ -18,7 +18,7 @@ from src.company.project_types import classify_project_type, project_type_instru
 
 import httpx
 
-from src.config.settings import settings
+from config.settings import settings
 
 
 logger = logging.getLogger(__name__)
