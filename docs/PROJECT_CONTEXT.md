@@ -1,11 +1,11 @@
 # Persistent Project Context — AI Software Company
 
-> Last reviewed: 2026-10-24 (UTC). This is the durable engineering handoff. Re-check live GitHub state before relying on branch, PR, or CI details.
+> Last reviewed: 2026-10-25 (UTC). This is the durable engineering handoff. Re-check live GitHub state before relying on branch, PR, or CI details.
 
 ## 1. Repository and working agreement
 
 - Repository: https://github.com/thakareatharv49-svg/AI-Software-Company
-- Default branch: `main`; latest verified main commit at this review: `4bdc9634aec5a56bc417c08cd8c77b31dcc66536` (merged planning PR #420).
+- Default branch: `main`; latest verified main commit at this review: `9187746f09a0b6933e6f405075818fc4ceb47fc0` (merged mission recovery PR #432).
 - Local checkout reported by the user: `C:\\Users\\TestUser123\\Documents\\Projects\\AI-Software-Company`.
 - GitHub is the durable engineering source of truth. Read this file, `docs/MILESTONES.md`, relevant architecture/security docs, current code, and recent PRs before resuming.
 - The user expects the assistant to inspect the implementation, make changes in GitHub, add tests, inspect CI/security results, fix failures, open PRs, and handle merges where appropriate. Do not ask the user to merge their own PR.
@@ -46,6 +46,11 @@ Useful paths to verify before edits:
 - `docs/MILESTONES.md` — authoritative milestone roadmap; `docs/IMPROVEMENT_PLAN.md` — improvement program; `docs/security.md` and `docs/security/` — security policy/runbooks.
 
 ## 4. Current roadmap and next major problem
+
+### Active foundation reliability revalidation — M1.1–M1.15
+
+The original M1 foundation remains marked complete in the historical roadmap. A new revalidation track audits reliability requirements that became more important as the product grew. See `docs/M1_FOUNDATION_RELIABILITY.md`. PR #432 was merged as `9187746f09a0b6933e6f405075818fc4ceb47fc0` after CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL all passed on its exact head SHA. That merge implements recovery for durable RUNNING jobs after an unexpected continuous-factory-loop exception; it does not by itself prove all restart/queue recovery paths end-to-end.
+
 
 The master roadmap contains milestones through M85, followed by the new large-project delivery program M86–M97. Do not rely on stale M47–M49 or old hardening tables from earlier handoff notes; read the current `docs/MILESTONES.md` for exact statuses.
 
