@@ -506,3 +506,48 @@ async def test_continuous_factory_skips_one_queue_sync_failure_and_processes_nex
     assert queue_errors[0].project_id == first.mission.id
     assert "OSError" in queue_errors[0].message
     assert "sensitive-storage-detail" not in queue_errors[0].message
+
+def test_mission_list_refreshes_dashboard_projection_from_durable_job() -> None:
+    from threading import Lock
+
+    from src.company.mission_controller.planner import build_mission_plan
+    from src.company.mission_jobs import MissionJob, MissionJobStatus
+    from src.company.control_center.service import MissionRecord
+    from src.company.models.contracts import CompanyMission
+
+    mission = CompanyMission(name="Dashboard sync", objective="Show persisted state")
+    plan = build_mission_plan(mission)
+    durable = MissionJob(
+        id=mission.id,
+        mission=mission,
+        plan=plan,
+        status=MissionJobStatus.RUNNING,
+        message="worker is executing",
+        attempts=1,
+    )
+    old_record = MissionRecord(
+        mission=mission,
+        status=MissionJobStatus.QUEUED.value,
+        message="Mission queued",
+        created_at=durable.created_at,
+        updated_at=durable.created_at,
+        plan=plan,
+    )
+
+    class JobStore:
+        def list_all(self):
+            return [durable]
+
+    center = object.__new__(CompanyControlCenter)
+    center._job_store = JobStore()
+    center._jobs = {}
+    center._missions = {mission.id: old_record}
+    center._lock = Lock()
+
+    records = center.missions()
+
+    assert len(records) == 1
+    assert records[0].status == MissionJobStatus.RUNNING.value
+    assert records[0].message == "worker is executing"
+    assert center._jobs[mission.id] == durable
+
