@@ -47,9 +47,9 @@ Useful paths to verify before edits:
 
 ## 4. Current roadmap and next major problem
 
-### Active foundation reliability revalidation — M1.1–M1.15
+### Foundation reliability revalidation — M1.1–M1.15
 
-The original M1 foundation remains marked complete in the historical roadmap. A new revalidation track audits reliability requirements that became more important as the product grew. See `docs/M1_FOUNDATION_RELIABILITY.md`. PR #432 was merged as `9187746f09a0b6933e6f405075818fc4ceb47fc0` after CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL all passed on its exact head SHA. That merge implements recovery for durable RUNNING jobs after an unexpected continuous-factory-loop exception; it does not by itself prove all restart/queue recovery paths end-to-end.
+The historical M1 repository/tooling foundation remains COMPLETE. The M1.1–M1.15 reliability revalidation track is now COMPLETE for its defined automated acceptance scope. It includes the lifecycle transition matrix (PR #433), SQLite-backed durable job tests (PR #434), seven-mission queue failure stress test (PR #435), dashboard durable-state synchronization test (PR #437), fresh-store ProjectFactory restart integration test (PR #438), and running cancellation/checkpoint recovery test (PR #439), alongside earlier queue isolation and orphan recovery (PRs #431–#432). Each merged PR passed CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL on its exact PR head. See `docs/M1_FOUNDATION_RELIABILITY.md` for detailed evidence. This is not a claim of a production-duration soak or live deployment monitoring.
 
 
 The master roadmap contains milestones through M85, followed by the new large-project delivery program M86–M97. Do not rely on stale M47–M49 or old hardening tables from earlier handoff notes; read the current `docs/MILESTONES.md` for exact statuses.
