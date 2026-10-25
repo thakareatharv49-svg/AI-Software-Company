@@ -5,7 +5,7 @@
 ## 1. Repository and working agreement
 
 - Repository: https://github.com/thakareatharv49-svg/AI-Software-Company
-- Default branch: `main`; latest verified main commit at this review: `9187746f09a0b6933e6f405075818fc4ceb47fc0` (merged mission recovery PR #432).
+- Default branch: `main`; latest verified main commit before this final acceptance documentation change: `7e42888b81160790887d4a6f4e4a8af52df89dab` (merged M2.9 factory/provider integration PR #450).
 - Local checkout reported by the user: `C:\\Users\\TestUser123\\Documents\\Projects\\AI-Software-Company`.
 - GitHub is the durable engineering source of truth. Read this file, `docs/MILESTONES.md`, relevant architecture/security docs, current code, and recent PRs before resuming.
 - The user expects the assistant to inspect the implementation, make changes in GitHub, add tests, inspect CI/security results, fix failures, open PRs, and handle merges where appropriate. Do not ask the user to merge their own PR.
@@ -53,6 +53,15 @@ The historical M1 repository/tooling foundation remains COMPLETE. The M1.1–M1.
 
 
 The master roadmap contains milestones through M85, followed by the new large-project delivery program M86–M97. Do not rely on stale M47–M49 or old hardening tables from earlier handoff notes; read the current `docs/MILESTONES.md` for exact statuses.
+
+### AI runtime reliability revalidation — M2.1–M2.10
+
+**Status: COMPLETE for automated acceptance** as recorded in [M2 AI Runtime Reliability](M2_AI_RUNTIME_RELIABILITY.md) and [MILESTONES](MILESTONES.md).
+
+- Merged increments: M2.1 PR #441, M2.2 #442, M2.3 #446, M2.4 #444, M2.5 #445, M2.6 #447, M2.7 #449, M2.8 #448, and M2.9 #450. Final acceptance and evidence ledger are recorded in PR #451.
+- Verified behaviors include provider input/configuration validation, Ollama/OpenAI-compatible response and health contracts, shared `AIRuntime` response checks, cancellation propagation, safe provider errors, structured project response shape, and deterministic factory dispatch tests for both provider paths.
+- The repository CI includes Ruff, Python compilation, dashboard JavaScript syntax, sandbox image build, and full pytest; required secret scan, dependency audit, and CodeQL checks were checked on the exact PR heads before merge.
+- **Not claimed:** live Ollama/hosted-provider smoke tests, production-duration soak, live deployment monitoring, or production latency SLOs. These remain operational follow-ups.
 
 ### Large-project delivery program — M86–M97
 
