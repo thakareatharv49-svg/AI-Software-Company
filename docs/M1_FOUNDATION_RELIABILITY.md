@@ -54,4 +54,5 @@ This is a focused revalidation track for the execution foundation of the expande
 | PR #432 exact-head Dependency Vulnerability Audit | PASS |
 | PR #432 exact-head CodeQL Security Analysis | PASS |
 | New exhaustive lifecycle transition matrix | Merged in PR #433; CI, secret scan, dependency audit, and CodeQL passed on exact head |
-| SQLite-backed mission store round-trip/recovery tests | Added in this increment; awaiting CI |\n| Full M1.15 acceptance | NOT YET MET |
+| SQLite-backed mission store round-trip/recovery tests | Added in this increment; awaiting CI |
+| Full M1.15 acceptance | NOT YET MET |
