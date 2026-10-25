@@ -19,7 +19,7 @@ The original M2 foundation was previously delivered and remains recorded as hist
 |---|---|---|---|
 | M2.1 | Provider input/configuration and failure contracts | Reject empty prompts/configuration and non-finite/non-positive timeouts; reject empty or malformed generations; sanitize upstream failures | IN PROGRESS |
 | M2.2 | Ollama HTTP protocol and health behavior | Validate response shape, timeout, HTTP status, transport errors, and health failures deterministically | NOT STARTED |
-| M2.3 | OpenAI-compatible protocol behavior | Validate completion shape, usage metadata, timeout, malformed JSON, HTTP/transport failures, and auth-header handling | NOT STARTED |
+| M2.3 | OpenAI-compatible protocol behavior | Validate completion shape, usage metadata, timeout, malformed JSON, HTTP/transport failures, health status, and auth-header handling | IN PROGRESS |
 | M2.4 | Shared provider contract and runtime dispatch | Both providers satisfy the same request/response/health contract; configured selection is covered without live credentials | NOT STARTED |
 | M2.5 | Cancellation and bounded execution | Cancellation propagates; no accidental retry of cancellation; configured deadlines bound provider calls | NOT STARTED |
 | M2.6 | Structured output contract | JSON-mode requests and invalid/missing structured output are handled predictably without silently accepting malformed results | NOT STARTED |
