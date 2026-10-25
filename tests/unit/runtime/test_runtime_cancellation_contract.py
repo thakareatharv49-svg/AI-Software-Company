@@ -1,6 +1,5 @@
 import asyncio
 from unittest.mock import AsyncMock, patch
-
 import pytest
 
 from runtime.models.messages import ModelRequest
@@ -23,8 +22,6 @@ async def test_ollama_cancellation_propagates_without_retry() -> None:
             json={"response": "late"},
             request=httpx.Request("POST", "http://ollama.test/api/generate"),
         )
-
-    import httpx
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock, side_effect=blocked_post) as post:
         task = asyncio.create_task(provider.generate(ModelRequest(prompt="hello")))
