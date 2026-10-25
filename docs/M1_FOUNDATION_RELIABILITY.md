@@ -53,5 +53,9 @@ This is a focused revalidation track for the execution foundation of the expande
 | PR #432 exact-head Dependency Vulnerability Audit | PASS |
 | PR #432 exact-head CodeQL Security Analysis | PASS |
 | New exhaustive lifecycle transition matrix | PR #433 merged; CI, secret scan, dependency audit, and CodeQL passed on exact head |
-| PR #434 durable mission store tests | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |\n| PR #435 seven-mission queue failure stress test | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |\n| PR #437 dashboard durable-state synchronization test | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |\n| PR #438 fresh-store factory restart integration test | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |\n| PR #439 running cancellation/checkpoint recovery test | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |
+| PR #434 durable mission store tests | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |
+| PR #435 seven-mission queue failure stress test | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |
+| PR #437 dashboard durable-state synchronization test | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |
+| PR #438 fresh-store factory restart integration test | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |
+| PR #439 running cancellation/checkpoint recovery test | Merged after CI, secret scan, dependency audit, and CodeQL passed on exact head |
 | Full M1.15 acceptance | MET for defined automated acceptance scope; production soak and deployment monitoring remain separate follow-ups |
