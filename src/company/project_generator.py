@@ -2180,6 +2180,9 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
             except json.JSONDecodeError as exc:
                 raise RuntimeError("Ollama returned invalid project JSON") from exc
 
+        if not isinstance(result, dict):
+            raise RuntimeError("Ollama returned an invalid project JSON object")
+
         raw_files = result.get("files")
         if not isinstance(raw_files, dict) or not raw_files:
             raise RuntimeError("Ollama returned no project files")
