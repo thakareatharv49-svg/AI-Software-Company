@@ -41,7 +41,7 @@ Repository, Python environment, testing and linting foundation.
 
 ### M1 reliability revalidation track (M1.1–M1.15)
 
-The original M1 established the repository/tooling foundation. This follow-up track audits the reliability of the now much larger mission-execution system; it does not retroactively change the original M1 completion record. See [M1 Foundation Reliability Audit](M1_FOUNDATION_RELIABILITY.md) for scoped acceptance criteria and evidence status. Track status: **IN PROGRESS**. Do not mark the track complete until M1.15 acceptance evidence is recorded.
+The original M1 established the repository/tooling foundation. This follow-up track audited reliability of the expanded mission-execution system without changing the historical M1 record. See [M1 Foundation Reliability Audit](M1_FOUNDATION_RELIABILITY.md) for the 15 sub-milestones, evidence ledger, and scope boundary. Track status: **COMPLETE for the defined automated acceptance scope**. A production-duration soak and live deployment monitoring remain operational follow-ups rather than claims of completed evidence.
 
 
 ## M2 — AI Runtime
