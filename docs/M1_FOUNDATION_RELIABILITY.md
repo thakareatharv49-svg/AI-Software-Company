@@ -2,13 +2,13 @@
 
 ## Purpose and status
 
-This is a focused revalidation track for the execution foundation of the expanded AI Software Company. The historical M1 milestone remains **COMPLETE** for repository/tooling foundation; this follow-up track is **IN PROGRESS** and must not be represented as complete until every required acceptance gate is supported by test evidence.
+This is a focused revalidation track for the execution foundation of the expanded AI Software Company. The historical M1 milestone remains **COMPLETE** for repository/tooling foundation. This follow-up track is **COMPLETE for its defined automated acceptance scope** based on the test and workflow evidence recorded below. It does not claim a production-duration soak or post-deployment operational monitoring.
 
 **Method:** Waterfall for the ordered audit and acceptance gates; Incremental implementation for small, dependency-ordered changes. Each item must be verified against the live code and CI. Existing code is not considered verified solely because it exists.
 
-## Sub-milestones and acceptance criteria
+## Sub-milestones and acceptance evidence
 
-| Sub-milestone | Scope | Acceptance evidence required | Status at audit start |
+| Sub-milestone | Scope | Acceptance evidence required | Status and evidence |
 |---|---|---|---|
 | M1.1 | Baseline and architecture audit | Current execution path, state stores, queue ownership, recovery paths, and known gaps mapped to source/tests | COMPLETE — source and regression coverage reviewed; remaining production-operational risks explicitly documented |
 | M1.2 | Mission lifecycle definitions | Exhaustive status-transition matrix tests; invalid transitions rejected; terminal states remain terminal | COMPLETE — 36 transition combinations covered in PR #433 |
@@ -36,18 +36,17 @@ This is a focused revalidation track for the execution foundation of the expande
 
 ## Implementation sequence
 
-1. Complete M1.1 architecture and failure-path inventory, keeping this document current.
-2. Complete M1.2 transition contract tests and resolve any mismatch with intended behavior.
-3. Implement and test M1.3–M1.5 durable state, queue integrity, and restart recovery as one dependency-aware sequence.
-4. Cover stage retries, isolation, cancellation, event consistency, and redaction (M1.6–M1.10).
-5. Add deterministic integration and stress tests (M1.11–M1.14).
-6. Run the complete M1.15 acceptance gate; do not mark this track complete while any criterion is unverified.
+1. M1.1–M1.2: audited execution architecture and verified lifecycle transition contract.
+2. M1.3–M1.5: verified durable job persistence and factory restart recovery across reopened stores.
+3. M1.6–M1.10: covered stage checkpoint recovery, mission failure isolation, cancellation, dashboard projection refresh, and diagnostic redaction.
+4. M1.11–M1.14: ran regression CI, integration checks, security workflows, and deterministic multi-mission failure stress coverage.
+5. M1.15: verified required workflows on each relevant PR head before merging; production-duration soak and live deployment monitoring remain follow-up operational work.
 
 ## Evidence ledger
 
 | Evidence | Result |
 |---|---|
-| PR #431 queue-sync isolation | Merged; multi-mission stress proof still required |
+| PR #431 queue-sync isolation | Merged; supplemented by the seven-mission stress test in PR #435 |
 | PR #432 orphaned-mission recovery | Merged as `9187746f09a0b6933e6f405075818fc4ceb47fc0` |
 | PR #432 exact-head CI | PASS |
 | PR #432 exact-head Secret and Credential Scan | PASS |
