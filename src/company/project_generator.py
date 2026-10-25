@@ -2136,12 +2136,11 @@ def test_expense_tracker_implements_crud_budgeting_and_search():
                     "The per-project generation deadline may have been reached; otherwise increase OLLAMA_TIMEOUT or use a faster model."
                 ) from exc
             except httpx.HTTPStatusError as exc:
-                body = exc.response.text[:500].replace("\n", " ")
                 raise RuntimeError(
-                    f"Ollama returned HTTP {exc.response.status_code} for model '{model}': {body}"
+                    f"Ollama returned HTTP {exc.response.status_code} for model '{model}'."
                 ) from exc
             except httpx.HTTPError as exc:
-                raise RuntimeError(f"Could not reach Ollama at {settings.ollama_base_url}: {exc}") from exc
+                raise RuntimeError("Could not reach the Ollama provider.") from exc
             except ValueError as exc:
                 raise RuntimeError(f"Ollama returned a non-JSON API response for model '{model}'") from exc
 
