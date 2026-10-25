@@ -89,6 +89,7 @@ class OllamaProvider(ModelProvider):
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(f"{self.base_url}/api/tags")
                 response.raise_for_status()
-            return True
-        except (httpx.HTTPError, OSError):
+                data = response.json()
+            return isinstance(data, dict) and isinstance(data.get("models"), list)
+        except (httpx.HTTPError, OSError, ValueError):
             return False
