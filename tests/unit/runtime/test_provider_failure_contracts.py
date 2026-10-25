@@ -106,3 +106,74 @@ async def test_openai_compatible_rejects_empty_prompt_before_network_call() -> N
         with pytest.raises(ValueError, match="Prompt cannot be empty"):
             await provider.generate_payload({"prompt": "   "})
     mock_post.assert_not_awaited()
+
+
+
+@pytest.mark.asyncio
+async def test_ollama_health_rejects_non_success_status() -> None:
+    provider = OllamaProvider(base_url="http://ollama.test")
+    response = httpx.Response(
+        503,
+        json={"error": "temporarily unavailable"},
+        request=httpx.Request("GET", "http://ollama.test/api/tags"),
+    )
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = response
+        assert await provider.health() is False
+
+
+@pytest.mark.asyncio
+async def test_ollama_health_rejects_invalid_json() -> None:
+    provider = OllamaProvider(base_url="http://ollama.test")
+    response = httpx.Response(
+        200,
+        text="not-json",
+        request=httpx.Request("GET", "http://ollama.test/api/tags"),
+    )
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = response
+        assert await provider.health() is False
+
+
+@pytest.mark.asyncio
+async def test_ollama_health_rejects_unexpected_response_shape() -> None:
+    provider = OllamaProvider(base_url="http://ollama.test")
+    response = httpx.Response(
+        200,
+        json={"status": "ok"},
+        request=httpx.Request("GET", "http://ollama.test/api/tags"),
+    )
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = response
+        assert await provider.health() is False
+
+
+@pytest.mark.asyncio
+async def test_ollama_generation_sends_expected_request_contract() -> None:
+    provider = OllamaProvider(
+        base_url="http://ollama.test",
+        default_model="configured-model",
+        timeout=2.5,
+    )
+    response = httpx.Response(
+        200,
+        json={"response": "generated", "model": "configured-model"},
+        request=httpx.Request("POST", "http://ollama.test/api/generate"),
+    )
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = response
+        result = await provider.generate(
+            ModelRequest(
+                prompt="Create a plan",
+                system="Be precise",
+                temperature=0.35,
+            )
+        )
+    payload = mock_post.await_args.kwargs["json"]
+    assert payload["model"] == "configured-model"
+    assert payload["prompt"] == "Create a plan"
+    assert payload["system"] == "Be precise"
+    assert payload["stream"] is False
+    assert payload["options"]["temperature"] == 0.35
+    assert result.content == "generated"
+    assert result.duration_ms is not None and result.duration_ms >= 0
