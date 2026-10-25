@@ -10,7 +10,28 @@ class AIRuntime:
         if not request.prompt.strip():
             raise ValueError("Prompt cannot be empty.")
 
-        return await self.provider.generate(request)
+        response = await self.provider.generate(request)
+        if not isinstance(response, ModelResponse):
+            raise TypeError("Model provider must return a ModelResponse.")
+        if not response.content.strip():
+            raise RuntimeError("Model provider returned an empty generation.")
+        if not response.model.strip():
+            raise RuntimeError("Model provider returned an empty model identifier.")
+
+        provider_name = getattr(self.provider, "name", None)
+        if (
+            isinstance(provider_name, str)
+            and provider_name
+            and response.provider != provider_name
+        ):
+            raise RuntimeError("Model provider returned inconsistent provider metadata.")
+        if response.duration_ms is not None and response.duration_ms < 0:
+            raise RuntimeError("Model provider returned invalid duration metadata.")
+
+        return response
 
     async def health(self) -> bool:
-        return await self.provider.health()
+        healthy = await self.provider.health()
+        if not isinstance(healthy, bool):
+            raise TypeError("Model provider health must return a boolean.")
+        return healthy
