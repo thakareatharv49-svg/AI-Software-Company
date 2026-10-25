@@ -1,5 +1,7 @@
 import asyncio
 from unittest.mock import AsyncMock, patch
+
+import httpx
 import pytest
 
 from runtime.models.messages import ModelRequest
@@ -47,8 +49,6 @@ async def test_openai_compatible_cancellation_propagates_without_retry() -> None
             request=httpx.Request("POST", "http://model.test/v1/chat/completions"),
         )
 
-    import httpx
-
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock, side_effect=blocked_post) as post:
         task = asyncio.create_task(provider.generate(ModelRequest(prompt="hello")))
         await started.wait()
@@ -91,6 +91,3 @@ async def test_ollama_timeout_is_bounded_and_sanitized() -> None:
         with pytest.raises(RuntimeError, match="timed out after 0.1s") as error:
             await provider.generate(ModelRequest(prompt="hello"))
     assert "private request data" not in str(error.value)
-
-
-import httpx
