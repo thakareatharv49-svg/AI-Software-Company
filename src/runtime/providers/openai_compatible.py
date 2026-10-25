@@ -157,6 +157,6 @@ class OpenAICompatibleProvider(ModelProvider):
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(f"{self.base_url}/models", headers=headers)
-                return response.status_code < 500
+                return response.status_code < 400 or response.status_code in {401, 403}
         except (httpx.HTTPError, OSError):
             return False
