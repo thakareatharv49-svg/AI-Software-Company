@@ -31,7 +31,7 @@ This is a focused revalidation track for the execution foundation of the expande
 - Mission lifecycle is represented by `MissionJobStatus` and `transition_job` in `src/company/mission_jobs.py`; tests already cover several valid and invalid paths. PR #433 adds a complete public-contract transition matrix, which passed CI and was merged.
 - Durable RUNNING-job recovery is implemented by `recover_running_job` and the continuous-loop exception path in `src/company/control_center/service.py`. PR #432 passed CI, Secret and Credential Scan, Dependency Vulnerability Audit, and CodeQL on head `1b84db566359b7a4f22548a33833ca227a2c8135`, then merged as `9187746f09a0b6933e6f405075818fc4ceb47fc0`.
 - PR #431 isolated per-mission queue synchronization exceptions so later missions can proceed. This is a targeted fix, not a substitute for multi-mission stress testing.
-- The current test suite contains unit tests for transition legality, stage recovery, retry behavior, and diagnostic redaction. A full real-factory restart/soak test remains an explicit gap.
+- The current test suite contains unit tests for transition legality, stage recovery, retry behavior, and diagnostic redaction. A deterministic real-ProjectFactory restart integration test is now covered by PR #438; a production-duration soak remains an explicit operational gap.
 - A workflow passing on one commit proves checks for that revision only. Each follow-up PR must validate its own exact head.
 
 ## Implementation sequence
