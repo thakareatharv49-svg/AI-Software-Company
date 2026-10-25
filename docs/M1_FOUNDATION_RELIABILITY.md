@@ -12,9 +12,9 @@ This is a focused revalidation track for the execution foundation of the expande
 |---|---|---|---|
 | M1.1 | Baseline and architecture audit | Current execution path, state stores, queue ownership, recovery paths, and known gaps mapped to source/tests | IN PROGRESS |
 | M1.2 | Mission lifecycle definitions | Exhaustive status-transition matrix tests; invalid transitions rejected; terminal states remain terminal | IN PROGRESS — transition matrix added in this increment; CI pending |
-| M1.3 | Mission persistence | Restart test proves queued/running/terminal records reload with safe normalized state and ownership preserved | NOT VERIFIED |
+| M1.3 | Mission persistence | Restart test proves queued/running/terminal records reload with safe normalized state and ownership preserved | IN PROGRESS — SQLite-backed durable store regression tests added; CI pending |
 | M1.4 | Queue integrity | Tests prove no silent loss/duplication during enqueue, dequeue, sync failure, and recovery | PARTIALLY IMPLEMENTED — PR #431 addressed per-mission queue-sync failure; broader proof pending |
-| M1.5 | Execution recovery | Durable RUNNING jobs recover to QUEUED; interrupted stages reset; valid completed work preserved; queue entry restored | PARTIALLY IMPLEMENTED — PR #432 merged; end-to-end restart verification pending |
+| M1.5 | Execution recovery | Durable RUNNING jobs recover to QUEUED; interrupted stages reset; valid completed work preserved; queue entry restored | PARTIALLY IMPLEMENTED — PR #432 merged; SQLite-backed persistence/restart regression tests added; full factory restart path pending |
 | M1.6 | Stage-level reliability | Stage failure/attempt metadata persists; retry resets only invalid work and preserves valid checkpoints | PARTIALLY IMPLEMENTED — unit coverage exists; real factory-path coverage pending |
 | M1.7 | Error isolation | One mission's unexpected failure does not stop later eligible missions; cancellation remains cancellation | PARTIALLY IMPLEMENTED — PR #431 contains isolation logic; extended regression coverage pending |
 | M1.8 | Cancellation and stop controls | Stop/cancel tests cover queued and running work, responsive shutdown, and no accidental requeue of explicitly cancelled work | NOT VERIFIED |
@@ -53,5 +53,5 @@ This is a focused revalidation track for the execution foundation of the expande
 | PR #432 exact-head Secret and Credential Scan | PASS |
 | PR #432 exact-head Dependency Vulnerability Audit | PASS |
 | PR #432 exact-head CodeQL Security Analysis | PASS |
-| New exhaustive lifecycle transition matrix | Added to unit tests; awaiting CI in this increment |
-| Full M1.15 acceptance | NOT YET MET |
+| New exhaustive lifecycle transition matrix | Merged in PR #433; CI, secret scan, dependency audit, and CodeQL passed on exact head |
+| SQLite-backed mission store round-trip/recovery tests | Added in this increment; awaiting CI |\n| Full M1.15 acceptance | NOT YET MET |
