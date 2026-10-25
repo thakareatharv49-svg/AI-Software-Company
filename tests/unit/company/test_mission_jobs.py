@@ -280,3 +280,60 @@ def test_resume_failed_plan_resets_interrupted_stage_and_dependents_only() -> No
     assert recovered_steps["product"].attempts == 1
     assert recovered_steps["architecture"].status == "planned"
     assert recovered_steps["architecture"].detail is None
+
+@pytest.mark.parametrize(
+    ("source", "target", "allowed"),
+    [
+        (MissionJobStatus.QUEUED, MissionJobStatus.QUEUED, True),
+        (MissionJobStatus.QUEUED, MissionJobStatus.RUNNING, True),
+        (MissionJobStatus.QUEUED, MissionJobStatus.FAILED, True),
+        (MissionJobStatus.QUEUED, MissionJobStatus.CANCELLED, True),
+        (MissionJobStatus.QUEUED, MissionJobStatus.COMPLETED, False),
+        (MissionJobStatus.QUEUED, MissionJobStatus.BLOCKED, False),
+        (MissionJobStatus.RUNNING, MissionJobStatus.RUNNING, True),
+        (MissionJobStatus.RUNNING, MissionJobStatus.QUEUED, True),
+        (MissionJobStatus.RUNNING, MissionJobStatus.COMPLETED, True),
+        (MissionJobStatus.RUNNING, MissionJobStatus.FAILED, True),
+        (MissionJobStatus.RUNNING, MissionJobStatus.BLOCKED, True),
+        (MissionJobStatus.RUNNING, MissionJobStatus.CANCELLED, True),
+        (MissionJobStatus.COMPLETED, MissionJobStatus.COMPLETED, True),
+        (MissionJobStatus.COMPLETED, MissionJobStatus.QUEUED, False),
+        (MissionJobStatus.COMPLETED, MissionJobStatus.RUNNING, False),
+        (MissionJobStatus.COMPLETED, MissionJobStatus.FAILED, False),
+        (MissionJobStatus.COMPLETED, MissionJobStatus.BLOCKED, False),
+        (MissionJobStatus.COMPLETED, MissionJobStatus.CANCELLED, False),
+        (MissionJobStatus.FAILED, MissionJobStatus.FAILED, True),
+        (MissionJobStatus.FAILED, MissionJobStatus.QUEUED, True),
+        (MissionJobStatus.FAILED, MissionJobStatus.RUNNING, False),
+        (MissionJobStatus.FAILED, MissionJobStatus.COMPLETED, False),
+        (MissionJobStatus.FAILED, MissionJobStatus.BLOCKED, False),
+        (MissionJobStatus.FAILED, MissionJobStatus.CANCELLED, False),
+        (MissionJobStatus.BLOCKED, MissionJobStatus.BLOCKED, True),
+        (MissionJobStatus.BLOCKED, MissionJobStatus.QUEUED, True),
+        (MissionJobStatus.BLOCKED, MissionJobStatus.RUNNING, False),
+        (MissionJobStatus.BLOCKED, MissionJobStatus.COMPLETED, False),
+        (MissionJobStatus.BLOCKED, MissionJobStatus.FAILED, False),
+        (MissionJobStatus.BLOCKED, MissionJobStatus.CANCELLED, False),
+        (MissionJobStatus.CANCELLED, MissionJobStatus.CANCELLED, True),
+        (MissionJobStatus.CANCELLED, MissionJobStatus.QUEUED, False),
+        (MissionJobStatus.CANCELLED, MissionJobStatus.RUNNING, False),
+        (MissionJobStatus.CANCELLED, MissionJobStatus.COMPLETED, False),
+        (MissionJobStatus.CANCELLED, MissionJobStatus.FAILED, False),
+        (MissionJobStatus.CANCELLED, MissionJobStatus.BLOCKED, False),
+    ],
+)
+def test_every_mission_status_transition_matches_the_lifecycle_contract(
+    source: MissionJobStatus,
+    target: MissionJobStatus,
+    allowed: bool,
+) -> None:
+    """Cover the full transition matrix, including terminal states and no-ops."""
+    job = make_job(source)
+    if allowed:
+        updated = transition_job(job, target, "matrix verification")
+        assert updated.status == target
+        assert updated.message == "matrix verification"
+    else:
+        with pytest.raises(ValueError, match="Invalid mission transition"):
+            transition_job(job, target, "matrix verification")
+
