@@ -45,9 +45,9 @@ The original M1 established the repository/tooling foundation. This follow-up tr
 
 
 ## M2 — AI Runtime
-Status: COMPLETE
+Status: COMPLETE (original foundation); reliability revalidation IN PROGRESS
 
-Initial AI runtime.
+Initial AI runtime foundation was delivered previously. The M2.1–M2.10 reliability revalidation track is now the acceptance record for provider correctness, timeout/error semantics, structured responses, privacy-safe diagnostics, real-path integration, and final regression evidence. See [M2 AI Runtime Reliability](M2_AI_RUNTIME_RELIABILITY.md). The original completion label is preserved as historical context; the revalidation track must pass its own gates before it is called complete.
 
 ## M3 — Agent Engine
 Status: COMPLETE
