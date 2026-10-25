@@ -1,5 +1,3 @@
-from sqlalchemy import create_engine
-
 from src.company.mission_controller.planner import build_mission_plan
 from src.company.mission_jobs import MissionJob, MissionJobStatus, transition_job
 from src.company.persistence import MissionJobRow, MissionJobStore
