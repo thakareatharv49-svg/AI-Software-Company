@@ -1617,3 +1617,35 @@ def test_factory_restore_skips_job_store_failure_and_restores_later_missions() -
     assert factory.restore() == 1
     assert [project.mission.id for project in factory.queue] == [good.id]
 
+@pytest.mark.asyncio
+async def test_factory_processes_each_queued_mission_once_when_all_workers_fail() -> None:
+    """Repeated per-mission failures must not duplicate or starve later queue entries."""
+    class FailingRuntime:
+        async def generate(self, request):
+            raise RuntimeError("injected deterministic worker failure")
+
+    orchestrator = CompanyOrchestrator()
+    controller = MissionController(orchestrator)
+    pipeline = MissionExecutionPipeline(
+        orchestrator,
+        AgentExecutor(FailingRuntime()),
+        AgentRegistry(),
+    )
+    factory = ProjectFactory(orchestrator, controller, pipeline)
+    missions = [
+        CompanyMission(name=f"Stress mission {index}", objective=f"Failure case {index}")
+        for index in range(7)
+    ]
+    projects = [factory.enqueue(mission) for mission in missions]
+
+    results = await factory.run(max_projects=len(missions), max_retries=0)
+
+    assert len(results) == len(missions)
+    assert {project.mission.id for project in results} == {
+        mission.id for mission in missions
+    }
+    assert len({project.mission.id for project in results}) == len(missions)
+    assert all(project.status == "blocked" for project in projects)
+    assert factory.queue == []
+    assert orchestrator.state.status.value == "blocked"
+
